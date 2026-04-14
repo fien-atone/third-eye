@@ -232,6 +232,14 @@ export default function App() {
     setSelectedProviders(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
+  const serverDown = providersQuery.isError || overviewQuery.isError
+  const retryAll = () => {
+    qc.invalidateQueries({ queryKey: ['providers'] })
+    qc.invalidateQueries({ queryKey: ['projects'] })
+    qc.invalidateQueries({ queryKey: ['overview'] })
+    qc.invalidateQueries({ queryKey: ['insights'] })
+  }
+
   return (
     <div className="app">
       <div className="header">
@@ -264,6 +272,8 @@ export default function App() {
           <ThemeToggle theme={theme} setTheme={setTheme} />
         </div>
       </div>
+
+      {serverDown && <ServerDownBanner onRetry={retryAll} />}
 
       <div className="controls">
         <div className="group">
@@ -434,6 +444,27 @@ function HelpTip({ children }: { children: React.ReactNode }) {
         </div>
       )}
     </>
+  )
+}
+
+function ServerDownBanner({ onRetry }: { onRetry: () => void }) {
+  const t = useT()
+  return (
+    <div className="server-down">
+      <div className="server-down-head">
+        <span className="server-down-icon" aria-hidden="true">⚠</span>
+        <div className="server-down-body">
+          <div className="server-down-title">{t('server.down.title')}</div>
+          <div className="server-down-msg">{t('server.down.msg')}</div>
+        </div>
+        <button className="primary" onClick={onRetry}>{t('server.down.retry')}</button>
+      </div>
+      <div className="server-down-cmds">
+        <div className="cmd-row"><span className="cmd-label">{t('server.down.docker')}</span><code>docker compose up -d</code></div>
+        <div className="cmd-row"><span className="cmd-label">{t('server.down.node')}</span><code>npm start</code></div>
+        <div className="cmd-row"><span className="cmd-label">{t('server.down.check')}</span><code><a href="http://localhost:4317/api/health" target="_blank" rel="noreferrer">http://localhost:4317/api/health</a></code></div>
+      </div>
+    </div>
   )
 }
 
@@ -711,7 +742,7 @@ function VersionsPanel({ rows }: { rows: VersionRow[] }) {
                 <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={88} paddingAngle={1} isAnimationActive={false}>
                   {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="var(--panel)" strokeWidth={2} />)}
                 </Pie>
-                <Tooltip content={<VersionTooltip total={total} fmt={fmt} />} />
+                <Tooltip content={<VersionTooltip total={total} fmt={fmt} />} animationDuration={0} isAnimationActive={false} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -1036,7 +1067,7 @@ function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectVi
               <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
               <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={v => `$${v}`} width={70} />
-              <Tooltip content={<SeriesTooltip />} cursor={{ fill: 'var(--hover)' }} />
+              <Tooltip content={<SeriesTooltip />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
               <Legend wrapperStyle={{ paddingTop: 8 }} iconType="square" />
               {modelNames.map((m, i) => {
                 const isLast = i === modelNames.length - 1
@@ -1071,7 +1102,7 @@ function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectVi
               <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
               <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={fmtInt} width={60} />
-              <Tooltip content={<CallsTooltip />} cursor={{ fill: 'var(--hover)' }} />
+              <Tooltip content={<CallsTooltip />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
               <Bar dataKey="calls" fill="var(--chart-2)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
@@ -1094,7 +1125,7 @@ function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectVi
                 <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" tickFormatter={v => `$${v}`} tickLine={false} axisLine={{ stroke: 'var(--grid)' }} />
                 <YAxis type="category" dataKey="name" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} width={110} />
-                <Tooltip content={<RowTooltip />} cursor={{ fill: 'var(--hover)' }} />
+                <Tooltip content={<RowTooltip />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
                 <Bar dataKey="cost" fill="var(--chart-1)" radius={[0, 4, 4, 0]} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
@@ -1173,7 +1204,7 @@ function TokensPanel({ series, granularity: _g, hasData }: { series: Array<Recor
             <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
             <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={fmtTokens} width={60} />
-            <Tooltip content={<TokenTooltip />} cursor={{ fill: 'var(--hover)' }} />
+            <Tooltip content={<TokenTooltip />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
             <Legend wrapperStyle={{ paddingTop: 8 }} iconType="square" />
             {bars.map((b, i) => (
               <Bar

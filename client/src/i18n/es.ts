@@ -155,6 +155,13 @@ export const es: Dict = {
   'common.empty': 'Sin datos en este rango.',
   'common.emptyChart': 'Sin datos',
   'common.emptyChartHint': 'Nada coincide con tus filtros actuales en este período.',
+
+  'server.down.title': 'No se puede contactar el servidor Third Eye',
+  'server.down.msg': 'El backend en localhost:4317 no responde. Tus datos están seguros en disco — solo falta que el proceso del servidor esté corriendo.',
+  'server.down.docker': 'Si instalaste con Docker, ejecuta',
+  'server.down.node': 'Si instalaste con Node, ejecuta',
+  'server.down.check': 'Luego verifica',
+  'server.down.retry': 'Reintentar',
   'common.total': 'Total',
   'common.share': 'Parte',
 

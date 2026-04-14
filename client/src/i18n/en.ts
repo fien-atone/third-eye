@@ -168,6 +168,13 @@ export const en = {
   'common.empty': 'No data in this range.',
   'common.emptyChart': 'No data',
   'common.emptyChartHint': 'Nothing matches your current filters in this period.',
+
+  'server.down.title': "Can't reach the Third Eye server",
+  'server.down.msg': 'The backend at localhost:4317 is not responding. Your data is safe on disk — the UI just needs the server process running to show it.',
+  'server.down.docker': 'If you installed via Docker: run',
+  'server.down.node': 'If you installed via Node: run',
+  'server.down.check': 'Then check',
+  'server.down.retry': 'Retry',
   'common.total': 'Total',
   'common.share': 'Share',
 

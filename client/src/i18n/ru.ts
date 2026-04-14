@@ -155,6 +155,13 @@ export const ru: Dict = {
   'common.empty': 'В этом диапазоне данных нет.',
   'common.emptyChart': 'Нет данных',
   'common.emptyChartHint': 'В этом периоде ничего не подходит под текущие фильтры.',
+
+  'server.down.title': 'Сервер Third Eye недоступен',
+  'server.down.msg': 'Бэкенд на localhost:4317 не отвечает. Данные на диске в порядке — просто процесс сервера не запущен.',
+  'server.down.docker': 'Если ставил через Docker — выполни',
+  'server.down.node': 'Если ставил через Node — выполни',
+  'server.down.check': 'Потом проверь',
+  'server.down.retry': 'Повторить',
   'common.total': 'Всего',
   'common.share': 'Доля',
 

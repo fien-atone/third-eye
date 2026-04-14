@@ -155,6 +155,13 @@ export const de: Dict = {
   'common.empty': 'Keine Daten in diesem Bereich.',
   'common.emptyChart': 'Keine Daten',
   'common.emptyChartHint': 'In diesem Zeitraum passt nichts zu deinen aktuellen Filtern.',
+
+  'server.down.title': 'Third-Eye-Server nicht erreichbar',
+  'server.down.msg': 'Das Backend auf localhost:4317 antwortet nicht. Deine Daten sind sicher auf der Platte — nur der Server-Prozess läuft gerade nicht.',
+  'server.down.docker': 'Falls per Docker installiert, führe aus',
+  'server.down.node': 'Falls per Node installiert, führe aus',
+  'server.down.check': 'Dann prüfe',
+  'server.down.retry': 'Erneut versuchen',
   'common.total': 'Gesamt',
   'common.share': 'Anteil',
 

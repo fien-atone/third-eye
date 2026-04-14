@@ -1,13 +1,21 @@
 {
   "name": "third-eye",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "description": "Self-hosted web dashboard for AI coding spend — Claude Code, Desktop/Cowork, Codex CLI",
   "license": "MIT",
   "author": "Ivan Shumov <contact@ivanshumov.com>",
-  "repository": { "type": "git", "url": "https://github.com/fien-atone/third-eye" },
-  "workspaces": ["server", "client"],
-  "engines": { "node": ">=20" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fien-atone/third-eye"
+  },
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "npm run build && npm --prefix server start",
     "build": "npm --prefix client run build",

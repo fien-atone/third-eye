@@ -155,6 +155,13 @@ export const zh: Dict = {
   'common.empty': '本范围内无数据。',
   'common.emptyChart': '无数据',
   'common.emptyChartHint': '当前过滤条件下该周期没有匹配数据。',
+
+  'server.down.title': '无法连接到 Third Eye 服务器',
+  'server.down.msg': 'localhost:4317 上的后端没有响应。磁盘上的数据安全 — 只是服务器进程没有运行。',
+  'server.down.docker': '如果通过 Docker 安装:运行',
+  'server.down.node': '如果通过 Node 安装:运行',
+  'server.down.check': '然后检查',
+  'server.down.retry': '重试',
   'common.total': '总计',
   'common.share': '占比',
 
