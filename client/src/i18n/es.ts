@@ -18,6 +18,11 @@ export const es: Dict = {
   'controls.week': 'Semana',
   'controls.month': 'Mes',
   'controls.allProviders': 'Todos los proveedores',
+  'preset.7d': '7d',
+  'preset.30d': '30d',
+  'preset.12w': '12sem',
+  'preset.mtd': 'Mes',
+  'preset.12m': '12m',
   'controls.providerCalls': 'llamadas',
 
   'summary.days': 'días',

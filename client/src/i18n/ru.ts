@@ -18,6 +18,11 @@ export const ru: Dict = {
   'controls.week': 'Неделя',
   'controls.month': 'Месяц',
   'controls.allProviders': 'Все вендоры',
+  'preset.7d': '7д',
+  'preset.30d': '30д',
+  'preset.12w': '12н',
+  'preset.mtd': 'Мес.',
+  'preset.12m': '12м',
   'controls.providerCalls': 'вызовов',
 
   'summary.days': 'дней',

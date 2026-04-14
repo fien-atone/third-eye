@@ -18,6 +18,11 @@ export const zh: Dict = {
   'controls.week': '周',
   'controls.month': '月',
   'controls.allProviders': '所有厂商',
+  'preset.7d': '7天',
+  'preset.30d': '30天',
+  'preset.12w': '12周',
+  'preset.mtd': '本月',
+  'preset.12m': '12月',
   'controls.providerCalls': '次调用',
 
   'summary.days': '天',

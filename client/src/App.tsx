@@ -118,13 +118,14 @@ function formatFrameRange(startISO: string, endISO: string, g: Granularity, dl: 
   return `${format(s, 'PP', { locale: dl })} - ${format(e, 'PP', { locale: dl })}`
 }
 
-type Preset = { label: string; get: (weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6) => { start: Date; end: Date; granularity: Granularity } }
+type PresetKey = 'preset.7d' | 'preset.30d' | 'preset.12w' | 'preset.mtd' | 'preset.12m'
+type Preset = { key: PresetKey; get: (weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6) => { start: Date; end: Date; granularity: Granularity } }
 const PRESETS: Preset[] = [
-  { label: '7d',  get: () => ({ start: subDays(new Date(), 6), end: new Date(), granularity: 'day' }) },
-  { label: '30d', get: () => ({ start: subDays(new Date(), 29), end: new Date(), granularity: 'day' }) },
-  { label: '12w', get: (w) => ({ start: startOfWeek(subDays(new Date(), 83), { weekStartsOn: w }), end: endOfWeek(new Date(), { weekStartsOn: w }), granularity: 'week' }) },
-  { label: 'MTD', get: () => ({ start: startOfMonth(new Date()), end: endOfMonth(new Date()), granularity: 'day' }) },
-  { label: '12m', get: () => {
+  { key: 'preset.7d',  get: () => ({ start: subDays(new Date(), 6), end: new Date(), granularity: 'day' }) },
+  { key: 'preset.30d', get: () => ({ start: subDays(new Date(), 29), end: new Date(), granularity: 'day' }) },
+  { key: 'preset.12w', get: (w) => ({ start: startOfWeek(subDays(new Date(), 83), { weekStartsOn: w }), end: endOfWeek(new Date(), { weekStartsOn: w }), granularity: 'week' }) },
+  { key: 'preset.mtd', get: () => ({ start: startOfMonth(new Date()), end: endOfMonth(new Date()), granularity: 'day' }) },
+  { key: 'preset.12m', get: () => {
     const e = new Date()
     const s = new Date(e.getFullYear() - 1, e.getMonth(), 1)
     return { start: s, end: endOfMonth(e), granularity: 'month' }
@@ -287,12 +288,12 @@ export default function App() {
         <div className="sep" />
         <div className="group">
           {PRESETS.map(p => (
-            <button key={p.label} onClick={() => {
+            <button key={p.key} onClick={() => {
               const v = p.get(weekStartsOn)
               setStart(v.start)
               setEnd(v.end)
               setGranularity(v.granularity)
-            }}>{p.label}</button>
+            }}>{t(p.key)}</button>
           ))}
           <span className="date-range-inline">
             <DateField value={start} onChange={setStart} />

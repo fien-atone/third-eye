@@ -19,6 +19,11 @@ export const en = {
   'controls.week': 'Week',
   'controls.month': 'Month',
   'controls.allProviders': 'All providers',
+  'preset.7d': '7d',
+  'preset.30d': '30d',
+  'preset.12w': '12w',
+  'preset.mtd': 'MTD',
+  'preset.12m': '12m',
   'controls.providerCalls': 'calls',
 
   // Summary

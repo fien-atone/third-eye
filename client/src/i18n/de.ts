@@ -18,6 +18,11 @@ export const de: Dict = {
   'controls.week': 'Woche',
   'controls.month': 'Monat',
   'controls.allProviders': 'Alle Anbieter',
+  'preset.7d': '7T',
+  'preset.30d': '30T',
+  'preset.12w': '12W',
+  'preset.mtd': 'Monat',
+  'preset.12m': '12M',
   'controls.providerCalls': 'Aufrufe',
 
   'summary.days': 'Tage',
