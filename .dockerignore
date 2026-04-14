@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/data
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/.git
+**/.DS_Store
+**/.env
+**/tmp
+**/*.log

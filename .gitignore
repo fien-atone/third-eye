@@ -1,0 +1,33 @@
+# Dependencies
+**/node_modules/
+
+# Build output
+**/dist/
+**/build/
+
+# Local SQLite DB — contains session data, never commit
+**/data/
+**/*.db
+**/*.db-wal
+**/*.db-shm
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# OS cache
+.cache/
+Thumbs.db

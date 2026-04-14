@@ -1,0 +1,29 @@
+{
+  "name": "third-eye-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch index.ts",
+    "start": "tsx index.ts",
+    "ingest": "tsx ingest.ts",
+    "ingest:full": "tsx ingest.ts --full",
+    "ingest:rebuild": "tsx ingest.ts --rebuild",
+    "ingest:hour": "tsx ingest.ts --since=1h",
+    "ingest:day": "tsx ingest.ts --since=24h",
+    "ingest:week": "tsx ingest.ts --since=7d"
+  },
+  "dependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.9.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.5.0",
+    "typescript": "^5.5.0"
+  }
+}
