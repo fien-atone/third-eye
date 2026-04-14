@@ -111,20 +111,30 @@ npm run ingest:rebuild               # interactive
 npm --prefix server run ingest:rebuild -- --yes   # cron/CI
 ```
 
-### Automated refresh (non-Docker)
+### Automated hourly refresh (non-Docker)
 
-**Unix cron** — hourly incremental + nightly full:
+**One command**, cross-platform:
 
-```cron
-5 * * * *  cd /path/to/third-eye && /usr/local/bin/npm run ingest:hour --silent >> /tmp/third-eye.log 2>&1
-30 3 * * * cd /path/to/third-eye && /usr/local/bin/npm run ingest      --silent >> /tmp/third-eye.log 2>&1
+```bash
+npm run schedule:install      # register hourly ingest
+npm run schedule:status       # check it's live + see recent log
+npm run schedule:uninstall    # remove
 ```
 
-**Windows Task Scheduler** — trigger Daily / repeat every 1 hour, action
-`powershell -NoProfile -Command "cd 'C:\path\to\third-eye'; npm run ingest:hour"`.
+What it does under the hood, per OS:
 
-**Inside Docker** — nothing to set up. `CODEBURN_INGEST_INTERVAL_MIN` env var
-controls it (default 15 min window 2h).
+| Platform | Mechanism | Where it lives |
+|---|---|---|
+| macOS   | `launchd` user agent | `~/Library/LaunchAgents/org.thirdeye.ingest.plist` |
+| Linux   | `cron` user crontab  | `crontab -l` (tagged `# org.thirdeye.ingest`) |
+| Windows | `schtasks` user task | Task Scheduler → `ThirdEyeIngest` |
+
+Runs `npm run ingest:hour` every hour. Uses absolute paths to `npm` so it
+works under `nvm`, Homebrew, `fnm`, etc. Logs go to `~/.third-eye-ingest.log`.
+Safe to run the installer multiple times — it replaces any existing entry.
+
+**Inside Docker** — nothing to install. `CODEBURN_INGEST_INTERVAL_MIN` env
+controls in-container auto-refresh (default: 15 min / window 2h).
 
 ## Windows specifics
 

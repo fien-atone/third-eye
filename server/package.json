@@ -11,7 +11,10 @@
     "ingest:rebuild": "tsx ingest.ts --rebuild",
     "ingest:hour": "tsx ingest.ts --since=1h",
     "ingest:day": "tsx ingest.ts --since=24h",
-    "ingest:week": "tsx ingest.ts --since=7d"
+    "ingest:week": "tsx ingest.ts --since=7d",
+    "schedule:install": "tsx schedule.ts install",
+    "schedule:uninstall": "tsx schedule.ts uninstall",
+    "schedule:status": "tsx schedule.ts status"
   },
   "dependencies": {
     "@types/better-sqlite3": "^7.6.13",

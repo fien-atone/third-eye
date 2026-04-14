@@ -1,6 +1,6 @@
 {
   "name": "third-eye",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Self-hosted web dashboard for AI coding spend — Claude Code, Desktop/Cowork, Codex CLI",
   "license": "MIT",
@@ -18,6 +18,9 @@
     "ingest:day": "npm --prefix server run ingest:day",
     "ingest:week": "npm --prefix server run ingest:week",
     "ingest:rebuild": "npm --prefix server run ingest:rebuild",
+    "schedule:install": "npm --prefix server run schedule:install",
+    "schedule:uninstall": "npm --prefix server run schedule:uninstall",
+    "schedule:status": "npm --prefix server run schedule:status",
     "typecheck": "npm --prefix client exec -- tsc --noEmit"
   },
   "devDependencies": {
