@@ -1146,12 +1146,12 @@ function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectVi
               <tbody>
                 {data.projects.slice(0, 12).map(p => (
                   <tr key={p.name} className="clickable" onClick={() => onSelectProject(p.name)}>
-                    <td title={p.name} style={{ maxWidth: 380, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {shortenProject(p.name)}
-                      <span className="open-arrow">→</span>
+                    <td title={p.name} className="project-cell">
+                      <span className="project-name">{shortenProject(p.name)}</span>
                     </td>
                     <td className="num">{fmtInt(p.calls)}</td>
                     <td className="num">{fmtCurrency(p.cost)}</td>
+                    <td className="open-arrow-cell"><span className="open-arrow">→</span></td>
                   </tr>
                 ))}
               </tbody>

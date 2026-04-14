@@ -409,18 +409,31 @@ table.breakdown td .swatch {
 
 table.breakdown tr.clickable { cursor: pointer; }
 table.breakdown tr.clickable:hover td { color: var(--text); }
-table.breakdown td .open-arrow {
+/* Dedicated arrow column — all arrows align vertically on the right edge */
+table.breakdown td.open-arrow-cell {
+  width: 24px;
+  text-align: right;
+  padding-right: 10px;
+}
+table.breakdown td.open-arrow-cell .open-arrow {
   color: var(--text-dim);
-  margin-left: 8px;
   opacity: 0.5;
-  transition: opacity 0.12s, transform 0.12s;
+  transition: opacity 0.12s, transform 0.12s, color 0.12s;
   display: inline-block;
 }
-table.breakdown tr.clickable td .open-arrow { opacity: 0.6; }
-table.breakdown tr.clickable:hover td .open-arrow {
+table.breakdown tr.clickable:hover td.open-arrow-cell .open-arrow {
   opacity: 1;
   color: var(--accent);
   transform: translateX(3px);
+}
+
+/* Project name cell — truncate cleanly on the left, leave arrow column alone */
+table.breakdown td.project-cell { overflow: hidden; }
+table.breakdown td.project-cell .project-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grid {

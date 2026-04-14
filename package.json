@@ -1,6 +1,6 @@
 {
   "name": "third-eye",
-  "version": "1.2.2",
+  "version": "1.1.0",
   "private": true,
   "description": "Self-hosted web dashboard for AI coding spend — Claude Code, Desktop/Cowork, Codex CLI",
   "license": "MIT",
