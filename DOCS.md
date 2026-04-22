@@ -210,7 +210,7 @@ in `strftime` to align weekly buckets.
 
 ## Sharing your data
 
-SQLite is a single file: `server/data/third-eye.db`.
+SQLite is a single file: `server/data/codeburn.db`.
 
 1. Copy it to the target machine.
 2. Run Third Eye there without mounting `~/.claude` / `~/.codex` — the data is
@@ -243,6 +243,14 @@ USER_HOME=C:\Users\your-name
 
 For the Node-native path, the scheduler uses `schtasks.exe /Create /SC HOURLY`
 and resolves the absolute `npm` path via `where npm` at install time.
+
+---
+
+## Upgrading
+
+See [UPGRADING.md](./UPGRADING.md) for the safe upgrade procedure. Short
+version: back up `server/data/codeburn.db`, then pull and restart.
+Schema migrations apply automatically on startup; data is preserved.
 
 ---
 

@@ -28,6 +28,7 @@ ephemeral ones from Cowork.
 
 - **Cost breakdowns** by model, project, activity, git branch — any date range, any aggregation (day / week / month)
 - **Per-project drill-down** — click any project, get the full story: files you edit most, tools you invoke, subagents you spawn, skills you trigger, MCP servers you lean on
+- **Projects registry** — search, sort, rename, pin favourites; ⌘/Ctrl/middle-click any row to open the project in a new tab
 - **Activity heatmap** — 7×24 grid showing when you actually work on each project
 - **Claude Code version tracking** — see which CLI versions touched each project, distribution by cost / calls / tokens
 - **Shareable project URLs** — stable UUID in the hash, bookmark it, send it
@@ -109,6 +110,11 @@ honest screenshots are the ones you make yourself once it's running.*
 - **[DOCS.md](./DOCS.md)** — tech stack, API reference, full ingest / scheduler
   docs, Windows specifics, cost calculation math, timezone handling,
   dev-mode setup, project layout, data-sharing how-to.
+- **[UPGRADING.md](./UPGRADING.md)** — safe upgrade procedure for new
+  releases. TL;DR: back up the DB file, then `git pull && npm install &&
+  npm start` (or `docker compose pull && docker compose up -d --build`).
+- **[CHANGELOG.md](./CHANGELOG.md)** — what's new in each release, fixes,
+  removals, and internals worth knowing.
 
 ## License & credits
 

@@ -79,6 +79,10 @@ function migrate(d: Database.Database) {
   addCol("ALTER TABLE api_calls ADD COLUMN has_plan_mode INTEGER NOT NULL DEFAULT 0")
   addCol("ALTER TABLE api_calls ADD COLUMN has_todo_write INTEGER NOT NULL DEFAULT 0")
   addCol("ALTER TABLE api_calls ADD COLUMN file_count INTEGER NOT NULL DEFAULT 0")
+
+  // User-editable project metadata
+  addCol("ALTER TABLE projects ADD COLUMN custom_label TEXT")
+  addCol("ALTER TABLE projects ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
 }
 
 export function truncateAll(): { calls: number; projects: number } {

@@ -108,9 +108,51 @@ const PROVIDER_DISPLAY: Record<string, string> = {
   codex: 'Codex (OpenAI)',
 }
 
+/** Single source of truth for project-label resolution.
+ *  Priority: user's custom rename → algorithmic auto-label → raw filesystem key.
+ *  Used everywhere the UI needs to display "the project's name". */
+function resolveLabel(row: { custom_label: string | null; label: string | null; key: string }): string {
+  return row.custom_label ?? row.label ?? row.key
+}
+
+/** Round a USD amount for JSON serialization. 4 decimals = 0.01¢ precision —
+ *  finer than any real-world cost we report. Returns 0 for null/undefined/NaN
+ *  so a missing aggregate never leaks `null` or `NaN` into the response. */
+function roundUsd(n: number | null | undefined): number {
+  if (n == null || !Number.isFinite(n)) return 0
+  return Number(n.toFixed(4))
+}
+
+/** Standard projection of the projects table. Add a column here once and it
+ *  shows up in every project lookup automatically — no risk of one endpoint
+ *  forgetting a new field (as happened with `is_favorite` initially). */
+type ProjectRow = {
+  id: string
+  key: string
+  label: string | null
+  custom_label: string | null
+  is_favorite: number
+}
+// NB: `archived` column still exists in the DB (kept for backwards-compat /
+// data preservation) but the feature was removed from the UI — if you ever
+// bring it back, add it here and it'll flow through every project lookup.
+const PROJECT_COLS = 'id, key, label, custom_label, is_favorite'
+
+function getProjectById(d: ReturnType<typeof db>, id: string): ProjectRow | undefined {
+  return d.prepare(`SELECT ${PROJECT_COLS} FROM projects WHERE id = ?`).get(id) as ProjectRow | undefined
+}
+function getProjectByKey(d: ReturnType<typeof db>, key: string): ProjectRow | undefined {
+  return d.prepare(`SELECT ${PROJECT_COLS} FROM projects WHERE key = ?`).get(key) as ProjectRow | undefined
+}
+function getProjectsByKeys(d: ReturnType<typeof db>, keys: string[]): ProjectRow[] {
+  if (keys.length === 0) return []
+  const placeholders = keys.map(() => '?').join(',')
+  return d.prepare(`SELECT ${PROJECT_COLS} FROM projects WHERE key IN (${placeholders})`).all(...keys) as ProjectRow[]
+}
+
 app.get('/api/projects', (_req, res) => {
   const rows = db().prepare(`
-    SELECT p.id, p.key, p.label,
+    SELECT p.id, p.key, p.label, p.custom_label, p.is_favorite,
            COUNT(c.dedup_key) AS calls,
            COALESCE(SUM(c.cost_usd), 0) AS cost,
            MIN(c.ts) AS first_ts,
@@ -120,13 +162,61 @@ app.get('/api/projects', (_req, res) => {
     GROUP BY p.id
     HAVING calls > 0
     ORDER BY cost DESC
-  `).all() as Array<{ id: string; key: string; label: string | null; calls: number; cost: number; first_ts: string; last_ts: string }>
+  `).all() as Array<{
+    id: string; key: string; label: string | null; custom_label: string | null;
+    is_favorite: number; calls: number; cost: number;
+    first_ts: string; last_ts: string
+  }>
   res.json({
     projects: rows.map(r => ({
-      id: r.id, key: r.key, label: r.label ?? r.key,
-      calls: r.calls, cost: Number(r.cost.toFixed(4)),
-      firstTs: r.first_ts, lastTs: r.last_ts,
+      id: r.id,
+      key: r.key,
+      label: resolveLabel(r),
+      autoLabel: r.label ?? r.key,
+      customLabel: r.custom_label,
+      favorite: r.is_favorite === 1,
+      calls: r.calls,
+      cost: roundUsd(r.cost),
+      firstTs: r.first_ts,
+      lastTs: r.last_ts,
     })),
+  })
+})
+
+// User-editable project metadata. Body: { customLabel?: string|null, favorite?: boolean }
+// Pass customLabel: null (or empty string) to clear the override.
+app.patch('/api/projects/:id', (req, res) => {
+  const id = req.params.id
+  const body = req.body as { customLabel?: string | null; favorite?: boolean }
+  const d = db()
+  const existing = d.prepare('SELECT id FROM projects WHERE id = ?').get(id) as { id: string } | undefined
+  if (!existing) return res.status(404).json({ error: 'project not found' })
+
+  const updates: string[] = []
+  const params: unknown[] = []
+  if ('customLabel' in body) {
+    const cl = body.customLabel
+    const norm = typeof cl === 'string' && cl.trim() ? cl.trim().slice(0, 200) : null
+    updates.push('custom_label = ?')
+    params.push(norm)
+  }
+  if ('favorite' in body) {
+    updates.push('is_favorite = ?')
+    params.push(body.favorite ? 1 : 0)
+  }
+  if (updates.length === 0) return res.status(400).json({ error: 'no updatable fields in body' })
+
+  params.push(id)
+  d.prepare(`UPDATE projects SET ${updates.join(', ')} WHERE id = ?`).run(...params)
+
+  const row = getProjectById(d, id)!
+  res.json({
+    id: row.id,
+    key: row.key,
+    label: resolveLabel(row),
+    autoLabel: row.label ?? row.key,
+    customLabel: row.custom_label,
+    favorite: row.is_favorite === 1,
   })
 })
 
@@ -143,7 +233,7 @@ app.get('/api/providers', (_req, res) => {
       id: r.provider,
       label: PROVIDER_DISPLAY[r.provider] ?? r.provider,
       calls: r.calls,
-      cost: Number((r.cost ?? 0).toFixed(4)),
+      cost: roundUsd(r.cost),
       firstTs: r.first_ts,
       lastTs: r.last_ts,
     })),
@@ -181,11 +271,11 @@ app.get('/api/overview', (req, res) => {
   let projectKey: string | null = null
   let projectLabel: string | null = null
   if (projectIdRaw) {
-    const row = db().prepare('SELECT id, key, label FROM projects WHERE id = ?').get(projectIdRaw) as { id: string; key: string; label: string | null } | undefined
-    if (row) { projectId = row.id; projectKey = row.key; projectLabel = row.label }
+    const row = getProjectById(db(), projectIdRaw)
+    if (row) { projectId = row.id; projectKey = row.key; projectLabel = resolveLabel(row) }
   } else if (projectKeyRaw) {
-    const row = db().prepare('SELECT id, key, label FROM projects WHERE key = ?').get(projectKeyRaw) as { id: string; key: string; label: string | null } | undefined
-    if (row) { projectId = row.id; projectKey = row.key; projectLabel = row.label }
+    const row = getProjectByKey(db(), projectKeyRaw)
+    if (row) { projectId = row.id; projectKey = row.key; projectLabel = resolveLabel(row) }
     else projectKey = projectKeyRaw
   }
 
@@ -239,17 +329,25 @@ app.get('/api/overview', (req, res) => {
     ORDER BY cost DESC
   `).all(...baseParams) as Array<{ name: string; calls: number; cost: number }>
 
-  const projectTotals = d.prepare(`
+  const projectTotals = (d.prepare(`
     SELECT project AS name, COUNT(*) AS calls, SUM(cost_usd) AS cost
     FROM api_calls
     WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where}
     GROUP BY project
     ORDER BY cost DESC
-    LIMIT 30
-  `).all(...baseParams) as Array<{ name: string; calls: number; cost: number }>
+  `).all(...baseParams) as Array<{ name: string; calls: number; cost: number }>)
+    .slice(0, 30)
 
-  // Per-project per-bucket breakdown for the new "Work by project" stacked chart.
-  // Top N by cost in current range, rest aggregated as "__other".
+  // Resolve labels for ALL projectTotals (not just topProjectKeys) so the
+  // dashboard's Top Projects table shows custom_label too. One extra query
+  // for ~30 keys; cheap.
+  const allProjectMeta: Record<string, { label: string; id: string | null; favorite: boolean }> = {}
+  for (const r of getProjectsByKeys(d, projectTotals.map(p => p.name))) {
+    allProjectMeta[r.key] = { label: resolveLabel(r), id: r.id, favorite: r.is_favorite === 1 }
+  }
+
+  // Per-project per-bucket breakdown for the "Project activity" stacked chart.
+  // Top N by cost in current range, rest → "__other".
   const TOP_N_PROJECTS = 8
   const topProjectKeys = projectTotals.slice(0, TOP_N_PROJECTS).map(p => p.name)
   const projectBucketRows = topProjectKeys.length > 0
@@ -260,12 +358,9 @@ app.get('/api/overview', (req, res) => {
         GROUP BY bucket, project
       `).all(...baseParams) as Array<{ bucket: string; project: string; cost: number }>
     : []
-  // Resolve project labels + ids (for click-to-drill) in one lookup.
   const projectMeta: Record<string, { label: string; id: string | null }> = {}
-  if (topProjectKeys.length > 0) {
-    const placeholders = topProjectKeys.map(() => '?').join(',')
-    const rows = d.prepare(`SELECT key, id, label FROM projects WHERE key IN (${placeholders})`).all(...topProjectKeys) as Array<{ key: string; id: string; label: string | null }>
-    for (const r of rows) projectMeta[r.key] = { label: r.label ?? r.key, id: r.id }
+  for (const r of getProjectsByKeys(d, topProjectKeys)) {
+    projectMeta[r.key] = { label: resolveLabel(r), id: r.id }
   }
 
   const totals = d.prepare(`
@@ -303,7 +398,7 @@ app.get('/api/overview', (req, res) => {
     const s = seriesMap.get(k)
     const row: Record<string, number | string> = {
       bucket: k,
-      cost: Number((s?.cost ?? 0).toFixed(4)),
+      cost: roundUsd(s?.cost),
       calls: s?.calls ?? 0,
       inputTokens: s?.input_tokens ?? 0,
       outputTokens: s?.output_tokens ?? 0,
@@ -311,10 +406,10 @@ app.get('/api/overview', (req, res) => {
       cacheWrite: s?.cache_write ?? 0,
     }
     const mb = modelByBucket.get(k)
-    for (const m of topModels) row[`model:${m}`] = Number((mb?.get(m) ?? 0).toFixed(4))
+    for (const m of topModels) row[`model:${m}`] = roundUsd(mb?.get(m))
     const pb = projectByBucket.get(k)
-    for (const key of topProjectKeys) row[`project:${key}`] = Number((pb?.get(key) ?? 0).toFixed(4))
-    row['project:__other'] = Number((pb?.get('__other') ?? 0).toFixed(4))
+    for (const key of topProjectKeys) row[`project:${key}`] = roundUsd(pb?.get(key))
+    row['project:__other'] = roundUsd(pb?.get('__other'))
     return row
   })
 
@@ -331,7 +426,7 @@ app.get('/api/overview', (req, res) => {
       project: projectKey ? { id: projectId, key: projectKey, label: projectLabel ?? projectKey } : null,
     },
     totals: {
-      cost: Number((totals.cost ?? 0).toFixed(4)),
+      cost: roundUsd(totals.cost),
       calls: totals.calls ?? 0,
       inputTokens: totals.input_tokens ?? 0,
       outputTokens: totals.output_tokens ?? 0,
@@ -341,26 +436,36 @@ app.get('/api/overview', (req, res) => {
     },
     series,
     models: modelTotals.map(m => ({
-      name: m.name, calls: m.calls, cost: Number(m.cost.toFixed(4)),
+      name: m.name, calls: m.calls, cost: roundUsd(m.cost),
       inputTokens: m.input_tokens, outputTokens: m.output_tokens,
       cacheRead: m.cache_read, cacheWrite: m.cache_write,
     })),
-    categories: categoryTotals.map(c => ({ name: c.name, calls: c.calls, cost: Number(c.cost.toFixed(4)) })),
-    projects: projectTotals.map(p => ({ name: p.name, calls: p.calls, cost: Number(p.cost.toFixed(4)) })),
+    categories: categoryTotals.map(c => ({ name: c.name, calls: c.calls, cost: roundUsd(c.cost) })),
+    projects: projectTotals.map(p => {
+      const meta = allProjectMeta[p.name]
+      return {
+        name: p.name,                              // raw key, used for click-to-drill lookup
+        label: meta?.label ?? p.name,              // effective label (custom or auto)
+        id: meta?.id ?? null,
+        favorite: meta?.favorite ?? false,
+        calls: p.calls,
+        cost: roundUsd(p.cost),
+      }
+    }),
     topProjects: topProjectKeys.map(key => {
       const tot = projectTotals.find(p => p.name === key)!
       const meta = projectMeta[key]
-      return { key, id: meta?.id ?? null, label: meta?.label ?? key, cost: Number(tot.cost.toFixed(4)), calls: tot.calls }
+      return { key, id: meta?.id ?? null, label: meta?.label ?? key, cost: roundUsd(tot.cost), calls: tot.calls }
     }),
     otherProjects: projectTotals.length > TOP_N_PROJECTS
-      ? { count: projectTotals.length - TOP_N_PROJECTS, cost: Number(projectTotals.slice(TOP_N_PROJECTS).reduce((s, p) => s + p.cost, 0).toFixed(4)) }
+      ? { count: projectTotals.length - TOP_N_PROJECTS, cost: roundUsd(projectTotals.slice(TOP_N_PROJECTS).reduce((s, p) => s + p.cost, 0)) }
       : { count: 0, cost: 0 },
     lastIngestAt: getMeta('last_ingest_at'),
   })
 })
 
 app.get('/api/insights/:projectId', (req, res) => {
-  const proj = db().prepare('SELECT key FROM projects WHERE id = ?').get(req.params.projectId) as { key: string } | undefined
+  const proj = getProjectById(db(), req.params.projectId)
   if (!proj) return res.status(404).json({ error: 'project not found' })
   const projectKey = proj.key
 
@@ -447,15 +552,15 @@ app.get('/api/insights/:projectId', (req, res) => {
   res.json({
     project: { key: projectKey },
     range: { start: new Date(startEpoch).toISOString(), end: new Date(endEpoch).toISOString(), tzOffsetMin: tzMin },
-    subagents: subagents.map(r => ({ ...r, cost: Number(r.cost.toFixed(4)) })),
-    skills: skills.map(r => ({ ...r, cost: Number(r.cost.toFixed(4)) })),
-    mcp: mcp.map(r => ({ ...r, cost: Number(r.cost.toFixed(4)) })),
-    bash: bash.map(r => ({ ...r, cost: Number(r.cost.toFixed(4)) })),
-    files: files.map(r => ({ ...r, cost: Number(r.cost.toFixed(4)) })),
+    subagents: subagents.map(r => ({ ...r, cost: roundUsd(r.cost) })),
+    skills: skills.map(r => ({ ...r, cost: roundUsd(r.cost) })),
+    mcp: mcp.map(r => ({ ...r, cost: roundUsd(r.cost) })),
+    bash: bash.map(r => ({ ...r, cost: roundUsd(r.cost) })),
+    files: files.map(r => ({ ...r, cost: roundUsd(r.cost) })),
     filesUnique,
     flags,
-    branches: branches.map(r => ({ ...r, cost: Number(r.cost.toFixed(4)) })),
-    versions: versions.map(v => ({ ...v, cost: Number(v.cost.toFixed(4)), tokens: v.tokens ?? 0 })),
+    branches: branches.map(r => ({ ...r, cost: roundUsd(r.cost) })),
+    versions: versions.map(v => ({ ...v, cost: roundUsd(v.cost), tokens: v.tokens ?? 0 })),
     heatmap: heatmapRows,
   })
 })
