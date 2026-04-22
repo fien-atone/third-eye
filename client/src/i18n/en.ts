@@ -52,11 +52,11 @@ export const en = {
   'kpi.calls': 'calls',
 
   // Panel: cost by model
-  'panel.costByProject.title': 'Cost by project',
-  'panel.costByProject.subDay': 'Daily totals, stacked',
-  'panel.costByProject.subWeek': 'Weekly totals, stacked',
-  'panel.costByProject.subMonth': 'Monthly totals, stacked',
-  'panel.costByProject.help': 'Each bar is USD spent that period, stacked by project. Top 8 projects by cost get their own color; the rest are grouped as "Other". Click a legend row to drill into that project.',
+  'panel.costByProject.title': 'Project activity',
+  'panel.costByProject.subDay': 'USD per day, stacked by project',
+  'panel.costByProject.subWeek': 'USD per week, stacked by project',
+  'panel.costByProject.subMonth': 'USD per month, stacked by project',
+  'panel.costByProject.help': 'Bar height shows total spend that period; colors show which projects you worked on. Top 8 projects by cost get their own color; the rest are grouped as "Other". Click any pill to drill into that project.',
   'panel.costByProject.other': 'Other',
   'panel.costByProject.otherWith': '{count} more projects',
 

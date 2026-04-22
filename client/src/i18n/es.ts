@@ -47,11 +47,11 @@ export const es: Dict = {
   'kpi.apiCalls': 'llamadas API',
   'kpi.calls': 'llamadas',
 
-  'panel.costByProject.title': 'Costo por proyecto',
-  'panel.costByProject.subDay': 'Totales diarios, apilados',
-  'panel.costByProject.subWeek': 'Totales semanales, apilados',
-  'panel.costByProject.subMonth': 'Totales mensuales, apilados',
-  'panel.costByProject.help': 'Cada barra es el gasto en USD de ese período, apilado por proyecto. Los 8 proyectos principales por costo tienen su propio color; el resto se agrupa como "Otros". Clic en una fila de la leyenda para ver el proyecto.',
+  'panel.costByProject.title': 'Actividad por proyecto',
+  'panel.costByProject.subDay': 'USD por día, apilado por proyecto',
+  'panel.costByProject.subWeek': 'USD por semana, apilado por proyecto',
+  'panel.costByProject.subMonth': 'USD por mes, apilado por proyecto',
+  'panel.costByProject.help': 'La altura de la barra es el gasto total del período; los colores muestran en qué proyectos trabajaste. Los 8 proyectos principales por costo tienen su propio color; el resto se agrupa como "Otros". Clic en cualquier pill para ver el proyecto.',
   'panel.costByProject.other': 'Otros',
   'panel.costByProject.otherWith': '{count} proyectos más',
 

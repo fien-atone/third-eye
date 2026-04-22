@@ -140,6 +140,21 @@ function shortenProject(p: string): string {
   return p.replace(/^-?Users-[^-]+-/, '~/').replace(/-/g, '/')
 }
 
+/**
+ * Compact label for inline pills. Path-aware:
+ *  ~/Desktop/Inoise/Global/TTRPG/app  →  TTRPG/app
+ *  ~/Desktop/Inoise/Global/dnd/character/builder  →  character/builder
+ *  long Cowork prompt text...  →  first ~22 chars + ellipsis
+ */
+function compactProjectLabel(label: string, max = 24): string {
+  if (/[/\\]/.test(label)) {
+    const parts = label.split(/[/\\]+/).filter(Boolean)
+    const tail = parts.length >= 2 ? parts.slice(-2).join('/') : (parts[0] ?? label)
+    return tail.length <= max ? tail : tail.slice(0, max - 1).trimEnd() + '…'
+  }
+  return label.length <= max ? label : label.slice(0, max - 1).trimEnd() + '…'
+}
+
 export default function App() {
   const init = PRESETS[1].get(1)
   const [start, setStart] = useState<Date>(init.start)
@@ -1221,54 +1236,55 @@ function CostByProjectPanel({
       {!hasData || entries.length === 0 ? (
         <ChartEmpty height={340} />
       ) : (
-        <div className="cost-by-project-layout">
-          <div className="cost-by-project-chart">
-            <ResponsiveContainer width="100%" height={340}>
-              <BarChart data={series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barCategoryGap="15%">
-                <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
-                <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={v => `$${v}`} width={70} />
-                <Tooltip content={<ProjectSeriesTooltip entries={entries} />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
-                {entries.map((e, i) => {
-                  const isLast = i === entries.length - 1
-                  return (
-                    <Bar
-                      key={e.dataKey}
-                      dataKey={e.dataKey}
-                      name={e.label}
-                      stackId="cost"
-                      fill={e.color}
-                      radius={isLast ? [3, 3, 0, 0] : 0}
-                      isAnimationActive={false}
-                    />
-                  )
-                })}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="cost-by-project-legend" role="list">
+        <>
+          <div className="activity-pills" role="list">
             {entries.map(e => {
               const isOther = e.dataKey === 'project:__other'
               const clickable = !isOther && !!e.projectKey
+              const shortLabel = isOther
+                ? t('panel.costByProject.other')
+                : compactProjectLabel(e.label)
+              const fullTitle = isOther
+                ? t('panel.costByProject.otherWith', { count: otherProjects.count })
+                : `${e.label} · ${fmtCurrency(e.cost)}`
               return (
                 <button
                   key={e.dataKey}
                   role="listitem"
-                  className={`legend-row${clickable ? ' clickable' : ''}`}
+                  className={`activity-pill${clickable ? ' clickable' : ''}`}
                   onClick={clickable ? () => onSelectProject(e.projectKey) : undefined}
                   disabled={!clickable}
-                  title={isOther ? t('panel.costByProject.otherWith', { count: otherProjects.count }) : e.label}
+                  title={fullTitle}
                 >
-                  <span className="legend-dot" style={{ background: e.color }} />
-                  <span className="legend-label">
-                    {isOther ? `${e.label} · ${t('panel.costByProject.otherWith', { count: otherProjects.count })}` : e.label}
-                  </span>
-                  <span className="legend-cost">{fmtCurrency(e.cost)}</span>
+                  <span className="pill-dot" style={{ background: e.color }} />
+                  <span className="pill-label">{shortLabel}</span>
                 </button>
               )
             })}
           </div>
-        </div>
+          <ResponsiveContainer width="100%" height={340}>
+            <BarChart data={series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barCategoryGap="15%">
+              <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
+              <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={v => `$${v}`} width={70} />
+              <Tooltip content={<ProjectSeriesTooltip entries={entries} />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
+              {entries.map((e, i) => {
+                const isLast = i === entries.length - 1
+                return (
+                  <Bar
+                    key={e.dataKey}
+                    dataKey={e.dataKey}
+                    name={e.label}
+                    stackId="cost"
+                    fill={e.color}
+                    radius={isLast ? [3, 3, 0, 0] : 0}
+                    isAnimationActive={false}
+                  />
+                )
+              })}
+            </BarChart>
+          </ResponsiveContainer>
+        </>
       )}
     </div>
   )

@@ -47,11 +47,11 @@ export const ru: Dict = {
   'kpi.apiCalls': 'API-вызовов',
   'kpi.calls': 'вызовов',
 
-  'panel.costByProject.title': 'Стоимость по проектам',
-  'panel.costByProject.subDay': 'По дням, стэковые столбики',
-  'panel.costByProject.subWeek': 'По неделям, стэковые столбики',
-  'panel.costByProject.subMonth': 'По месяцам, стэковые столбики',
-  'panel.costByProject.help': 'Каждый столбик — USD за период, разбит по проектам. Топ-8 проектов получают свой цвет, остальные сгруппированы как "Прочие". Клик по строке в легенде — детализация проекта.',
+  'panel.costByProject.title': 'Активность по проектам',
+  'panel.costByProject.subDay': 'USD в день, разбит по проектам',
+  'panel.costByProject.subWeek': 'USD в неделю, разбит по проектам',
+  'panel.costByProject.subMonth': 'USD в месяц, разбит по проектам',
+  'panel.costByProject.help': 'Высота столбика — расход за период, цвета — над какими проектами работал. Топ-8 проектов по cost получают свой цвет, остальные сгруппированы как "Прочие". Клик по pill — детализация проекта.',
   'panel.costByProject.other': 'Прочие',
   'panel.costByProject.otherWith': 'ещё {count} проектов',
 
