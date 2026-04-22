@@ -248,6 +248,26 @@ app.get('/api/overview', (req, res) => {
     LIMIT 30
   `).all(...baseParams) as Array<{ name: string; calls: number; cost: number }>
 
+  // Per-project per-bucket breakdown for the new "Work by project" stacked chart.
+  // Top N by cost in current range, rest aggregated as "__other".
+  const TOP_N_PROJECTS = 8
+  const topProjectKeys = projectTotals.slice(0, TOP_N_PROJECTS).map(p => p.name)
+  const projectBucketRows = topProjectKeys.length > 0
+    ? d.prepare(`
+        SELECT ${bucketExpr} AS bucket, project, SUM(cost_usd) AS cost
+        FROM api_calls
+        WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where}
+        GROUP BY bucket, project
+      `).all(...baseParams) as Array<{ bucket: string; project: string; cost: number }>
+    : []
+  // Resolve project labels + ids (for click-to-drill) in one lookup.
+  const projectMeta: Record<string, { label: string; id: string | null }> = {}
+  if (topProjectKeys.length > 0) {
+    const placeholders = topProjectKeys.map(() => '?').join(',')
+    const rows = d.prepare(`SELECT key, id, label FROM projects WHERE key IN (${placeholders})`).all(...topProjectKeys) as Array<{ key: string; id: string; label: string | null }>
+    for (const r of rows) projectMeta[r.key] = { label: r.label ?? r.key, id: r.id }
+  }
+
   const totals = d.prepare(`
     SELECT SUM(cost_usd) AS cost, COUNT(*) AS calls,
            SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
@@ -270,6 +290,15 @@ app.get('/api/overview', (req, res) => {
   }
   const topModels = modelTotals.slice(0, 8).map(m => m.name)
 
+  const topProjectSet = new Set(topProjectKeys)
+  const projectByBucket = new Map<string, Map<string, number>>()
+  for (const r of projectBucketRows) {
+    const key = topProjectSet.has(r.project) ? r.project : '__other'
+    const m = projectByBucket.get(r.bucket) ?? new Map<string, number>()
+    m.set(key, (m.get(key) ?? 0) + r.cost)
+    projectByBucket.set(r.bucket, m)
+  }
+
   const series = bucketKeys.map(k => {
     const s = seriesMap.get(k)
     const row: Record<string, number | string> = {
@@ -283,6 +312,9 @@ app.get('/api/overview', (req, res) => {
     }
     const mb = modelByBucket.get(k)
     for (const m of topModels) row[`model:${m}`] = Number((mb?.get(m) ?? 0).toFixed(4))
+    const pb = projectByBucket.get(k)
+    for (const key of topProjectKeys) row[`project:${key}`] = Number((pb?.get(key) ?? 0).toFixed(4))
+    row['project:__other'] = Number((pb?.get('__other') ?? 0).toFixed(4))
     return row
   })
 
@@ -315,6 +347,14 @@ app.get('/api/overview', (req, res) => {
     })),
     categories: categoryTotals.map(c => ({ name: c.name, calls: c.calls, cost: Number(c.cost.toFixed(4)) })),
     projects: projectTotals.map(p => ({ name: p.name, calls: p.calls, cost: Number(p.cost.toFixed(4)) })),
+    topProjects: topProjectKeys.map(key => {
+      const tot = projectTotals.find(p => p.name === key)!
+      const meta = projectMeta[key]
+      return { key, id: meta?.id ?? null, label: meta?.label ?? key, cost: Number(tot.cost.toFixed(4)), calls: tot.calls }
+    }),
+    otherProjects: projectTotals.length > TOP_N_PROJECTS
+      ? { count: projectTotals.length - TOP_N_PROJECTS, cost: Number(projectTotals.slice(TOP_N_PROJECTS).reduce((s, p) => s + p.cost, 0).toFixed(4)) }
+      : { count: 0, cost: 0 },
     lastIngestAt: getMeta('last_ingest_at'),
   })
 })

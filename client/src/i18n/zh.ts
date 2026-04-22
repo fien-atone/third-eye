@@ -47,6 +47,14 @@ export const zh: Dict = {
   'kpi.apiCalls': 'API 调用',
   'kpi.calls': '次调用',
 
+  'panel.costByProject.title': '按项目的成本',
+  'panel.costByProject.subDay': '每日汇总,堆叠',
+  'panel.costByProject.subWeek': '每周汇总,堆叠',
+  'panel.costByProject.subMonth': '每月汇总,堆叠',
+  'panel.costByProject.help': '每根柱子表示该周期内的美元支出,按项目分段。按成本排名前 8 的项目各有一种颜色,其余合并为"其他"。点击图例中的一行查看该项目详情。',
+  'panel.costByProject.other': '其他',
+  'panel.costByProject.otherWith': '还有 {count} 个项目',
+
   'panel.costByModel.title': '按模型的成本',
   'panel.costByModel.subDay': '每日汇总,堆叠',
   'panel.costByModel.subWeek': '每周汇总,堆叠',

@@ -47,6 +47,14 @@ export const de: Dict = {
   'kpi.apiCalls': 'API-Aufrufe',
   'kpi.calls': 'Aufrufe',
 
+  'panel.costByProject.title': 'Kosten nach Projekt',
+  'panel.costByProject.subDay': 'Tageswerte, gestapelt',
+  'panel.costByProject.subWeek': 'Wochenwerte, gestapelt',
+  'panel.costByProject.subMonth': 'Monatswerte, gestapelt',
+  'panel.costByProject.help': 'Jeder Balken sind USD-Ausgaben in dieser Periode, gestapelt nach Projekt. Top-8-Projekte nach Kosten haben jeweils eine eigene Farbe; der Rest wird als „Sonstige" gruppiert. Klick auf eine Legendenzeile öffnet das Projekt im Detail.',
+  'panel.costByProject.other': 'Sonstige',
+  'panel.costByProject.otherWith': '{count} weitere Projekte',
+
   'panel.costByModel.title': 'Kosten nach Modell',
   'panel.costByModel.subDay': 'Tageswerte, gestapelt',
   'panel.costByModel.subWeek': 'Wochenwerte, gestapelt',

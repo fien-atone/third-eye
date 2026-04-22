@@ -1,5 +1,5 @@
 import { parseAllSessions } from './lib/parser.ts'
-import { loadPricing } from './lib/models.ts'
+import { loadPricing, getShortModelName } from './lib/models.ts'
 import { CATEGORY_LABELS } from './lib/types.ts'
 import type { ClassifiedTurn, ParsedApiCall, DateRange } from './lib/types.ts'
 import { randomUUID } from 'crypto'
@@ -95,32 +95,9 @@ async function upsertProjects(keys: Set<string>) {
   }
 }
 
-const SHORT_MODEL_MAP: Record<string, string> = {
-  'claude-opus-4-6': 'Opus 4.6',
-  'claude-opus-4-5': 'Opus 4.5',
-  'claude-opus-4-1': 'Opus 4.1',
-  'claude-opus-4': 'Opus 4',
-  'claude-sonnet-4-6': 'Sonnet 4.6',
-  'claude-sonnet-4-5': 'Sonnet 4.5',
-  'claude-sonnet-4': 'Sonnet 4',
-  'claude-3-7-sonnet': 'Sonnet 3.7',
-  'claude-3-5-sonnet': 'Sonnet 3.5',
-  'claude-haiku-4-5': 'Haiku 4.5',
-  'claude-3-5-haiku': 'Haiku 3.5',
-  'gpt-4o-mini': 'GPT-4o Mini',
-  'gpt-4o': 'GPT-4o',
-  'gpt-5.4-mini': 'GPT-5.4 Mini',
-  'gpt-5.4': 'GPT-5.4',
-  'gpt-5.3-codex': 'GPT-5.3 Codex',
-  'gpt-5': 'GPT-5',
-  'gemini-2.5-pro': 'Gemini 2.5 Pro',
-}
-
-function shortModel(model: string): string {
-  const c = model.replace(/@.*$/, '').replace(/-\d{8}$/, '')
-  for (const [k, v] of Object.entries(SHORT_MODEL_MAP)) if (c.startsWith(k)) return v
-  return c
-}
+// Short model naming is now algorithmic — see getShortModelName in lib/models.ts.
+// New Anthropic/OpenAI/Google releases resolve automatically without code changes.
+const shortModel = getShortModelName
 
 export type IngestStats = {
   durationMs: number

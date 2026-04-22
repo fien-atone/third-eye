@@ -54,6 +54,8 @@ type OverviewResponse = {
   models: Array<{ name: string; cost: number; calls: number; inputTokens: number; outputTokens: number; cacheRead: number; cacheWrite: number }>
   categories: Array<{ name: string; cost: number; calls: number }>
   projects: Array<{ name: string; cost: number; calls: number }>
+  topProjects: Array<{ key: string; id: string | null; label: string; cost: number; calls: number }>
+  otherProjects: { count: number; cost: number }
   lastIngestAt: string | null
 }
 
@@ -1056,6 +1058,17 @@ function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectVi
         </KpiGroup>
       </div>
 
+      {!inProjectView && (
+        <CostByProjectPanel
+          series={series}
+          topProjects={data.topProjects ?? []}
+          otherProjects={data.otherProjects ?? { count: 0, cost: 0 }}
+          granularity={granularity}
+          hasData={hasAnyData}
+          onSelectProject={onSelectProject}
+        />
+      )}
+
       <div className="panel" style={{ marginBottom: 14 }}>
         <PanelHeader
           title={t('panel.costByModel.title')}
@@ -1166,6 +1179,124 @@ function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectVi
 }
 
 type TokenView = 'all' | 'io' | 'cache'
+
+function CostByProjectPanel({
+  series, topProjects, otherProjects, granularity, hasData, onSelectProject,
+}: {
+  series: Array<Record<string, number | string>>
+  topProjects: OverviewResponse['topProjects']
+  otherProjects: OverviewResponse['otherProjects']
+  granularity: Granularity
+  hasData: boolean
+  onSelectProject: (key: string) => void
+}) {
+  const t = useT()
+  // Assign each top project a stable color from the palette; "Other" is neutral dim.
+  const entries = topProjects.map((p, i) => ({
+    dataKey: `project:${p.key}`,
+    label: p.label,
+    projectKey: p.key,
+    projectId: p.id,
+    cost: p.cost,
+    color: COLORS[i % COLORS.length],
+  }))
+  if (otherProjects.count > 0) {
+    entries.push({
+      dataKey: 'project:__other',
+      label: t('panel.costByProject.other'),
+      projectKey: '',
+      projectId: null,
+      cost: otherProjects.cost,
+      color: 'var(--text-dim)',
+    })
+  }
+
+  return (
+    <div className="panel" style={{ marginBottom: 14 }}>
+      <PanelHeader
+        title={t('panel.costByProject.title')}
+        sub={t(granularity === 'day' ? 'panel.costByProject.subDay' : granularity === 'week' ? 'panel.costByProject.subWeek' : 'panel.costByProject.subMonth')}
+        help={t('panel.costByProject.help')}
+      />
+      {!hasData || entries.length === 0 ? (
+        <ChartEmpty height={340} />
+      ) : (
+        <div className="cost-by-project-layout">
+          <div className="cost-by-project-chart">
+            <ResponsiveContainer width="100%" height={340}>
+              <BarChart data={series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barCategoryGap="15%">
+                <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
+                <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={v => `$${v}`} width={70} />
+                <Tooltip content={<ProjectSeriesTooltip entries={entries} />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
+                {entries.map((e, i) => {
+                  const isLast = i === entries.length - 1
+                  return (
+                    <Bar
+                      key={e.dataKey}
+                      dataKey={e.dataKey}
+                      name={e.label}
+                      stackId="cost"
+                      fill={e.color}
+                      radius={isLast ? [3, 3, 0, 0] : 0}
+                      isAnimationActive={false}
+                    />
+                  )
+                })}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="cost-by-project-legend" role="list">
+            {entries.map(e => {
+              const isOther = e.dataKey === 'project:__other'
+              const clickable = !isOther && !!e.projectKey
+              return (
+                <button
+                  key={e.dataKey}
+                  role="listitem"
+                  className={`legend-row${clickable ? ' clickable' : ''}`}
+                  onClick={clickable ? () => onSelectProject(e.projectKey) : undefined}
+                  disabled={!clickable}
+                  title={isOther ? t('panel.costByProject.otherWith', { count: otherProjects.count }) : e.label}
+                >
+                  <span className="legend-dot" style={{ background: e.color }} />
+                  <span className="legend-label">
+                    {isOther ? `${e.label} · ${t('panel.costByProject.otherWith', { count: otherProjects.count })}` : e.label}
+                  </span>
+                  <span className="legend-cost">{fmtCurrency(e.cost)}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ProjectSeriesTooltip({ active, payload, label, entries }: TTProps & { entries: Array<{ dataKey: string; label: string; color: string }> }) {
+  if (!active || !payload || payload.length === 0) return null
+  const items = payload.filter(p => p.value > 0)
+  const total = items.reduce((s, p) => s + (p.value ?? 0), 0)
+  const byKey = new Map(entries.map(e => [e.dataKey, e]))
+  return (
+    <div className="tooltip">
+      <div className="tt-title">{label}</div>
+      <div className="tt-row"><span>Total</span><span className="tt-val">{fmtCurrency(total)}</span></div>
+      <div style={{ height: 6, borderTop: '1px solid var(--border)', marginTop: 4 }} />
+      {items.sort((a, b) => b.value - a.value).map(p => {
+        const entry = byKey.get(String(p.dataKey))
+        const name = entry?.label ?? String(p.dataKey).replace('project:', '')
+        return (
+          <div className="tt-row" key={p.dataKey}>
+            <span><span className="swatch" style={{ background: p.color }} />{name}</span>
+            <span className="tt-val">{fmtCurrency(p.value)}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 function TokensPanel({ series, granularity: _g, hasData }: { series: Array<Record<string, number | string>>; granularity: Granularity; hasData: boolean }) {
   const t = useT()

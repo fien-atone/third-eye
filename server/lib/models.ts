@@ -167,30 +167,56 @@ export function calculateCost(
   )
 }
 
+/**
+ * Algorithmic short-name derivation. Parses model IDs by pattern so new releases
+ * (claude-opus-5-0, gpt-6-codex, gemini-3.0-ultra, etc.) get sensible names automatically.
+ * Explicit OVERRIDES_SHORT table is used only for irregular cases that break pattern.
+ */
+const OVERRIDES_SHORT: Record<string, string> = {
+  '<synthetic>': '<synthetic>',
+}
+
+function capitalize(s: string): string { return s.charAt(0).toUpperCase() + s.slice(1) }
+
 export function getShortModelName(model: string): string {
-  const canonical = getCanonicalName(model)
-  const shortNames: Record<string, string> = {
-    'claude-opus-4-6': 'Opus 4.6',
-    'claude-opus-4-5': 'Opus 4.5',
-    'claude-opus-4-1': 'Opus 4.1',
-    'claude-opus-4': 'Opus 4',
-    'claude-sonnet-4-6': 'Sonnet 4.6',
-    'claude-sonnet-4-5': 'Sonnet 4.5',
-    'claude-sonnet-4': 'Sonnet 4',
-    'claude-3-7-sonnet': 'Sonnet 3.7',
-    'claude-3-5-sonnet': 'Sonnet 3.5',
-    'claude-haiku-4-5': 'Haiku 4.5',
-    'claude-3-5-haiku': 'Haiku 3.5',
-    'gpt-4o-mini': 'GPT-4o Mini',
-    'gpt-4o': 'GPT-4o',
-    'gpt-5.4-mini': 'GPT-5.4 Mini',
-    'gpt-5.4': 'GPT-5.4',
-    'gpt-5.3-codex': 'GPT-5.3 Codex',
-    'gpt-5': 'GPT-5',
-    'gemini-2.5-pro': 'Gemini 2.5 Pro',
+  const c = getCanonicalName(model)
+  if (OVERRIDES_SHORT[c]) return OVERRIDES_SHORT[c]
+
+  // Anthropic modern: claude-(family)-N-M   e.g. claude-opus-4-7 → Opus 4.7
+  let m = c.match(/^claude-(opus|sonnet|haiku)-(\d+)(?:-(\d+))?$/)
+  if (m) {
+    const [, family, major, minor] = m
+    return minor ? `${capitalize(family)} ${major}.${minor}` : `${capitalize(family)} ${major}`
   }
-  for (const [key, name] of Object.entries(shortNames)) {
-    if (canonical.startsWith(key)) return name
+
+  // Anthropic legacy: claude-N-M-(family)   e.g. claude-3-5-sonnet → Sonnet 3.5
+  m = c.match(/^claude-(\d+)-(\d+)-(opus|sonnet|haiku)$/)
+  if (m) return `${capitalize(m[3])} ${m[1]}.${m[2]}`
+
+  // OpenAI GPT-5 family with optional variant: gpt-5.3-codex → GPT-5.3 Codex, gpt-5 → GPT-5
+  m = c.match(/^gpt-(\d+(?:\.\d+)?)(?:-(\w+))?$/)
+  if (m) {
+    const version = m[1]
+    const variant = m[2] ? ` ${capitalize(m[2])}` : ''
+    return `GPT-${version}${variant}`
   }
-  return canonical
+
+  // OpenAI older: gpt-4o, gpt-4o-mini, gpt-4-turbo
+  m = c.match(/^gpt-(\d+[a-z]*)(?:-(\w+))?$/)
+  if (m) {
+    const version = m[1]
+    const variant = m[2] ? ` ${capitalize(m[2])}` : ''
+    return `GPT-${version}${variant}`
+  }
+
+  // Google Gemini: gemini-2.5-pro → Gemini 2.5 Pro
+  m = c.match(/^gemini-(\d+(?:\.\d+)?)(?:-(\w+))?$/)
+  if (m) {
+    const version = m[1]
+    const variant = m[2] ? ` ${capitalize(m[2])}` : ''
+    return `Gemini ${version}${variant}`
+  }
+
+  // Unknown family — return canonical unchanged (honest fallback, no silent lies)
+  return c
 }
