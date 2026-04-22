@@ -3,8 +3,13 @@ import cors from 'cors'
 import { existsSync, statSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
-import { db, getMeta } from './db.ts'
+import { db, getMeta, seedScreenLayouts } from './db.ts'
 import { runIngest } from './ingest.ts'
+import { DEFAULT_LAYOUTS, KNOWN_SCREENS, type ScreenLayout } from './lib/default-layouts.ts'
+
+// Seed default screen layouts on first start (idempotent — never overwrites
+// user customizations once they exist).
+seedScreenLayouts(DEFAULT_LAYOUTS)
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -218,6 +223,52 @@ app.patch('/api/projects/:id', (req, res) => {
     customLabel: row.custom_label,
     favorite: row.is_favorite === 1,
   })
+})
+
+// ──────────────────────────────────────────────────────────────────────
+// Screen layouts — per-screen widget grids editable in the UI.
+// Layout shape is opaque to the server (just a JSON blob); the client
+// decides which widget ids are valid via its catalog. Server only:
+//   1. validates `screen` is a known name (prevents arbitrary writes)
+//   2. validates JSON parses
+//   3. round-trips the blob
+// ──────────────────────────────────────────────────────────────────────
+
+function getLayout(screen: string): ScreenLayout {
+  const row = db().prepare('SELECT layout_json FROM screen_layouts WHERE screen = ?').get(screen) as { layout_json: string } | undefined
+  if (row) {
+    try { return JSON.parse(row.layout_json) as ScreenLayout } catch { /* fall through to default */ }
+  }
+  return DEFAULT_LAYOUTS[screen]
+}
+
+app.get('/api/layout/:screen', (req, res) => {
+  const screen = req.params.screen
+  if (!KNOWN_SCREENS.has(screen)) return res.status(404).json({ error: 'unknown screen' })
+  res.json(getLayout(screen))
+})
+
+app.put('/api/layout/:screen', (req, res) => {
+  const screen = req.params.screen
+  if (!KNOWN_SCREENS.has(screen)) return res.status(404).json({ error: 'unknown screen' })
+  const body = req.body as ScreenLayout
+  if (!body || !Array.isArray(body.widgets) || !Array.isArray(body.hidden)) {
+    return res.status(400).json({ error: 'invalid layout shape' })
+  }
+  db().prepare(`INSERT INTO screen_layouts (screen, layout_json, updated_at) VALUES (?, ?, ?)
+                ON CONFLICT(screen) DO UPDATE SET layout_json = excluded.layout_json, updated_at = excluded.updated_at`)
+    .run(screen, JSON.stringify(body), new Date().toISOString())
+  res.json({ ok: true })
+})
+
+// Reset to factory default — overwrites with the constant from default-layouts.ts.
+app.delete('/api/layout/:screen', (req, res) => {
+  const screen = req.params.screen
+  if (!KNOWN_SCREENS.has(screen)) return res.status(404).json({ error: 'unknown screen' })
+  db().prepare(`INSERT INTO screen_layouts (screen, layout_json, updated_at) VALUES (?, ?, ?)
+                ON CONFLICT(screen) DO UPDATE SET layout_json = excluded.layout_json, updated_at = excluded.updated_at`)
+    .run(screen, JSON.stringify(DEFAULT_LAYOUTS[screen]), new Date().toISOString())
+  res.json(DEFAULT_LAYOUTS[screen])
 })
 
 app.get('/api/providers', (_req, res) => {

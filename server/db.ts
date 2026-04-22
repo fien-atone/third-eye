@@ -83,6 +83,27 @@ function migrate(d: Database.Database) {
   // User-editable project metadata
   addCol("ALTER TABLE projects ADD COLUMN custom_label TEXT")
   addCol("ALTER TABLE projects ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
+
+  // Per-screen widget layouts. layout_json shape matches the ScreenLayout
+  // type in server/lib/default-layouts.ts. Defaults are seeded by
+  // seedScreenLayouts() below — only on first start, never overwriting
+  // existing rows.
+  d.exec(`CREATE TABLE IF NOT EXISTS screen_layouts (
+    screen TEXT PRIMARY KEY,
+    layout_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`)
+}
+
+/** Seed default layouts on first startup. Idempotent: INSERT OR IGNORE
+ *  leaves user customizations untouched on subsequent starts. */
+export function seedScreenLayouts(defaults: Record<string, unknown>) {
+  const d = db()
+  const now = new Date().toISOString()
+  const stmt = d.prepare('INSERT OR IGNORE INTO screen_layouts (screen, layout_json, updated_at) VALUES (?, ?, ?)')
+  for (const [screen, layout] of Object.entries(defaults)) {
+    stmt.run(screen, JSON.stringify(layout), now)
+  }
 }
 
 export function truncateAll(): { calls: number; projects: number } {

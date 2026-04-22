@@ -1184,6 +1184,227 @@ table.breakdown td.project-cell .project-name-wrap {
   .projects-grid .cell-fav { padding-left: 6px; }
 }
 
+/* ============================================================
+ * Widget grid (Customize / drag-resize dashboards)
+ * ============================================================ */
+
+/* Customize button in the controls bar — gear icon + label, pinned right
+   via `.controls-spacer` flex pushes prior elements together. */
+.controls-spacer { flex: 1 1 auto; }
+.customize-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.customize-btn:hover { color: var(--text); border-color: var(--border-strong); }
+.customize-btn.on { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.customize-icon { font-size: 14px; line-height: 1; }
+@media (max-width: 720px) {
+  .customize-label { display: none; }
+  .customize-btn { padding: 6px 8px; }
+}
+
+/* The grid itself — react-grid-layout uses absolute positioning under the
+   hood. We let it. Outside edit mode it's just a normal stack of tiles
+   with a small gap. */
+.widget-grid { position: relative; min-height: 100px; }
+.widget-grid-loading { min-height: 200px; }
+
+/* Each tile: a positioned <div> that contains either a .panel or a
+   bare-content widget (KPI groups, etc). Cells fill the tile so charts
+   can use height: 100% and stretch with the user's resize. */
+.widget-tile {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.widget-tile > .panel,
+.widget-tile > .kpi-group,
+.widget-tile-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Force panels inside a tile to fill height and clip cleanly */
+.widget-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 0 !important;
+  overflow: hidden;
+}
+.widget-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+.widget-panel-body-scroll { overflow: auto; }
+/* Recharts ResponsiveContainer needs an actual height — flex child with
+   min-height: 0 gives it one. */
+.widget-panel-body .recharts-responsive-container { height: 100% !important; }
+
+/* KPI groups inside a tile: they normally sit in a flex row .kpis. Inside
+   a tile they should fill it and look like a card. */
+.widget-tile > .kpi-group {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  height: 100%;
+  box-sizing: border-box;
+  box-shadow: var(--shadow);
+}
+
+/* Edit-mode visual cues: dashed outline on every tile, drag handle
+   strip across the top, remove button. */
+.widget-grid.is-editing .widget-tile {
+  outline: 2px dashed var(--border-strong);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+.widget-grid.is-editing .widget-tile:hover {
+  outline-color: var(--accent);
+}
+.widget-tile-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-2));
+  border-bottom: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+  cursor: move;
+  user-select: none;
+  z-index: 10;
+  font-size: 11px;
+  color: var(--text-2);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.widget-tile-handle .widget-tile-title {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.widget-tile-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.widget-tile-remove:hover { color: var(--bad); background: var(--hover); }
+/* When the handle is visible, body content needs top padding to clear it */
+.widget-grid.is-editing .widget-tile { padding-top: 26px; }
+.widget-grid.is-editing .widget-tile > .widget-tile-handle { top: 0; }
+
+/* react-grid-layout's resizing placeholder (the dashed slot showing where
+   a tile will land). Style to match our outline aesthetic. */
+.widget-grid .react-grid-placeholder {
+  background: color-mix(in srgb, var(--accent) 18%, transparent) !important;
+  border: 2px dashed var(--accent) !important;
+  border-radius: 8px !important;
+  opacity: 1 !important;
+}
+.widget-grid .react-resizable-handle::after {
+  border-color: var(--accent) !important;
+}
+/* Hide resize handle outside edit mode */
+.widget-grid:not(.is-editing) .react-resizable-handle { display: none; }
+
+/* Mobile: a flat single-column stack, read-only — no edit. */
+.widget-grid-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.widget-tile-mobile { width: 100%; }
+
+/* ─── Edit-mode toolbar (Add picker + Reset) ──────────────────────── */
+.edit-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--bg-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+}
+.add-widget { position: relative; }
+.add-widget-btn {
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.add-widget-btn:hover { color: var(--accent); border-color: var(--accent); }
+.add-widget-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 50;
+  min-width: 220px;
+  max-height: 320px;
+  overflow: auto;
+}
+.add-widget-item {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.add-widget-item:hover { background: var(--hover); color: var(--accent); }
+.add-widget-empty {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+.reset-layout-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.reset-layout-btn:hover { color: var(--bad); border-color: var(--bad); }
+
 .notfound {
   display: flex;
   flex-direction: column;

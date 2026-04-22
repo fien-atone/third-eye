@@ -24,6 +24,12 @@ export const es: Dict = {
   'preset.mtd': 'Mes',
   'preset.12m': '12m',
   'controls.providerCalls': 'llamadas',
+  'controls.customize': 'Personalizar',
+  'controls.customize.done': 'Listo',
+  'customize.reset': 'Restablecer por defecto',
+  'customize.resetConfirm': '¿Restablecer esta pantalla al diseño predeterminado? Se perderán tus personalizaciones.',
+  'customize.add': 'Añadir widget',
+  'customize.addEmpty': 'Todos los widgets están en pantalla — no hay nada más que añadir.',
 
   'summary.days': 'días',
   'summary.weeks': 'semanas',

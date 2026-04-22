@@ -29,6 +29,7 @@ ephemeral ones from Cowork.
 - **Cost breakdowns** by model, project, activity, git branch — any date range, any aggregation (day / week / month)
 - **Per-project drill-down** — click any project, get the full story: files you edit most, tools you invoke, subagents you spawn, skills you trigger, MCP servers you lean on
 - **Projects registry** — search, sort, rename, pin favourites; ⌘/Ctrl/middle-click any row to open the project in a new tab
+- **Customizable widget dashboards** — drag, resize, add and remove widgets on both the Dashboard and per-project view; layouts saved to your local DB and travel with the file across machines
 - **Activity heatmap** — 7×24 grid showing when you actually work on each project
 - **Claude Code version tracking** — see which CLI versions touched each project, distribution by cost / calls / tokens
 - **Shareable project URLs** — stable UUID in the hash, bookmark it, send it

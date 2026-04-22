@@ -24,6 +24,12 @@ export const de: Dict = {
   'preset.mtd': 'Monat',
   'preset.12m': '12M',
   'controls.providerCalls': 'Aufrufe',
+  'controls.customize': 'Anpassen',
+  'controls.customize.done': 'Fertig',
+  'customize.reset': 'Auf Standard zurücksetzen',
+  'customize.resetConfirm': 'Diesen Bildschirm auf das Standardlayout zurücksetzen? Ihre Anpassungen gehen verloren.',
+  'customize.add': 'Widget hinzufügen',
+  'customize.addEmpty': 'Alle Widgets sind auf dem Bildschirm — nichts mehr hinzuzufügen.',
 
   'summary.days': 'Tage',
   'summary.weeks': 'Wochen',

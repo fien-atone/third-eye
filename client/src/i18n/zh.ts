@@ -24,6 +24,12 @@ export const zh: Dict = {
   'preset.mtd': '本月',
   'preset.12m': '12月',
   'controls.providerCalls': '次调用',
+  'controls.customize': '自定义',
+  'controls.customize.done': '完成',
+  'customize.reset': '恢复默认',
+  'customize.resetConfirm': '将此页面重置为默认布局？您的自定义将丢失。',
+  'customize.add': '添加小部件',
+  'customize.addEmpty': '所有小部件都已在屏幕上 — 没有其他可添加的了。',
 
   'summary.days': '天',
   'summary.weeks': '周',

@@ -4,6 +4,48 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-04-23
+
+### Added
+- **Customizable widget dashboards** — both the Dashboard and Project
+  view are now grids of draggable, resizable widgets. Click **Customize**
+  (gear icon, right side of the controls bar) to enter edit mode: drag
+  the title bar to reposition, drag the bottom-right corner to resize,
+  click `×` to remove a widget. An **Add widget** button below the grid
+  shows everything in the catalog that isn't currently placed.
+- **Per-screen layouts persisted in the DB** — your customizations
+  travel with the SQLite file across machines. No more re-arranging
+  from scratch when you migrate.
+- **Reset to defaults** button in edit mode — restores the screen's
+  factory layout (with confirmation).
+- **15 widgets** to mix and match: 4 KPI groups, 7 dashboard
+  charts/tables (Project activity, Cost by model, Tokens, API calls,
+  Models, By activity, Top projects) + 9 project-page insights
+  (Subagents, Skills, MCP servers, Bash, File hotspots, Workflow flags,
+  Versions, Branches, Heatmap).
+
+### Changed
+- **Default Dashboard layout** matches the previous static order — new
+  installs and existing users (on first launch of v1.4.0) see exactly
+  the layout they're used to. Customization is opt-in.
+- Charts now fill the widget tile dynamically instead of using fixed
+  pixel heights — resize a widget bigger and the chart scales with it.
+
+### Internals
+- New table `screen_layouts` (seeded once on first start, never
+  overwritten thereafter — same idempotent migration pattern as the
+  rest of the schema).
+- API: `GET/PUT /api/layout/:screen` for layouts, `DELETE /api/layout/:screen`
+  for reset-to-default.
+- New module `client/src/widgets/grid.tsx` (`<WidgetGrid>`,
+  `<AddWidgetPicker>`, `useScreenLayout`) — generic and screen-agnostic;
+  any future screen plugs in by passing its own catalog and screen id.
+- Mobile (≤720px): grid renders as a read-only single-column stack in
+  the saved y-order; edit mode is disabled. Avoids per-breakpoint
+  layout proliferation while keeping content reachable.
+- Built on `react-grid-layout` 1.5.x — proven, single-purpose library
+  for resizable dashboards (used by Grafana-style tools for years).
+
 ## [1.3.0] — 2026-04-23
 
 ### Added
@@ -176,6 +218,7 @@ Initial public release.
 - Adapted parser from [CodeBurn](https://github.com/codeburn/codeburn)
   (MIT) — see [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
+[1.4.0]: https://github.com/inoise/third-eye/releases/tag/v1.4.0
 [1.3.0]: https://github.com/inoise/third-eye/releases/tag/v1.3.0
 [1.2.1]: https://github.com/inoise/third-eye/releases/tag/v1.2.1
 [1.2.0]: https://github.com/inoise/third-eye/releases/tag/v1.2.0

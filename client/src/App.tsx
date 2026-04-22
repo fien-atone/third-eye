@@ -18,6 +18,7 @@ import {
 } from 'recharts'
 import { applyTheme, getStoredTheme, type Theme } from './theme'
 import { useRoute, navigate, hrefFor } from './router'
+import { WidgetGrid, AddWidgetPicker, useScreenLayout, type WidgetDef } from './widgets/grid'
 import { Logo } from './Logo'
 import { useT, useLocale, LOCALES, LOCALE_KEYS, type T } from './i18n'
 import { DATE_LOCALES } from './i18n/dateLocale'
@@ -317,6 +318,10 @@ export default function App() {
   const [granularity, setGranularity] = useState<Granularity>(init.granularity)
   const [selectedProviders, setSelectedProviders] = useState<string[]>([])
   const [theme, setTheme] = useState<Theme>(getStoredTheme())
+  // Customize / edit-layout mode for the widget grid. Per-screen — resets
+  // automatically when the user navigates away from the dashboard or
+  // project view (cleared in the route effect below).
+  const [editingLayout, setEditingLayout] = useState(false)
   const route = useRoute()
   const projectId = route.name === 'project' ? route.id : null
   const isNotFound = route.name === 'notfound'
@@ -365,6 +370,9 @@ export default function App() {
   const data = overviewQuery.data
   const modelNames = useMemo(() => (data?.models ?? []).map(m => m.name).slice(0, 8), [data])
   const unresolvedProject = !!projectId && !!data && !data.frame.project
+
+  // Reset edit mode when navigating away from a customizable screen.
+  useEffect(() => { setEditingLayout(false) }, [route.name])
 
   // Update document.title on route change.
   useEffect(() => {
@@ -505,6 +513,17 @@ export default function App() {
             </button>
           ))}
         </div>
+        <div className="controls-spacer" />
+        <button
+          className={`customize-btn${editingLayout ? ' on' : ''}`}
+          onClick={() => setEditingLayout(e => !e)}
+          title={editingLayout ? t('controls.customize.done') : t('controls.customize')}
+          aria-label={t('controls.customize')}
+          aria-pressed={editingLayout}
+        >
+          <span className="customize-icon" aria-hidden="true">⚙</span>
+          <span className="customize-label">{editingLayout ? t('controls.customize.done') : t('controls.customize')}</span>
+        </button>
       </div>
 
       {data && (
@@ -540,12 +559,10 @@ export default function App() {
               if (p) navigate({ name: 'project', id: p.id })
             }}
             inProjectView={!!projectId}
+            insightsData={projectId && claudeInScope ? insightsQuery.data : undefined}
+            insightsProjectKey={data?.frame.project?.key ?? null}
+            editing={editingLayout}
           />
-        </div>
-      )}
-      {!isNotFound && !unresolvedProject && projectId && claudeInScope && insightsQuery.data && (
-        <div className={insightsQuery.isFetching && insightsQuery.isPlaceholderData ? 'is-fetching' : ''}>
-          <InsightsPanel data={insightsQuery.data} projectKey={data?.frame.project?.key ?? null} />
         </div>
       )}
         </>
@@ -1076,174 +1093,6 @@ function PanelHeader({ title, sub, help }: { title: string; sub?: string; help?:
   )
 }
 
-function InsightsPanel({ data, projectKey }: { data: InsightsResponse; projectKey: string | null }) {
-  const t = useT()
-  const dl = useDateLocale()
-  const weekStartsOn = (dl.options?.weekStartsOn ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
-  const fileBasename = (p: string) => p.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? p
-  const stripProjectPrefix = (path: string) => {
-    if (!projectKey) return path
-    const real = projectKey.replace(/^-?Users-([^-]+)-/, '/Users/$1/').replace(/-/g, '/')
-    return path.startsWith(real) ? path.slice(real.length).replace(/^\//, '') : path
-  }
-
-  // Day names indexed 0=Sun..6=Sat (matches SQLite strftime('%w')).
-  // Row order on the heatmap is derived from weekStartsOn so RU/DE/ES start from Monday, EN/ZH from Sunday.
-  const dayNames = [t('day.sun'), t('day.mon'), t('day.tue'), t('day.wed'), t('day.thu'), t('day.fri'), t('day.sat')]
-  const rowOrder = Array.from({ length: 7 }, (_, i) => (weekStartsOn + i) % 7)
-  const heatGrid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0))
-  let heatMax = 0
-  for (const c of data.heatmap) {
-    heatGrid[c.dow][c.hour] = c.calls
-    if (c.calls > heatMax) heatMax = c.calls
-  }
-
-  return (
-    <div className="insights">
-      <h2 className="insights-title">{t('insights.title')}</h2>
-
-      <div className="grid col-2">
-        <InsightsList
-          title={t('insights.subagents.title')}
-          subtitle={t('insights.subagents.sub')}
-          rows={data.subagents}
-          unit={t('common.calls')}
-          help={t('insights.subagents.help')}
-        />
-        <InsightsList
-          title={t('insights.skills.title')}
-          subtitle={t('insights.skills.sub')}
-          rows={data.skills}
-          unit={t('common.calls')}
-          help={t('insights.skills.help')}
-        />
-        <InsightsList
-          title={t('insights.mcp.title')}
-          subtitle={t('insights.mcp.sub')}
-          rows={data.mcp}
-          unit={t('common.calls')}
-          help={t('insights.mcp.help')}
-        />
-        <InsightsList
-          title={t('insights.bash.title')}
-          subtitle={t('insights.bash.sub')}
-          rows={data.bash}
-          unit={t('common.runs')}
-          help={t('insights.bash.help')}
-        />
-      </div>
-
-      <div className="panel" style={{ marginTop: 14 }}>
-        <PanelHeader
-          title={t('insights.files.title')}
-          sub={t('insights.files.subFmt', { unique: fmtInt(data.filesUnique), shown: data.files.length })}
-          help={t('insights.files.help')}
-        />
-        <table className="file-hotspots-table">
-          <colgroup>
-            <col style={{ width: 'auto' }} />
-            <col style={{ width: '90px' }} />
-            <col style={{ width: '90px' }} />
-          </colgroup>
-          <thead><tr><th>{t('insights.files.colFile')}</th><th className="num">{t('insights.files.colTouches')}</th><th className="num">{t('insights.files.colCost')}</th></tr></thead>
-          <tbody>
-            {data.files.map(f => {
-              const stripped = stripProjectPrefix(f.name)
-              const base = fileBasename(stripped)
-              const dir = stripped.slice(0, -base.length)
-              return (
-                <tr key={f.name}>
-                  <td>
-                    <div className="file-path-cell" tabIndex={0} title={f.name}>
-                      <span className="file-dir">{dir}</span>
-                      <span className="file-name">{base}</span>
-                      <span className="file-full" role="tooltip">{f.name}</span>
-                    </div>
-                  </td>
-                  <td className="num">{fmtInt(f.count)}</td>
-                  <td className="num">{fmtCurrency(f.cost)}</td>
-                </tr>
-              )
-            })}
-            {data.files.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--text-dim)' }}>{t('insights.files.empty')}</td></tr>}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="grid col-2" style={{ marginTop: 14 }}>
-        <div className="panel">
-          <PanelHeader
-            title={t('insights.flags.title')}
-            help={t('insights.flags.help')}
-          />
-          <div className="flag-grid">
-            <FlagStat label={t('insights.flags.planMode')} value={data.flags.plan_mode_calls} total={data.flags.total_calls} />
-            <FlagStat label={t('insights.flags.todoWrite')} value={data.flags.todo_write_calls} total={data.flags.total_calls} />
-          </div>
-        </div>
-        <VersionsPanel rows={data.versions} />
-      </div>
-
-      <div className="grid col-2" style={{ marginTop: 14 }}>
-        <div className="panel">
-          <PanelHeader
-            title={t('insights.branches.title')}
-            sub={t('insights.branches.sub')}
-            help={t('insights.branches.help')}
-          />
-          {data.branches.length === 0 ? (
-            <ChartEmpty height={160} hint={t('insights.branches.empty')} />
-          ) : (
-            <table className="breakdown">
-              <thead><tr><th>{t('insights.branches.colBranch')}</th><th className="num">{t('insights.branches.colCalls')}</th><th className="num">{t('insights.branches.colCost')}</th></tr></thead>
-              <tbody>
-                {data.branches.map(b => (
-                  <tr key={b.name}>
-                    <td style={{ wordBreak: 'break-all' }}><span style={{ fontFamily: 'ui-monospace, monospace' }}>{b.name}</span></td>
-                    <td className="num">{fmtInt(b.calls)}</td>
-                    <td className="num">{fmtCurrency(b.cost)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="panel">
-          <PanelHeader
-            title={t('insights.heatmap.title')}
-            sub={t('insights.heatmap.sub')}
-            help={t('insights.heatmap.help')}
-          />
-          <div className="heatmap">
-            <div className="heatmap-hours">
-              <div className="heatmap-corner" />
-              {Array.from({ length: 24 }, (_, h) => (
-                <div className="heatmap-hour" key={h}>{h % 3 === 0 ? h : ''}</div>
-              ))}
-            </div>
-            {rowOrder.map(dow => (
-              <div className="heatmap-row" key={dow}>
-                <div className="heatmap-day">{dayNames[dow]}</div>
-                {heatGrid[dow].map((calls, hour) => {
-                  const intensity = heatMax > 0 ? calls / heatMax : 0
-                  return (
-                    <div
-                      key={hour}
-                      className="heatmap-cell"
-                      style={{ background: intensity > 0 ? `rgba(255, 140, 66, ${0.15 + intensity * 0.85})` : 'var(--bg-2)' }}
-                      title={`${dayNames[dow]} ${hour}:00 — ${calls}`}
-                    />
-                  )
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function InsightsList({ title, subtitle, rows, unit, help }: { title: string; subtitle: string; rows: InsightsItem[]; unit: string; help?: React.ReactNode }) {
   const max = Math.max(1, ...rows.map(r => r.count))
@@ -1589,12 +1438,149 @@ function LocaleSwitcher() {
   )
 }
 
-function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectView }: {
+/** Insight widget render-fns. Pulled out of the legacy InsightsPanel
+ *  layout into individual widgets so they can be placed/sized like any
+ *  other widget on the project screen. */
+function buildInsightsCatalog(t: T, data: InsightsResponse, projectKey: string | null, dl: Locale): WidgetDef[] {
+  const fileBasename = (p: string) => p.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? p
+  const stripProjectPrefix = (path: string) => {
+    if (!projectKey) return path
+    const real = projectKey.replace(/^-?Users-([^-]+)-/, '/Users/$1/').replace(/-/g, '/')
+    return path.startsWith(real) ? path.slice(real.length).replace(/^\//, '') : path
+  }
+  const weekStartsOn = (dl.options?.weekStartsOn ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
+  const dayNames = [t('day.sun'), t('day.mon'), t('day.tue'), t('day.wed'), t('day.thu'), t('day.fri'), t('day.sat')]
+  const rowOrder = Array.from({ length: 7 }, (_, i) => (weekStartsOn + i) % 7)
+  const heatGrid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0))
+  let heatMax = 0
+  for (const c of data.heatmap) {
+    heatGrid[c.dow][c.hour] = c.calls
+    if (c.calls > heatMax) heatMax = c.calls
+  }
+
+  return [
+    { id: 'subagents', title: t('insights.subagents.title'), render: () => (
+      <InsightsList title={t('insights.subagents.title')} subtitle={t('insights.subagents.sub')} rows={data.subagents} unit={t('common.calls')} help={t('insights.subagents.help')} />
+    ) },
+    { id: 'skills', title: t('insights.skills.title'), render: () => (
+      <InsightsList title={t('insights.skills.title')} subtitle={t('insights.skills.sub')} rows={data.skills} unit={t('common.calls')} help={t('insights.skills.help')} />
+    ) },
+    { id: 'mcp', title: t('insights.mcp.title'), render: () => (
+      <InsightsList title={t('insights.mcp.title')} subtitle={t('insights.mcp.sub')} rows={data.mcp} unit={t('common.calls')} help={t('insights.mcp.help')} />
+    ) },
+    { id: 'bash', title: t('insights.bash.title'), render: () => (
+      <InsightsList title={t('insights.bash.title')} subtitle={t('insights.bash.sub')} rows={data.bash} unit={t('common.runs')} help={t('insights.bash.help')} />
+    ) },
+    { id: 'files', title: t('insights.files.title'), render: () => (
+      <div className="panel widget-panel">
+        <PanelHeader
+          title={t('insights.files.title')}
+          sub={t('insights.files.subFmt', { unique: fmtInt(data.filesUnique), shown: data.files.length })}
+          help={t('insights.files.help')}
+        />
+        <div className="widget-panel-body widget-panel-body-scroll">
+          <table className="file-hotspots-table">
+            <colgroup><col style={{ width: 'auto' }} /><col style={{ width: '90px' }} /><col style={{ width: '90px' }} /></colgroup>
+            <thead><tr><th>{t('insights.files.colFile')}</th><th className="num">{t('insights.files.colTouches')}</th><th className="num">{t('insights.files.colCost')}</th></tr></thead>
+            <tbody>
+              {data.files.map(f => {
+                const stripped = stripProjectPrefix(f.name)
+                const base = fileBasename(stripped)
+                const dir = stripped.slice(0, -base.length)
+                return (
+                  <tr key={f.name}>
+                    <td>
+                      <div className="file-path-cell" tabIndex={0} title={f.name}>
+                        <span className="file-dir">{dir}</span>
+                        <span className="file-name">{base}</span>
+                        <span className="file-full" role="tooltip">{f.name}</span>
+                      </div>
+                    </td>
+                    <td className="num">{fmtInt(f.count)}</td>
+                    <td className="num">{fmtCurrency(f.cost)}</td>
+                  </tr>
+                )
+              })}
+              {data.files.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--text-dim)' }}>{t('insights.files.empty')}</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ) },
+    { id: 'flags', title: t('insights.flags.title'), render: () => (
+      <div className="panel widget-panel">
+        <PanelHeader title={t('insights.flags.title')} help={t('insights.flags.help')} />
+        <div className="flag-grid">
+          <FlagStat label={t('insights.flags.planMode')} value={data.flags.plan_mode_calls} total={data.flags.total_calls} />
+          <FlagStat label={t('insights.flags.todoWrite')} value={data.flags.todo_write_calls} total={data.flags.total_calls} />
+        </div>
+      </div>
+    ) },
+    { id: 'versions', title: t('insights.versions.title'), render: () => <VersionsPanel rows={data.versions} /> },
+    { id: 'branches', title: t('insights.branches.title'), render: () => (
+      <div className="panel widget-panel">
+        <PanelHeader title={t('insights.branches.title')} sub={t('insights.branches.sub')} help={t('insights.branches.help')} />
+        <div className="widget-panel-body widget-panel-body-scroll">
+          {data.branches.length === 0 ? (
+            <ChartEmpty hint={t('insights.branches.empty')} />
+          ) : (
+            <table className="breakdown">
+              <thead><tr><th>{t('insights.branches.colBranch')}</th><th className="num">{t('insights.branches.colCalls')}</th><th className="num">{t('insights.branches.colCost')}</th></tr></thead>
+              <tbody>
+                {data.branches.map(b => (
+                  <tr key={b.name}>
+                    <td style={{ wordBreak: 'break-all' }}><span style={{ fontFamily: 'ui-monospace, monospace' }}>{b.name}</span></td>
+                    <td className="num">{fmtInt(b.calls)}</td>
+                    <td className="num">{fmtCurrency(b.cost)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    ) },
+    { id: 'heatmap', title: t('insights.heatmap.title'), render: () => (
+      <div className="panel widget-panel">
+        <PanelHeader title={t('insights.heatmap.title')} sub={t('insights.heatmap.sub')} help={t('insights.heatmap.help')} />
+        <div className="heatmap">
+          <div className="heatmap-hours">
+            <div className="heatmap-corner" />
+            {Array.from({ length: 24 }, (_, h) => (
+              <div className="heatmap-hour" key={h}>{h % 3 === 0 ? h : ''}</div>
+            ))}
+          </div>
+          {rowOrder.map(dow => (
+            <div className="heatmap-row" key={dow}>
+              <div className="heatmap-day">{dayNames[dow]}</div>
+              {heatGrid[dow].map((calls, hour) => {
+                const intensity = heatMax > 0 ? calls / heatMax : 0
+                return (
+                  <div
+                    key={hour}
+                    className="heatmap-cell"
+                    style={{ background: intensity > 0 ? `rgba(255, 140, 66, ${0.15 + intensity * 0.85})` : 'var(--bg-2)' }}
+                    title={`${dayNames[dow]} ${hour}:00 — ${calls}`}
+                  />
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    ) },
+  ]
+}
+
+function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectView, insightsData, insightsProjectKey, editing }: {
   data: OverviewResponse
   modelNames: string[]
   granularity: Granularity
   onSelectProject: (p: string) => void
   inProjectView: boolean
+  insightsData?: InsightsResponse
+  insightsProjectKey?: string | null
+  editing: boolean
 }) {
   const t = useT()
   const dl = useDateLocale()
@@ -1611,104 +1597,114 @@ function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectVi
   const hasAnyData = data.totals.calls > 0
   const hasTokenData = data.totals.inputTokens + data.totals.outputTokens + data.totals.cacheRead + data.totals.cacheWrite > 0
 
-  return (
-    <>
-      <div className="kpis">
-        <KpiGroup title={t('kpi.spend')}>
-          <KpiMetric label={t('kpi.total')} value={fmtCurrency(data.totals.cost)} sub={`${fmtInt(data.totals.calls)} ${t('kpi.apiCalls')}`} />
-          <KpiMetric label={`${t('kpi.avg')} / ${t('controls.' + granularity as any)}`} value={fmtCurrency(avgPerBucket)} sub={`${fmtInt(avgCallsPerBucket)} ${t('kpi.calls')}`} />
-        </KpiGroup>
-        <KpiGroup title={t('kpi.tokens')}>
-          <KpiMetric label={t('kpi.input')} value={fmtTokens(data.totals.inputTokens)} />
-          <KpiMetric label={t('kpi.output')} value={fmtTokens(data.totals.outputTokens)} />
-        </KpiGroup>
-        <KpiGroup title={t('kpi.cache')}>
-          <KpiMetric label={t('kpi.read')} value={fmtTokens(data.totals.cacheRead)} />
-          <KpiMetric label={t('kpi.write')} value={fmtTokens(data.totals.cacheWrite)} />
-        </KpiGroup>
-        <KpiGroup title={t('kpi.scope')}>
-          {!inProjectView && <KpiMetric label={t('kpi.projects')} value={String(data.totals.projects)} />}
-          <KpiMetric label={`${t('kpi.active')} ${t(granularity === 'day' ? 'summary.days' : granularity === 'week' ? 'summary.weeks' : 'summary.months')}`} value={`${activeBuckets} / ${data.frame.bucketCount}`} />
-        </KpiGroup>
-      </div>
+  // ─── Widget catalog ─────────────────────────────────────────────────
+  // Each entry is a (id, title, render) trio. The id is stable and matches
+  // server/lib/default-layouts.ts. Render fns close over `data`, `t`, etc.
+  // The same catalog covers both the dashboard and the project view; the
+  // server-side default layout for each screen decides which widgets are
+  // initially placed (e.g. cost-by-project / top-projects are dashboard-only).
 
-      {!inProjectView && (
-        <CostByProjectPanel
-          series={series}
-          topProjects={data.topProjects ?? []}
-          otherProjects={data.otherProjects ?? { count: 0, cost: 0 }}
-          granularity={granularity}
-          hasData={hasAnyData}
-          onSelectProject={onSelectProject}
-        />
-      )}
-
-      <div className="panel" style={{ marginBottom: 14 }}>
+  const catalog: WidgetDef[] = [
+    { id: 'kpi-spend', title: t('kpi.spend'), render: () => (
+      <KpiGroup title={t('kpi.spend')}>
+        <KpiMetric label={t('kpi.total')} value={fmtCurrency(data.totals.cost)} sub={`${fmtInt(data.totals.calls)} ${t('kpi.apiCalls')}`} />
+        <KpiMetric label={`${t('kpi.avg')} / ${t('controls.' + granularity as any)}`} value={fmtCurrency(avgPerBucket)} sub={`${fmtInt(avgCallsPerBucket)} ${t('kpi.calls')}`} />
+      </KpiGroup>
+    ) },
+    { id: 'kpi-tokens', title: t('kpi.tokens'), render: () => (
+      <KpiGroup title={t('kpi.tokens')}>
+        <KpiMetric label={t('kpi.input')} value={fmtTokens(data.totals.inputTokens)} />
+        <KpiMetric label={t('kpi.output')} value={fmtTokens(data.totals.outputTokens)} />
+      </KpiGroup>
+    ) },
+    { id: 'kpi-cache', title: t('kpi.cache'), render: () => (
+      <KpiGroup title={t('kpi.cache')}>
+        <KpiMetric label={t('kpi.read')} value={fmtTokens(data.totals.cacheRead)} />
+        <KpiMetric label={t('kpi.write')} value={fmtTokens(data.totals.cacheWrite)} />
+      </KpiGroup>
+    ) },
+    { id: 'kpi-scope', title: t('kpi.scope'), render: () => (
+      <KpiGroup title={t('kpi.scope')}>
+        {!inProjectView && <KpiMetric label={t('kpi.projects')} value={String(data.totals.projects)} />}
+        <KpiMetric label={`${t('kpi.active')} ${t(granularity === 'day' ? 'summary.days' : granularity === 'week' ? 'summary.weeks' : 'summary.months')}`} value={`${activeBuckets} / ${data.frame.bucketCount}`} />
+      </KpiGroup>
+    ) },
+    { id: 'cost-by-project', title: t('panel.costByProject.title'), render: () => (
+      <CostByProjectPanel
+        series={series}
+        topProjects={data.topProjects ?? []}
+        otherProjects={data.otherProjects ?? { count: 0, cost: 0 }}
+        granularity={granularity}
+        hasData={hasAnyData}
+        onSelectProject={onSelectProject}
+      />
+    ) },
+    { id: 'cost-by-model', title: t('panel.costByModel.title'), render: () => (
+      <div className="panel widget-panel">
         <PanelHeader
           title={t('panel.costByModel.title')}
           sub={t(granularity === 'day' ? 'panel.costByModel.subDay' : granularity === 'week' ? 'panel.costByModel.subWeek' : 'panel.costByModel.subMonth')}
           help={t('panel.costByModel.help')}
         />
-        {hasAnyData ? (
-          <ResponsiveContainer width="100%" height={340}>
-            <BarChart data={series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barCategoryGap="15%">
-              <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
-              <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={v => `$${v}`} width={70} />
-              <Tooltip content={<SeriesTooltip />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
-              <Legend wrapperStyle={{ paddingTop: 8 }} iconType="square" />
-              {modelNames.map((m, i) => {
-                const isLast = i === modelNames.length - 1
-                return (
-                  <Bar
-                    key={m}
-                    dataKey={`model:${m}`}
-                    name={m}
-                    stackId="cost"
-                    fill={COLORS[i % COLORS.length]}
-                    radius={isLast ? [3, 3, 0, 0] : 0}
-                    isAnimationActive={false}
-                  />
-                )
-              })}
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (<ChartEmpty height={340} />)}
+        <div className="widget-panel-body">
+          {hasAnyData ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barCategoryGap="15%">
+                <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
+                <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={v => `$${v}`} width={70} />
+                <Tooltip content={<SeriesTooltip />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
+                <Legend wrapperStyle={{ paddingTop: 8 }} iconType="square" />
+                {modelNames.map((m, i) => {
+                  const isLast = i === modelNames.length - 1
+                  return (
+                    <Bar key={m} dataKey={`model:${m}`} name={m} stackId="cost" fill={COLORS[i % COLORS.length]}
+                      radius={isLast ? [3, 3, 0, 0] : 0} isAnimationActive={false} />
+                  )
+                })}
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (<ChartEmpty />)}
+        </div>
       </div>
-
+    ) },
+    { id: 'tokens', title: t('panel.tokens.title'), render: () => (
       <TokensPanel series={series} granularity={granularity} hasData={hasTokenData} />
-
-      <div className="panel" style={{ marginBottom: 14 }}>
+    ) },
+    { id: 'calls', title: t('panel.calls.title'), render: () => (
+      <div className="panel widget-panel">
         <PanelHeader
           title={t('panel.calls.title')}
           sub={t(granularity === 'day' ? 'panel.calls.subDay' : granularity === 'week' ? 'panel.calls.subWeek' : 'panel.calls.subMonth')}
           help={t('panel.calls.help')}
         />
-        {hasAnyData ? (
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barCategoryGap="15%">
-              <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
-              <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={fmtInt} width={60} />
-              <Tooltip content={<CallsTooltip />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
-              <Bar dataKey="calls" fill="var(--chart-2)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (<ChartEmpty height={180} />)}
+        <div className="widget-panel-body">
+          {hasAnyData ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barCategoryGap="15%">
+                <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
+                <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={fmtInt} width={60} />
+                <Tooltip content={<CallsTooltip />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
+                <Bar dataKey="calls" fill="var(--chart-2)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (<ChartEmpty />)}
+        </div>
       </div>
-
-      <ModelsPanel data={data} />
-
-      <div className="grid col-2">
-        <div className="panel">
-          <div className="panel-head">
-            <div className="panel-title-row">
-              <h3 style={{ margin: 0 }}>{t('panel.activity.title')}</h3>
-              <HelpTip>{t('panel.activity.help')}</HelpTip>
-            </div>
+    ) },
+    { id: 'models', title: t('panel.models.title'), render: () => <ModelsPanel data={data} /> },
+    { id: 'activity', title: t('panel.activity.title'), render: () => (
+      <div className="panel widget-panel">
+        <div className="panel-head">
+          <div className="panel-title-row">
+            <h3 style={{ margin: 0 }}>{t('panel.activity.title')}</h3>
+            <HelpTip>{t('panel.activity.help')}</HelpTip>
           </div>
-          {data.categories.length === 0 ? <ChartEmpty height={280} /> : (
-            <ResponsiveContainer width="100%" height={280}>
+        </div>
+        <div className="widget-panel-body">
+          {data.categories.length === 0 ? <ChartEmpty /> : (
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.categories} layout="vertical" margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" tickFormatter={v => `$${v}`} tickLine={false} axisLine={{ stroke: 'var(--grid)' }} />
@@ -1719,16 +1715,18 @@ function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectVi
             </ResponsiveContainer>
           )}
         </div>
-
-        {!inProjectView && (
-          <div className="panel">
-            <div className="panel-head">
-              <div className="panel-title-row">
-                <h3 style={{ margin: 0 }}>{t('panel.topProjects.title')}</h3>
-                <HelpTip>{t('panel.topProjects.help')}</HelpTip>
-              </div>
-            </div>
-            {data.projects.length === 0 ? <ChartEmpty height={200} /> : (
+      </div>
+    ) },
+    { id: 'top-projects', title: t('panel.topProjects.title'), render: () => (
+      <div className="panel widget-panel">
+        <div className="panel-head">
+          <div className="panel-title-row">
+            <h3 style={{ margin: 0 }}>{t('panel.topProjects.title')}</h3>
+            <HelpTip>{t('panel.topProjects.help')}</HelpTip>
+          </div>
+        </div>
+        <div className="widget-panel-body widget-panel-body-scroll">
+          {data.projects.length === 0 ? <ChartEmpty /> : (
             <table className="breakdown breakdown-projects">
               <colgroup>
                 <col />
@@ -1742,17 +1740,11 @@ function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectVi
                   <tr key={p.name} className="clickable">
                     <td className="project-cell">
                       {p.id && (
-                        <a
-                          className="row-stretch-link"
-                          href={hrefFor({ name: 'project', id: p.id })}
-                          aria-label={p.label}
-                        />
+                        <a className="row-stretch-link" href={hrefFor({ name: 'project', id: p.id })} aria-label={p.label} />
                       )}
                       <span className="project-name">
                         {p.favorite && <span className="fav-star" aria-hidden="true">★</span>}
-                        <span className="project-name-wrap">
-                          <MidEllipsis text={p.label} />
-                        </span>
+                        <span className="project-name-wrap"><MidEllipsis text={p.label} /></span>
                       </span>
                     </td>
                     <td className="num">{fmtInt(p.calls)}</td>
@@ -1762,11 +1754,40 @@ function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectVi
                 ))}
               </tbody>
             </table>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
+    ) },
+  ]
+
+  // ─── Insights widgets — only registered when project view + data is loaded.
+  if (insightsData) {
+    catalog.push(...buildInsightsCatalog(t, insightsData, insightsProjectKey ?? null, dl))
+  }
+
+  const screen = inProjectView ? 'project' : 'dashboard'
+
+  return (
+    <>
+      <WidgetGrid screen={screen} catalog={catalog} editing={editing} />
+      {editing && <EditModeToolbar screen={screen} catalog={catalog} />}
     </>
+  )
+}
+
+/** Toolbar shown below the grid in edit mode: Add widget picker + Reset. */
+function EditModeToolbar({ screen, catalog }: { screen: string; catalog: WidgetDef[] }) {
+  const t = useT()
+  const { reset } = useScreenLayout(screen)
+  return (
+    <div className="edit-toolbar">
+      <AddWidgetPicker screen={screen} catalog={catalog} />
+      <button
+        className="reset-layout-btn"
+        onClick={() => { if (confirm(t('customize.resetConfirm'))) reset.mutate() }}
+        title={t('customize.reset')}
+      >↺ {t('customize.reset')}</button>
+    </div>
   )
 }
 

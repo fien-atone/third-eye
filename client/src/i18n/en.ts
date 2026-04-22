@@ -25,6 +25,12 @@ export const en = {
   'preset.mtd': 'MTD',
   'preset.12m': '12m',
   'controls.providerCalls': 'calls',
+  'controls.customize': 'Customize',
+  'controls.customize.done': 'Done',
+  'customize.reset': 'Reset to defaults',
+  'customize.resetConfirm': 'Reset this screen to its default layout? Your customizations will be lost.',
+  'customize.add': 'Add widget',
+  'customize.addEmpty': 'All widgets are on screen — nothing else to add.',
 
   // Summary
   'summary.days': 'days',

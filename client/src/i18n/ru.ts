@@ -24,6 +24,12 @@ export const ru: Dict = {
   'preset.mtd': 'Мес.',
   'preset.12m': '12м',
   'controls.providerCalls': 'вызовов',
+  'controls.customize': 'Настроить',
+  'controls.customize.done': 'Готово',
+  'customize.reset': 'Сбросить к дефолту',
+  'customize.resetConfirm': 'Сбросить этот экран к дефолтному раскладу? Ваши настройки будут потеряны.',
+  'customize.add': 'Добавить виджет',
+  'customize.addEmpty': 'Все виджеты на экране — добавлять больше нечего.',
 
   'summary.days': 'дней',
   'summary.weeks': 'недель',
