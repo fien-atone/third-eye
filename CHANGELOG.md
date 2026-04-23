@@ -4,6 +4,18 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] — 2026-04-24
+
+### Fixed
+- **Production build failed** with three TS6133 errors in
+  `client/src/widgets/panels.tsx` (unused `fmt`, `total`, `sorted`,
+  `pieData` locals left behind by the v2.0.0 VersionsPanel refactor).
+  Fresh installs of v2.0.0 hitting `npm start` (which builds the
+  client) couldn't get past `tsc -b`. Removed the dead bindings and
+  fixed the related `metricLabel` so the column header tracks the
+  effective metric instead of the un-clamped one (visible only when
+  the filter chips are hidden on a narrow Versions tile).
+
 ## [2.0.0] — 2026-04-24
 
 The widget grid grows up. Every widget now responds to its own size:

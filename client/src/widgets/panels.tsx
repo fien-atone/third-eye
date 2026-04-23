@@ -394,11 +394,6 @@ type VersionMetric = 'cost' | 'calls' | 'tokens'
 export function VersionsPanel({ rows }: { rows: VersionRow[] }) {
   const t = useT()
   const [metric, setMetric] = useState<VersionMetric>('cost')
-  const fmt = metric === 'cost' ? fmtCurrency : metric === 'calls' ? fmtInt : fmtTokens
-  const total = rows.reduce((s, v) => s + (v[metric] ?? 0), 0)
-  const sorted = [...rows].sort((a, b) => (b[metric] ?? 0) - (a[metric] ?? 0))
-  const pieData = sorted.map(v => ({ name: v.name, value: v[metric] ?? 0 }))
-  const metricLabel = metric === 'cost' ? t('insights.versions.metricCost') : metric === 'calls' ? t('insights.versions.metricCalls') : t('insights.versions.metricTokens')
 
   const panelRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -420,6 +415,10 @@ export function VersionsPanel({ rows }: { rows: VersionRow[] }) {
   const effectiveTotal = rows.reduce((s, v) => s + (v[effectiveMetric] ?? 0), 0)
   const effectiveSorted = [...rows].sort((a, b) => (b[effectiveMetric] ?? 0) - (a[effectiveMetric] ?? 0))
   const effectivePie = effectiveSorted.map(v => ({ name: v.name, value: v[effectiveMetric] ?? 0 }))
+  // Column header label tracks the EFFECTIVE metric, so when chips are
+  // hidden and metric is forced back to 'cost', the column shows the
+  // right title instead of whatever was last selected.
+  const metricLabel = effectiveMetric === 'cost' ? t('insights.versions.metricCost') : effectiveMetric === 'calls' ? t('insights.versions.metricCalls') : t('insights.versions.metricTokens')
 
   // Column priorities for the side table — same drop-by-width strategy
   // as ModelsPanel. Version + metric value are mandatory; share and
