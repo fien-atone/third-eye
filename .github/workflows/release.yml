@@ -1,0 +1,59 @@
+name: Release
+
+# Triggers when scripts/release.sh pushes a vX.Y.Z tag. Pulls the
+# matching ## [X.Y.Z] section out of CHANGELOG.md and creates a
+# GitHub Release page with it. The release is marked "Latest" iff
+# this is the highest semver tag in the repo (skips for backported
+# patches to old major lines).
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME#v}"
+          esc="${ver//./\\.}"
+          awk "/^## \\[${esc}\\]/{flag=1; next} /^## \\[/{flag=0} flag" CHANGELOG.md > /tmp/notes.md
+          if [[ ! -s /tmp/notes.md ]]; then
+            echo "::error::No '## [${ver}]' section found in CHANGELOG.md"
+            exit 1
+          fi
+          # Use the tag itself as the release title; subtitle lives in
+          # the body. Keeps automation self-contained — no parsing of
+          # subtitles out of headers.
+          echo "title=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether this is the latest release
+        id: latest
+        run: |
+          set -euo pipefail
+          highest=$(git tag -l 'v*.*.*' | sort -V | tail -1)
+          if [[ "${GITHUB_REF_NAME}" == "$highest" ]]; then
+            echo "flag=--latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=--latest=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${{ steps.notes.outputs.title }}" \
+            --notes-file /tmp/notes.md \
+            ${{ steps.latest.outputs.flag }}
