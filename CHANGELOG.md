@@ -131,6 +131,7 @@ components.
   across all 5 locales for the new truncation chip; `insights.heatmap.
   {tooSmall,cellCalls}` for the heatmap fallback + tooltip.
 
+## [1.4.0] — 2026-04-23
 
 
 ### Added
