@@ -104,7 +104,10 @@ function normalizeProviders(q: unknown): string[] {
 const app = express()
 // CORS: allow only the vite dev server and same-origin Docker/static use.
 // Override via CODEBURN_CORS_ORIGIN="https://your.host" if you ever expose this publicly (not recommended).
-const corsOrigin = process.env.CODEBURN_CORS_ORIGIN ?? ['http://localhost:5173', 'http://127.0.0.1:5173']
+const corsOrigin = process.env.CODEBURN_CORS_ORIGIN ?? [
+  'http://localhost:5173', 'http://127.0.0.1:5173',
+  'http://localhost:5180', 'http://127.0.0.1:5180',
+]
 app.use(cors({ origin: corsOrigin }))
 app.use(express.json())
 
@@ -634,7 +637,19 @@ for (const dist of clientDistCandidates) {
 const port = Number(process.env.PORT ?? 4317)
 
 async function boot() {
-  db()
+  const d = db()
+  // Warm SQLite's page cache so the first user request doesn't eat a
+  // 5–15 second cold-query hit. Cost: ~50 ms of extra boot latency for a
+  // 33k-row db; benefit: `/api/projects` (LEFT JOIN + GROUP BY on the
+  // whole api_calls table) and `/api/insights/:id` (multi-way aggregate
+  // on tool_events + api_calls) return immediately on the first click
+  // instead of leaving the UI spinning. Touching every page with a
+  // trivial COUNT query is enough — WAL + mmap mean subsequent real
+  // queries hit memory rather than disk. */
+  try {
+    d.prepare('SELECT COUNT(*) FROM api_calls').get()
+    d.prepare('SELECT COUNT(*) FROM tool_events').get()
+  } catch { /* empty DB on first start — no-op */ }
   const last = getMeta('last_ingest_at')
   if (!last) {
     console.log('[ingest] empty DB, running initial ingest…')
@@ -658,7 +673,26 @@ async function boot() {
   // Bind to loopback by default — the server reads your session data, so it should not be LAN-accessible
   // without intent. Override via CODEBURN_HOST=0.0.0.0 for Docker / container scenarios.
   const host = process.env.CODEBURN_HOST ?? '127.0.0.1'
-  app.listen(port, host, () => console.log(`Third Eye server on http://${host}:${port}`))
+  const server = app.listen(port, host, () => console.log(`Third Eye server on http://${host}:${port}`))
+
+  // Keep-alive tuning. Node's default keepAliveTimeout is 5s, but browsers
+  // reuse keep-alive sockets for much longer. After 5s of idle the server
+  // FINs the socket; the browser doesn't notice until it tries to send the
+  // next request, which then hangs (visible as "pending" in DevTools) until
+  // the client-side timeout. Bumping to 65s matches the de-facto industry
+  // standard (AWS ALB / nginx). headersTimeout must be > keepAliveTimeout
+  // or Node's own check fires first and aborts in-flight requests.
+  server.keepAliveTimeout = 65_000
+  server.headersTimeout = 66_000
+
+  // Graceful shutdown: close the listening socket before exiting so the OS
+  // releases the port immediately. Without this, `tsx watch` restarts on
+  // file change hit EADDRINUSE for ~30–60s until the kernel reclaims the
+  // socket — which kills `tsx watch`, which kills Vite (concurrently's
+  // --kill-others-on-fail), leaving the user with a dead dev session.
+  const shutdown = () => server.close(() => process.exit(0))
+  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', shutdown)
 }
 
 boot().catch(err => { console.error(err); process.exit(1) })

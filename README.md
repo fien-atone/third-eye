@@ -29,7 +29,7 @@ ephemeral ones from Cowork.
 - **Cost breakdowns** by model, project, activity, git branch — any date range, any aggregation (day / week / month)
 - **Per-project drill-down** — click any project, get the full story: files you edit most, tools you invoke, subagents you spawn, skills you trigger, MCP servers you lean on
 - **Projects registry** — search, sort, rename, pin favourites; ⌘/Ctrl/middle-click any row to open the project in a new tab
-- **Customizable widget dashboards** — drag, resize, add and remove widgets on both the Dashboard and per-project view; layouts saved to your local DB and travel with the file across machines
+- **Customizable widget dashboards** — drag, resize, add and remove widgets on both the Dashboard and per-project view; every widget adapts to the size you give it (lists fit by row count, tables drop columns by priority, KPIs scale text via container queries, the heatmap sizes its cells exactly); layouts saved to your local DB and travel with the file across machines
 - **Activity heatmap** — 7×24 grid showing when you actually work on each project
 - **Claude Code version tracking** — see which CLI versions touched each project, distribution by cost / calls / tokens
 - **Shareable project URLs** — stable UUID in the hash, bookmark it, send it
@@ -116,6 +116,8 @@ honest screenshots are the ones you make yourself once it's running.*
   npm start` (or `docker compose pull && docker compose up -d --build`).
 - **[CHANGELOG.md](./CHANGELOG.md)** — what's new in each release, fixes,
   removals, and internals worth knowing.
+- **[ROADMAP.md](./ROADMAP.md)** — what's planned, what's considered, and
+  what we explicitly decided not to do.
 
 ## License & credits
 

@@ -14,10 +14,23 @@ export default defineConfig({
     // so users can see what they're running and compare to the latest release.
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
+  // Pre-bundle heavy deps on dev-server start instead of on-demand. Without
+  // this, first request to a page using e.g. gridstack waits for esbuild
+  // to crawl and bundle it inline. Pre-bundling moves that cost to startup
+  // and dramatically speeds up cold page reloads in dev mode.
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-dom/client',
+      '@tanstack/react-query',
+      'recharts',
+      'gridstack',
+      'date-fns',
+    ],
+  },
   server: {
-    port: 5173,
-    proxy: {
-      '/api': 'http://localhost:4317',
-    },
+    port: 5180,
+    strictPort: true,
   },
 })

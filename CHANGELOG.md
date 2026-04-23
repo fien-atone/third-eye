@@ -4,7 +4,134 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.0] — 2026-04-23
+## [2.0.0] — 2026-04-24
+
+The widget grid grows up. Every widget now responds to its own size:
+lists fit by height, tables drop columns by priority, charts size to
+the tile, KPIs scale via container queries, the heatmap fits exactly
+or shows a "make me bigger" hint. Tooltips escape clipping ancestors
+via React portals. Project rename moved to the project page itself.
+App.tsx shrunk from 673 lines to 283 by extracting screen + control
+components.
+
+### Added
+- **Fit-by-height for every list / table widget** — Top projects, File
+  hotspots, Branches, Models, Subagents, Skills, MCP, Bash, and the
+  Versions table render only as many rows as visibly fit. A footer
+  chip below shows `Showing X of Y · N hidden` (or `All N shown` when
+  everything fits) so users always know the dataset size. Replaces
+  the old internal scrollbars.
+- **Priority-based column hiding for the Models table** — `Model` and
+  `Cost` are always visible; `Calls` / `Share` / `Input` / `Output` /
+  `CacheR` / `CacheW` come back as the tile gets wider.
+- **Donut ↔ table cross-highlight on the Versions widget** — hover a
+  segment to highlight the matching row, hover a row to spotlight the
+  matching segment (others dim to 35% opacity).
+- **Project rename on the project detail page** — click ✎ next to the
+  H1, edit inline, ✓ to save / ✕ to cancel / ⟲ to reset to auto.
+  Mirrors the pattern from the projects list; refetches both queries
+  so the new name shows up everywhere immediately.
+- **Heatmap cell tooltip** — stylized portal popup with day, hour
+  range, and call count. Hovered cell gets an accent outline; the
+  matching day row + hour column labels go bold.
+- **Always-on x-axis** on time-series charts so dates are readable
+  even on a 2-row tile (was hidden below `h>=3`).
+- **"Not enough space" fallback** for the Heatmap when the tile is
+  too small to render a usable 7×24 grid.
+
+### Changed
+- **Tooltips render via React Portal** into `document.body` — they no
+  longer get clipped by the tile's `overflow:hidden` boundary. Auto-
+  flip near viewport edges. Tooltips also now show the **full
+  localized date** (`Wednesday, 12 March 2026`) instead of the
+  compact axis label.
+- **Charts share a layout vocabulary** — `TIMESERIES_MARGIN`,
+  `TIMESERIES_YAXIS_WIDTH=60`, and a `.widget-chart-body` /
+  `.widget-chart-area` flex-column structure so the
+  `ResponsiveContainer` always sees a real bounded height. Two
+  time-series widgets at the same tile size now stack with axes
+  visually aligned.
+- **Activity widget** uses the same fit-by-height pattern as lists:
+  shows only as many bars as can be drawn cleanly at the current
+  height, hides its own x-axis if drawing it would shrink bars to
+  invisibility, and shows the truncation chip when bars are dropped.
+- **KPI value font scales via CSS container queries** at the tile
+  level (≤320px → 18px, ≤240px → 16px, ≤180px → 14px). All four
+  KPI tiles in a row pick the same font size at the same width —
+  including the single-metric `Scope` tile that previously stayed
+  20px while neighbours shrank.
+- **Filter chips on Tokens / Versions hide on narrow tiles** (panel
+  width <360px) and force the underlying view back to its default,
+  so a user can't get stuck on a filtered slice they can't change.
+- **Versions donut hides on widths <460px** — the table takes the
+  full panel. When shown, the donut uses percent radii and stretches
+  to the cell height (was clipped at h=2 with the old fixed 220px).
+- **Versions / Tokens / Branches / Files / Models tables clip
+  overflow at the cell** — long branch names use `MidEllipsis` and
+  `table-layout: fixed` so the numeric columns never get pushed off
+  the right edge.
+- **Empty-slot placeholder behaviour during edit mode** — the dashed
+  rectangles always render as drag-target guides, but the `+` button
+  inside (and the per-tile "↑+" insert-row button) only shows when
+  there's actually something in the catalog to add.
+- **Layout-customize toolbar hidden under window width 720** —
+  matches the existing `MOBILE_BREAKPOINT` where GridStack drag /
+  resize is disabled anyway.
+- **Insights widget subtitle ("PLAN MODE 0 / 0.0% from N calls"
+  etc.)** clamped to one line on narrow tiles so a long localized
+  subtitle doesn't eat into the body and starve `useFitCount`.
+- **Project rename label unified** — `Session: …` is used on both
+  the projects list and the project detail page (was `Location: …`
+  on the detail page).
+- **README** — bullet refresh + minor wording.
+
+### Fixed
+- **Charts no longer overflow the widget edge.** The pre-2.0 layout
+  let `ResponsiveContainer` claim 100% of the panel body height
+  while the legend stacked on top, so on narrow / short tiles the
+  rendered SVG escaped the rounded panel border.
+- **"Showing 0 of N" stuck state on cold mount** — when GridStack
+  assigned the tile a real size after the first measurement,
+  `useFitCount` had latched at 0 because no rows were rendered to
+  measure. The hook now never falls below 1 from "no rows present"
+  and re-measures correctly when the body comes online.
+- **Vite dev proxy hangs on macOS** (cold-start API requests
+  occasionally pending for 10s). The client in dev now hits the
+  backend directly at `127.0.0.1:4317` (`api.ts` reads
+  `import.meta.env.DEV`); the Vite proxy was rolling an
+  IPv6/IPv4 lottery for every fresh socket and losing.
+- **Project labels in subtitle no longer wrap to 2-3 lines on narrow
+  tiles** — clamped to single-line ellipsis so the panel header has
+  a predictable height.
+- **`server.keepAliveTimeout` bumped to 65s** (Node default 5s).
+  Browser keep-alive sockets were getting silently FIN'd between
+  requests, making subsequent requests hang for ~10s as Chrome
+  tried to reuse a closed socket. Pairs with `headersTimeout = 66s`
+  per Node's required ordering.
+
+### Internals
+- **New hook `lib/use-fit-count.ts`** — measures container height +
+  first-row height + footer height (via a `forwardRef` chip), works
+  for both `<table>`-shaped (with `rowSelector: 'tbody > tr'`) and
+  `<div>`-shaped row containers. Used by 9 widgets.
+- **App.tsx 673 → 283 lines.** Extracted:
+  - `screens/project-page.tsx` — project header (with rename) +
+    insights query + `<Dashboard inProjectView>` composition.
+  - `components/app-header.tsx` — brand, version, locale, theme,
+    nav-tabs.
+  - `components/dashboard-controls.tsx` — granularity, presets,
+    date pickers, provider chips, edit toolbar, summary band.
+  - `components/{date-field,locale-switcher,theme-toggle,footer,
+    server-down-banner}.tsx` — small standalone components lifted
+    out of App.
+- **`api.ts` got `apiPut` / `apiDelete`** (in addition to existing
+  `apiGet` / `apiPost` / `apiPatch`). Layout save/reset now use the
+  centralised wrapper.
+- **i18n: `widget.listMore.{count,hint,tip,compact,all}Fmt`** added
+  across all 5 locales for the new truncation chip; `insights.heatmap.
+  {tooSmall,cellCalls}` for the heatmap fallback + tooltip.
+
+
 
 ### Added
 - **Customizable widget dashboards** — both the Dashboard and Project
