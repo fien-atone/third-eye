@@ -318,6 +318,120 @@ export const en = {
   'time.minAgo': '{n}m ago',
   'time.hourAgo': '{n}h ago',
   'time.dayAgo': '{n}d ago',
+
+  // ─── Agents ───────────────────────────────────────────────────────
+  // Setup banner
+  'agents.banner.title': 'Set up your Agentic AI insights',
+  'agents.banner.projectBody': 'We found {n} agent {roles} in this project. Tell us which are real agents to unlock per-agent breakdowns.',
+  'agents.banner.globalBody': 'We detected {n} agent {roles} across your projects. Open any project to classify them and unlock role-level analytics.',
+  'agents.banner.cta': 'Set up agents →',
+  'agents.banner.roleOne': 'role',
+  'agents.banner.roleMany': 'roles',
+
+  // Registry modal
+  'agents.modal.title': 'Set up your agents',
+  'agents.modal.close': 'Close',
+  'agents.modal.intro': 'Mark the role names that are real agents. Nothing is saved until you click {apply} at the bottom — feel free to explore.',
+  'agents.modal.disclaimer': 'Detected from session logs. Some spawns may be missing or misclassified — treat this list as a starting point, not a complete ledger.',
+  'agents.modal.searchPlaceholder': 'Search {n} {roles}…',
+  'agents.modal.noMatch': 'No roles match “{q}”.',
+  'agents.modal.clearFilter': 'Clear filter',
+  'agents.modal.loading': 'Loading…',
+  'agents.modal.loadError': 'Failed to load: {err}',
+  'agents.modal.unknownRow': '{n} {sessions} (${cost}) had no role tag — nothing to classify here.',
+  'agents.modal.emptyRoles': 'No classifiable agent roles found in this project yet.',
+  'agents.modal.markToggleOn': '✓ Agent',
+  'agents.modal.markToggleOff': 'Mark as agent',
+  'agents.modal.displayNameLabel': 'Display name:',
+  'agents.modal.footerTrust': 'Trust the detector? Mark every role as an agent in one click.',
+  'agents.modal.footerPending': '{n} pending {changes} — click Apply to save.',
+  'agents.modal.markAll': 'Mark all as agents',
+  'agents.modal.apply': 'Apply',
+  'agents.modal.applyWithCount': 'Apply ({n})',
+  'agents.modal.applying': 'Saving…',
+  'agents.modal.saveError': 'Failed to save',
+  'agents.modal.discardConfirm': 'You have {n} unsaved {changes}. Discard?',
+  'agents.modal.discardTitle': 'Discard unsaved changes?',
+  'agents.modal.discardOk': 'Discard',
+  'agents.modal.discardCancel': 'Keep editing',
+  'agents.modal.sessionOne': 'session',
+  'agents.modal.sessionMany': 'sessions',
+  'agents.modal.changeOne': 'change',
+  'agents.modal.changeMany': 'changes',
+  'agents.modal.roleSessionStats': '{n} {sessions} · ${cost}',
+
+  // KPI pins
+  'agents.kpi.sessions.title': 'Agent sessions',
+  'agents.kpi.sessions.desc': 'Count of agent spawns + total tokens moved',
+  'agents.kpi.sessions.total': 'Total',
+  'agents.kpi.sessions.tokens': 'Tokens',
+
+  'agents.kpi.sessionAvg.title': 'Agent session avg',
+  'agents.kpi.sessionAvg.desc': 'Average cost and tokens for a typical agent spawn',
+  'agents.kpi.sessionAvg.cost': 'Cost',
+  'agents.kpi.sessionAvg.tokens': 'Tokens',
+
+  'agents.kpi.efficiency.title': 'Agent efficiency',
+  'agents.kpi.efficiency.desc': 'What share of the project runs through your agents',
+  'agents.kpi.efficiency.costShare': 'Cost share',
+  'agents.kpi.efficiency.tokensShare': 'Tokens share',
+
+  // Distribution widget
+  'agents.distribution.title': 'Agents by cost',
+  'agents.distribution.desc': 'Per-agent totals: sessions, tokens, cost',
+  'agents.distribution.sub': 'Per-agent totals across the selected range',
+  'agents.distribution.colAgent': 'Agent',
+  'agents.distribution.colSessions': 'Sessions',
+  'agents.distribution.colTokens': 'Tokens',
+  'agents.distribution.colTools': 'Tools',
+  'agents.distribution.colCost': 'Cost',
+  'agents.distribution.empty': 'No agents configured in this project yet.',
+
+  // Top sessions widget
+  'agents.topSessions.title': 'Top agent sessions by cost',
+  'agents.topSessions.desc': 'Heaviest individual agent invocations by spend',
+  'agents.topSessions.sub': 'Heaviest individual invocations in range',
+  'agents.topSessions.colAgent': 'Agent',
+  'agents.topSessions.colDescription': 'Description',
+  'agents.topSessions.colTokens': 'Tokens',
+  'agents.topSessions.colTools': 'Tools',
+  'agents.topSessions.colDuration': 'Dur',
+  'agents.topSessions.colCost': 'Cost',
+  'agents.topSessions.empty': 'No agent sessions in this range.',
+
+  // Timeline widget
+  'agents.timeline.title': 'Agents over time',
+  'agents.timeline.desc': 'Per-day cost by agent — see which roles work when',
+  'agents.timeline.subHour': 'Cost per agent per hour',
+  'agents.timeline.subDay': 'Cost per agent per day',
+  'agents.timeline.subWeek': 'Cost per agent per week',
+  'agents.timeline.subMonth': 'Cost per agent per month',
+  'agents.timeline.help': 'Cost per bucket stacked by agent. Bars show when each of your configured agents was active and how costly their work was. Only shows agents you\'ve classified — everything else is excluded.',
+  'agents.timeline.empty': 'No configured agents active in this range.',
+
+  // Placeholder used inside widget empty state (just informational — no CTA)
+  'agents.widget.emptyWithManage': 'No agents configured in this project yet. Use ‘Manage agents’ in the project header above to set them up.',
+
+  // Project header — Manage agents
+  'agents.projectHeader.manage': 'Manage agents',
+  'agents.projectHeader.manageTitle': 'Manage configured agents for this project',
+
+  // Widget picker sections + search
+  'customize.sectionGeneral': 'General',
+  'customize.sectionInsights': 'Insights by area',
+  'customize.sectionAgents': 'Agents',
+  'customize.searchPlaceholder': 'Search {n} {widgets}…',
+  'customize.searchDisabled': 'No widgets to add',
+  'customize.widgetOne': 'widget',
+  'customize.widgetMany': 'widgets',
+  'customize.noMatch': 'No widgets match “{q}”.',
+  'customize.clearSearch': 'Clear',
+
+  // Misc — aria-labels, tooltips that weren't covered in dedicated blocks
+  'common.home': 'Home',
+  'common.help': 'Help',
+  'footer.releasesTitle': 'Compare to the latest release on GitHub',
+  'agents.modal.unsavedDot': 'Unsaved change',
 } as const
 
 export type Dict = Record<keyof typeof en, string>

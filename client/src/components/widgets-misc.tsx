@@ -164,6 +164,7 @@ export function PanelHeader({ title, sub, help }: { title: string; sub?: string;
 const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches
 
 export function HelpTip({ children }: { children: React.ReactNode }) {
+  const t = useT()
   const triggerRef = useRef<HTMLSpanElement>(null)
   const bubbleRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
@@ -221,7 +222,7 @@ export function HelpTip({ children }: { children: React.ReactNode }) {
         ref={triggerRef}
         className="help-tip"
         tabIndex={0}
-        aria-label="Help"
+        aria-label={t('common.help')}
         aria-expanded={open}
         {...hoverProps}
       >?</span>

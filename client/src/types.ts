@@ -48,7 +48,6 @@ export type InsightsResponse = {
   flags: { plan_mode_calls: number; todo_write_calls: number; total_calls: number }
   branches: Array<{ name: string; calls: number; cost: number }>
   versions: VersionRow[]
-  heatmap: Array<{ dow: number; hour: number; calls: number; cost: number }>
 }
 
 export type OverviewResponse = {
@@ -90,7 +89,47 @@ export type OverviewResponse = {
   }>
   topProjects: Array<{ key: string; id: string | null; label: string; cost: number; calls: number }>
   otherProjects: { count: number; cost: number }
+  agentTelemetry: AgentTelemetry
   lastIngestAt: string | null
+}
+
+export type AgentTelemetry = {
+  totals: {
+    sessions: number
+    inputTokens: number
+    cacheCreate: number
+    cacheRead: number
+    outputTokens: number
+    totalTokens: number
+    cost: number
+    toolUses: number
+    durationS: number
+  }
+  byRole: Array<{
+    role: string                 // effective label: display_name OR raw role
+    sessions: number
+    tokens: number
+    cost: number
+    toolUses: number
+  }>
+  topSessions: Array<{
+    agentId: string
+    source: string               // 'subagent' | 'task'
+    role: string                 // effective label (see byRole.role)
+    rawRole: string              // original detected role, for reference
+    confidence: string
+    description: string
+    tsStart: string
+    durationS: number
+    totalTokens: number
+    cost: number
+    toolUses: number
+    apiCalls: number
+  }>
+  timeline: {
+    roles: string[]              // all effective roles seen in range, sorted
+    series: Array<Record<string, number | string>>  // per-bucket row, keys: bucket, `agent:<role>`
+  }
 }
 
 /** Recharts tooltip props (re-typed loosely — Recharts types are

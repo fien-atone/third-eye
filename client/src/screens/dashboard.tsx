@@ -6,6 +6,7 @@ import { useT } from '../i18n'
 import type { Granularity, InsightsResponse, OverviewResponse } from '../types'
 import { parseLocalDate, useDateLocale } from '../lib/format'
 import { buildDashboardCatalog, buildInsightsCatalog } from '../widgets/registry'
+import { AgentsSetupBanner } from '../components/agents-setup-banner'
 
 /** Hour buckets arrive as "YYYY-MM-DD HH:00" — split before parseLocalDate
  *  so the date helper still gets a clean YYYY-MM-DD. */
@@ -49,7 +50,7 @@ function formatBucketFull(bucket: string, g: Granularity, dl: Locale): string {
   return format(parseLocalDate(bucket), 'EEEE, d MMMM yyyy', { locale: dl })
 }
 
-export function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectView, insightsData, insightsProjectKey, editing, layoutEpoch, onLayoutReset, screenOverride, extraWidgets }: {
+export function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectView, insightsData, insightsProjectKey, editing, layoutEpoch, onLayoutReset, screenOverride, extraWidgets, onOpenAgentsRegistry }: {
   data: OverviewResponse
   modelNames: string[]
   granularity: Granularity
@@ -69,6 +70,10 @@ export function Dashboard({ data, modelNames, granularity, onSelectProject, inPr
    *  weekday-hour-heatmap) that need access to selectedDate state
    *  which lives in the day-view component. */
   extraWidgets?: WidgetDef[]
+  /** Threaded from ProjectPage — owns the registry modal because the
+   *  "Manage agents" button lives in the project header (a stable UI
+   *  location the user can't hide). Banner CTA uses the same handle. */
+  onOpenAgentsRegistry?: () => void
 }) {
   const t = useT()
   const dl = useDateLocale()
@@ -92,6 +97,8 @@ export function Dashboard({ data, modelNames, granularity, onSelectProject, inPr
   // covers both the dashboard and the project view; the server-side
   // default layout for each screen decides which widgets are initially
   // placed (e.g. cost-by-project / top-projects are dashboard-only).
+
+  const projectId = data.frame.project?.id ?? null
 
   const catalog: WidgetDef[] = buildDashboardCatalog({
     t, data, modelNames, granularity, onSelectProject, inProjectView,
@@ -123,7 +130,7 @@ export function Dashboard({ data, modelNames, granularity, onSelectProject, inPr
       subagents: [], skills: [], mcp: [], bash: [],
       files: [], filesUnique: 0,
       flags: { plan_mode_calls: 0, todo_write_calls: 0, total_calls: 0 },
-      branches: [], versions: [], heatmap: [],
+      branches: [], versions: [],
     }
     catalog.push(...buildInsightsCatalog({ t, data: effectiveInsights, projectKey: insightsProjectKey ?? null, dl }))
   }
@@ -132,13 +139,19 @@ export function Dashboard({ data, modelNames, granularity, onSelectProject, inPr
   const screen = screenOverride ?? (inProjectView ? 'project' : 'dashboard')
 
   return (
-    <DashboardView
-      screen={screen}
-      catalog={catalog}
-      editing={editing}
-      layoutEpoch={layoutEpoch}
-      onLayoutReset={onLayoutReset}
-    />
+    <>
+      <AgentsSetupBanner
+        projectId={projectId}
+        onOpenRegistry={onOpenAgentsRegistry}
+      />
+      <DashboardView
+        screen={screen}
+        catalog={catalog}
+        editing={editing}
+        layoutEpoch={layoutEpoch}
+        onLayoutReset={onLayoutReset}
+      />
+    </>
   )
 }
 

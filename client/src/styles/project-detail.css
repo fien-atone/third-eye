@@ -30,7 +30,12 @@
   color: var(--text);
   line-height: 1.2;
   display: inline-flex;
-  align-items: baseline;
+  /* center-align children uniformly. Previously this was `baseline`
+     with a translateY hack on the pencil to optically recenter —
+     adding a second action button next to the title (Manage agents)
+     made the mismatched alignment visible, so we normalize here and
+     drop the per-child transforms below. */
+  align-items: center;
   gap: 8px;
   letter-spacing: -0.01em;
 }
@@ -39,11 +44,9 @@
   font-weight: 700;
 }
 .project-header-rename {
-  /* Borderless pencil that sits centred next to the title (.project-
-     header-title uses align-items: baseline for its label, so we lift
-     the pencil with translateY to optically centre on the cap height
-     rather than the baseline). */
-  align-self: center;
+  /* Borderless icon button next to the title. Parent uses
+     align-items: center so we don't need the translateY hack that
+     used to compensate for baseline alignment. */
   border: none;
   background: transparent;
   padding: 0;
@@ -52,13 +55,33 @@
   font-size: 18px;
   color: var(--text-dim);
   border-radius: 6px;
-  margin-left: 6px;
-  transform: translateY(-0.18em);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .project-header-rename:hover {
   background: var(--hover);
   color: var(--text);
   border-color: transparent;
+}
+
+/* Secondary action buttons in the project header (e.g. "Manage agents").
+   Base look is set inline on the element; this rule just adds hover/
+   focus states that inline styles can't express. Keeps the experimental
+   purple tone on hover rather than flipping to accent orange. */
+.project-header-action {
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.project-header-action:hover,
+.project-header-action:focus-visible {
+  background: var(--experimental-soft, var(--hover)) !important;
+  border-style: solid !important;
+  border-color: var(--experimental, var(--border-strong)) !important;
+  color: var(--experimental-hover, var(--experimental, var(--text))) !important;
+  outline: none;
+}
+.project-header-action:active {
+  background: var(--experimental-strong, var(--hover)) !important;
 }
 .project-header-title-edit {
   display: inline-flex;

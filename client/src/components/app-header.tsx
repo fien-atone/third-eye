@@ -34,7 +34,7 @@ export function AppHeader({
             className="brand-link"
             href="/"
             onClick={e => { e.preventDefault(); navigate({ name: 'home' }) }}
-            aria-label="Home"
+            aria-label={t('common.home')}
           >
             <Logo size={28} />
             <h1>Third Eye</h1>

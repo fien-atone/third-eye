@@ -40,37 +40,41 @@ export const DASHBOARD_DEFAULT: ScreenLayout = {
     { i: 'calls',           x: 0, y: 8, w: 4, h: 2, minW: 2, minH: 2 },
     { i: 'models',          x: 0, y: 10, w: 4, h: 3, minW: 2, minH: 2 },
     // Bottom row — two-up
-    { i: 'activity',     x: 0, y: 12, w: 2, h: 2, minW: 2, minH: 2 },
-    { i: 'top-projects', x: 2, y: 12, w: 2, h: 2, minW: 2, minH: 2 },
+    { i: 'activity',     x: 0, y: 13, w: 2, h: 2, minW: 2, minH: 2 },
+    { i: 'top-projects', x: 2, y: 13, w: 2, h: 2, minW: 2, minH: 2 },
   ],
   hidden: [],
 }
 
 export const PROJECT_DEFAULT: ScreenLayout = {
   widgets: [
-    // Row 0 — KPI groups (4 across)
-    { i: 'kpi-spend',  x: 0, y: 0, w: 1, h: 1, minW: 1, minH: 1 },
-    { i: 'kpi-tokens', x: 1, y: 0, w: 1, h: 1, minW: 1, minH: 1 },
-    { i: 'kpi-cache',  x: 2, y: 0, w: 1, h: 1, minW: 1, minH: 1 },
-    { i: 'kpi-scope',  x: 3, y: 0, w: 1, h: 1, minW: 1, minH: 1 },
-    // Charts full-width
-    { i: 'cost-by-model', x: 0, y: 1, w: 4, h: 2, minW: 2, minH: 2 },
-    { i: 'tokens',        x: 0, y: 3, w: 4, h: 2, minW: 2, minH: 2 },
-    { i: 'calls',         x: 0, y: 5, w: 4, h: 2, minW: 2, minH: 2 },
-    { i: 'models',        x: 0, y: 7, w: 4, h: 2, minW: 2, minH: 2 },
-    // Insights — 2-up pairs
-    { i: 'activity',  x: 0, y: 9, w: 2, h: 2, minW: 2, minH: 2 },
-    { i: 'subagents', x: 2, y: 9, w: 2, h: 2, minW: 2, minH: 2 },
-    { i: 'skills',    x: 0, y: 11, w: 2, h: 2, minW: 2, minH: 2 },
-    { i: 'mcp',       x: 2, y: 11, w: 2, h: 2, minW: 2, minH: 2 },
-    { i: 'bash',      x: 0, y: 13, w: 2, h: 2, minW: 2, minH: 2 },
-    { i: 'flags',     x: 2, y: 13, w: 2, h: 2, minW: 2, minH: 2 },
-    { i: 'files',     x: 0, y: 15, w: 4, h: 2, minW: 2, minH: 2 },
-    { i: 'versions',  x: 0, y: 17, w: 4, h: 2, minW: 2, minH: 2 },
-    { i: 'branches',  x: 0, y: 19, w: 2, h: 2, minW: 2, minH: 2 },
-    { i: 'heatmap',   x: 2, y: 19, w: 2, h: 2, minW: 2, minH: 2 },
+    // KPI pins row
+    { i: 'kpi-spend',  x: 0, y: 0, w: 1, h: 1 },
+    { i: 'kpi-tokens', x: 1, y: 0, w: 1, h: 1 },
+    { i: 'kpi-cache',  x: 2, y: 0, w: 1, h: 1 },
+    { i: 'kpi-scope',  x: 3, y: 0, w: 1, h: 1 },
+    // Full-width charts
+    { i: 'cost-by-model', x: 0, y: 1, w: 4, h: 3 },
+    { i: 'tokens',        x: 0, y: 4, w: 4, h: 3 },
+    { i: 'calls',         x: 0, y: 7, w: 4, h: 2 },
+    { i: 'models',        x: 0, y: 9, w: 4, h: 2 },
+    // Insights — two-up pairs
+    { i: 'activity',  x: 0, y: 11, w: 2, h: 2 },
+    { i: 'mcp',       x: 2, y: 11, w: 2, h: 2 },
+    { i: 'versions',  x: 0, y: 13, w: 2, h: 2 },
+    { i: 'skills',    x: 2, y: 13, w: 2, h: 2 },
+    { i: 'bash',      x: 0, y: 15, w: 2, h: 2 },
+    { i: 'branches',  x: 2, y: 15, w: 2, h: 2 },
+    { i: 'files',     x: 0, y: 17, w: 4, h: 2 },
+    // Agents block: KPI pins → tables side-by-side → timeline
+    { i: 'kpi-agent-delegation',         x: 0, y: 19, w: 1, h: 1 },
+    { i: 'kpi-agent-sessions',           x: 1, y: 19, w: 1, h: 1 },
+    { i: 'kpi-agent-tokens-per-session', x: 2, y: 19, w: 1, h: 1 },
+    { i: 'agent-distribution', x: 0, y: 20, w: 2, h: 3 },
+    { i: 'agent-top-sessions', x: 2, y: 20, w: 2, h: 3 },
+    { i: 'agent-timeline',     x: 0, y: 23, w: 4, h: 3 },
   ],
-  hidden: [],
+  hidden: ['subagents', 'flags'],
 }
 
 /** Day-view screen — single calendar day, hour-by-hour breakdown.

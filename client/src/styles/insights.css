@@ -149,37 +149,12 @@ table.breakdown-projects td input { pointer-events: auto; }
    the table cell (e.g. extreme narrow widget where even a single word
    doesn't fit) is hidden instead of bleeding into the next column. */
 .file-hotspots-table td:first-child { overflow: hidden; }
-.file-path-cell .file-full {
-  position: absolute;
-  top: calc(100% - 2px);
-  left: 6px;
-  right: 6px;
-  background: var(--panel);
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 7px 10px;
-  font-size: 11.5px;
-  /* Wrap on path separators, not mid-character. Default break-all
-     was splitting "/Users/in / oise/Desktop/..." mid-word. */
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  color: var(--text);
-  word-break: break-all;
-  line-height: 1.45;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.06);
-  z-index: 30;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-2px);
-  transition: opacity 0.1s, transform 0.1s;
-}
-.file-path-cell:hover .file-full,
-.file-path-cell:focus-visible .file-full {
-  opacity: 1;
-  transform: translateY(0);
-}
+/* Custom .file-full overlay was removed: it was absolutely positioned
+   inside the cell, which lives inside the widget body's
+   `overflow: hidden`. The overlay got clipped on long paths and looked
+   broken. Native `title=` on the cell now handles the full-path
+   disclosure — browser-native tooltip escapes every clipping ancestor
+   and handles wrapping automatically. */
 
 /* Branch name cell — clamp to its column width and use mid-ellipsis
    ("feature/…ies") so long branch names on a narrow widget don't push

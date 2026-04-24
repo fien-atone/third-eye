@@ -50,6 +50,7 @@ export function branchesWidget(t: T, data: InsightsResponse): WidgetDef {
     title: t('insights.branches.title'),
     description: t('widgets.branches.description'),
     category: 'insights',
+    section: 'insights',
     sizes: [{ w: 2, h: 3 }, { w: 4, h: 3 }, { w: 2, h: 2 }],
     minW: 2,
     minH: 2,

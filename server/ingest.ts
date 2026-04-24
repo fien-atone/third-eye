@@ -8,6 +8,7 @@ import { readdir, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
 import { db, setMeta, truncateAll, type CallRow } from './db.ts'
+import { scanAgentSessions } from './lib/agent-sessions.ts'
 
 function shortenProjectLabel(key: string): string {
   return key.replace(/^-?Users-[^-]+-/, '~/').replace(/-/g, '/')
@@ -237,8 +238,52 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
 
   await upsertProjects(new Set(rows.map(r => r.project)))
 
+  // ── Agent-session telemetry ──────────────────────────────────────
+  // Separate pipeline: one row per spawned agent (subagent JSONL or
+  // Task tool output). Idempotent upsert by (source, project, agent_id).
+  // Runs on every ingest regardless of --since; the set is small
+  // (hundreds, not tens of thousands) and re-parsing is cheap.
+  let agentRows = 0
+  try {
+    const agentInsert = d.prepare(`
+      INSERT INTO agent_sessions (
+        agent_id, source, project, ts_start, ts_start_epoch, duration_s,
+        role, role_confidence, description, model,
+        input_tokens, cache_create_tokens, cache_read_tokens, output_tokens,
+        total_tokens, cost_usd, api_calls, tool_uses, tools_json
+      ) VALUES (
+        @agent_id, @source, @project, @ts_start, @ts_start_epoch, @duration_s,
+        @role, @role_confidence, @description, @model,
+        @input_tokens, @cache_create_tokens, @cache_read_tokens, @output_tokens,
+        @total_tokens, @cost_usd, @api_calls, @tool_uses, @tools_json
+      )
+      ON CONFLICT(source, project, agent_id) DO UPDATE SET
+        ts_start=excluded.ts_start, ts_start_epoch=excluded.ts_start_epoch,
+        duration_s=excluded.duration_s, role=excluded.role,
+        role_confidence=excluded.role_confidence, description=excluded.description,
+        model=excluded.model,
+        input_tokens=excluded.input_tokens,
+        cache_create_tokens=excluded.cache_create_tokens,
+        cache_read_tokens=excluded.cache_read_tokens,
+        output_tokens=excluded.output_tokens,
+        total_tokens=excluded.total_tokens,
+        cost_usd=excluded.cost_usd,
+        api_calls=excluded.api_calls,
+        tool_uses=excluded.tool_uses,
+        tools_json=excluded.tools_json
+    `)
+    const batch: Parameters<typeof agentInsert.run>[0][] = []
+    for await (const ar of scanAgentSessions()) batch.push(ar as unknown as Parameters<typeof agentInsert.run>[0])
+    const atx = d.transaction((rs: typeof batch) => { for (const r of rs) agentInsert.run(r) })
+    atx(batch)
+    agentRows = batch.length
+  } catch (err) {
+    console.error('[ingest] agent_sessions scan failed:', (err as Error).message)
+  }
+
   setMeta('last_ingest_at', new Date().toISOString())
   setMeta('last_ingest_rows', String(rows.length))
+  setMeta('last_ingest_agent_rows', String(agentRows))
 
   return {
     durationMs: Date.now() - t0,

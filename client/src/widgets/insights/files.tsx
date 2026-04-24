@@ -35,7 +35,6 @@ function FilesBody({ t, files, stripProjectPrefix }: {
                   <div className="file-path-cell" tabIndex={0} title={f.name}>
                     <span className="file-dir">{dir}</span>
                     <span className="file-name">{base}</span>
-                    <span className="file-full" role="tooltip">{f.name}</span>
                   </div>
                 </td>
                 <td className="num">{fmtInt(f.count)}</td>
@@ -62,6 +61,7 @@ export function filesWidget(t: T, data: InsightsResponse, projectKey: string | n
     title: t('insights.files.title'),
     description: t('widgets.files.description'),
     category: 'insights',
+    section: 'insights',
     sizes: [{ w: 2, h: 3 }, { w: 4, h: 3 }, { w: 2, h: 2 }],
     minW: 2,
     minH: 2,

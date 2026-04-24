@@ -122,6 +122,58 @@ function migrate(d: Database.Database) {
     layout_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`)
+
+  // Per-agent-invocation telemetry. One row = one spawned agent session
+  // (subagent or Task tool output). Populated by server/lib/agent-sessions.ts
+  // during ingest. Primary key is (source, project, agent_id) so re-ingest
+  // is idempotent — the same JSONL file always maps to the same row.
+  d.exec(`CREATE TABLE IF NOT EXISTS agent_sessions (
+    agent_id            TEXT NOT NULL,
+    source              TEXT NOT NULL,  -- 'subagent' | 'task'
+    project             TEXT NOT NULL,
+    ts_start            TEXT NOT NULL,
+    ts_start_epoch      INTEGER NOT NULL,
+    duration_s          INTEGER NOT NULL,
+    role                TEXT NOT NULL,
+    role_confidence     TEXT NOT NULL,  -- 'meta' | 'prompt' | 'unknown'
+    description         TEXT NOT NULL,
+    model               TEXT NOT NULL,
+    input_tokens        INTEGER NOT NULL,
+    cache_create_tokens INTEGER NOT NULL,
+    cache_read_tokens   INTEGER NOT NULL,
+    output_tokens       INTEGER NOT NULL,
+    total_tokens        INTEGER NOT NULL,
+    cost_usd            REAL NOT NULL,
+    api_calls           INTEGER NOT NULL,
+    tool_uses           INTEGER NOT NULL,
+    tools_json          TEXT NOT NULL,
+    PRIMARY KEY (source, project, agent_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_agent_sessions_project ON agent_sessions(project);
+  CREATE INDEX IF NOT EXISTS idx_agent_sessions_ts      ON agent_sessions(ts_start_epoch);
+  CREATE INDEX IF NOT EXISTS idx_agent_sessions_role    ON agent_sessions(role);
+  `)
+
+  // Per-project agent-role registry. Rows are created by the user via
+  // the Agents Setup modal — one row per detected raw-role value the
+  // user has explicitly acknowledged. raw_role is the key extracted by
+  // the parser (meta-prefix or "You are the X" match). display_name
+  // lets the user rename for UI; when merged_into is set the role is
+  // treated as an alias of another (rollup target). enabled=0 means
+  // the role is acknowledged but should be collapsed into the
+  // "Unclassified" bucket in views. Any raw role NOT in this table
+  // counts as "undetected-but-present" and drives the setup banner.
+  d.exec(`CREATE TABLE IF NOT EXISTS agent_registry (
+    project       TEXT NOT NULL,
+    raw_role      TEXT NOT NULL,
+    display_name  TEXT,
+    enabled       INTEGER NOT NULL DEFAULT 1,
+    merged_into   TEXT,
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (project, raw_role)
+  );
+  CREATE INDEX IF NOT EXISTS idx_agent_registry_project ON agent_registry(project);
+  `)
 }
 
 /** Seed default layouts on first startup. Idempotent: INSERT OR IGNORE
@@ -139,7 +191,7 @@ export function truncateAll(): { calls: number; projects: number } {
   const d = db()
   const calls = (d.prepare('SELECT COUNT(*) AS n FROM api_calls').get() as { n: number }).n
   const projects = (d.prepare('SELECT COUNT(*) AS n FROM projects').get() as { n: number }).n
-  d.exec('DELETE FROM api_calls; DELETE FROM tool_events; DELETE FROM projects; DELETE FROM meta WHERE key LIKE \'last_ingest%\';')
+  d.exec('DELETE FROM api_calls; DELETE FROM tool_events; DELETE FROM projects; DELETE FROM agent_sessions; DELETE FROM agent_registry; DELETE FROM meta WHERE key LIKE \'last_ingest%\';')
   d.exec('VACUUM')
   return { calls, projects }
 }

@@ -406,6 +406,48 @@ body .widget-grid.grid-stack,
   border-bottom: 1px solid var(--border);
 }
 
+/* Search input for the picker — visually distinct from the slot-hint
+   above it and the scrollable list below it. Sticky to the top of the
+   picker panel so it never scrolls off. */
+.widget-picker-search {
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.widget-picker-search input {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.widget-picker-search input:focus {
+  border-color: var(--accent);
+}
+.widget-picker-search input::placeholder {
+  color: var(--text-dim);
+}
+
+/* Group header inside the picker list — "General / Insights / Agents".
+   Subtle uppercase label with top padding so it breathes between groups. */
+.widget-picker-section-header {
+  padding: 14px 4px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  grid-column: 1 / -1;
+}
+.widget-picker-section-header:first-child {
+  padding-top: 4px;
+}
+
 .widget-picker-list {
   flex: 1 1 auto;
   overflow-y: auto;

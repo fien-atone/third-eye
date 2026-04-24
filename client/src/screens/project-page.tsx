@@ -15,6 +15,9 @@ import { hrefFor, navigate } from '../router'
 import { apiGet, apiPatch, dashboardParams } from '../api'
 import type { Granularity, InsightsResponse, OverviewResponse, ProjectInfo } from '../types'
 import { toInputDate } from '../lib/format'
+import { AgentsRegistryModal } from '../components/agents-registry-modal'
+import { useDetectedRoles } from '../lib/agents'
+import { SettingsIcon, PencilIcon } from '../components/icons'
 
 type DashboardSharedProps = {
   modelNames: string[]
@@ -46,6 +49,20 @@ export function ProjectPage({
     placeholderData: keepPreviousData,
   })
 
+  // Agent registry modal state — lifted here (not in Dashboard) so the
+  // project-header Manage button (a stable, un-hidable UI element) and
+  // the banner CTA share one modal instance. Widgets deliberately have
+  // no access path: widgets are user-reconfigurable and can be removed
+  // from the layout; critical controls must not live inside them.
+  const projectKey = data.frame.project?.key ?? null
+
+  const detected = useDetectedRoles(projectId)
+  const hasActionableAgents = !!detected.data?.detected.some(r => r.rawRole !== 'unknown')
+  const alreadyConfigured = !!detected.data?.configured
+  const canManageAgents = hasActionableAgents || alreadyConfigured
+  const [registryOpen, setRegistryOpen] = useState(false)
+  const onOpenRegistry = canManageAgents ? () => setRegistryOpen(true) : undefined
+
   return (
     <>
       {data.frame.project && (
@@ -53,6 +70,7 @@ export function ProjectPage({
           projectId={projectId}
           frameProject={data.frame.project}
           lookedUp={lookedUpProject}
+          onManageAgents={onOpenRegistry}
         />
       )}
       <Dashboard
@@ -60,16 +78,23 @@ export function ProjectPage({
         data={data}
         inProjectView
         insightsData={claudeInScope ? insightsQuery.data : undefined}
-        insightsProjectKey={data.frame.project?.key ?? null}
+        insightsProjectKey={projectKey}
+        onOpenAgentsRegistry={onOpenRegistry}
+      />
+      <AgentsRegistryModal
+        open={registryOpen}
+        onClose={() => setRegistryOpen(false)}
+        projectId={projectId}
       />
     </>
   )
 }
 
-function ProjectHeader({ projectId, frameProject, lookedUp }: {
+function ProjectHeader({ projectId, frameProject, lookedUp, onManageAgents }: {
   projectId: string
   frameProject: NonNullable<OverviewResponse['frame']['project']>
   lookedUp: ProjectInfo | null
+  onManageAgents?: () => void
 }) {
   const t = useT()
   const qc = useQueryClient()
@@ -142,7 +167,33 @@ function ProjectHeader({ projectId, frameProject, lookedUp }: {
               onClick={startEdit}
               title={t('projects.editTitle')}
               aria-label={t('projects.editTitle')}
-            >✎</button>
+            ><PencilIcon size={16} /></button>
+            {onManageAgents && (
+              <button
+                className="project-header-action"
+                onClick={onManageAgents}
+                title={t('agents.projectHeader.manageTitle')}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 12, fontWeight: 500,
+                  borderRadius: 6,
+                  border: '1px dashed var(--experimental-border, var(--border))',
+                  background: 'transparent',
+                  color: 'var(--experimental, var(--text-dim))',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  // Subtle ghost style matches the pencil — both read as
+                  // small secondary actions next to the bold title without
+                  // competing with it. Dashed border signals EXPERIMENTAL.
+                }}
+              >
+                <SettingsIcon size={13} />
+                {t('agents.projectHeader.manage')}
+              </button>
+            )}
           </>
         )}
       </h1>

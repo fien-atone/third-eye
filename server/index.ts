@@ -7,6 +7,11 @@ import { db, getMeta, seedScreenLayouts } from './db.ts'
 import { runIngest } from './ingest.ts'
 import { DEFAULT_LAYOUTS, KNOWN_SCREENS, type ScreenLayout } from './lib/default-layouts.ts'
 import { envRead, envReadNumber } from './lib/env.ts'
+import {
+  countUnclassified, countUnclassifiedGlobal, listDetectedRoles,
+  listRegistry, upsertRegistry, deleteRegistry, acknowledgeAllUndetected,
+  isProjectConfigured, isAnyProjectConfigured,
+} from './lib/agent-registry.ts'
 
 // Seed default screen layouts on first start (idempotent — never overwrites
 // user customizations once they exist).
@@ -41,22 +46,22 @@ function fmtClientDate(ms: number, tzMin: number): string {
   return `${y}-${m}-${d}`
 }
 
-function bucketSql(g: Granularity, tzMin: number, weekStartsOn: number): string {
+function bucketSql(g: Granularity, tzMin: number, weekStartsOn: number, col: string = 'ts'): string {
   const sign = tzMin >= 0 ? '+' : '-'
   const tz = `'${sign}${Math.abs(tzMin)} minutes'`
-  if (g === 'month') return `strftime('%Y-%m', datetime(ts, ${tz}))`
+  if (g === 'month') return `strftime('%Y-%m', datetime(${col}, ${tz}))`
   if (g === 'week') {
     // end-of-week weekday = the day BEFORE the week's first day.
     // SQLite 'weekday N' advances to the next occurrence of weekday N (0=Sun..6=Sat);
     // then -6 days gives the start of the week containing the date.
     const endOfWeek = (weekStartsOn + 6) % 7
-    return `strftime('%Y-%m-%d', date(ts, ${tz}, 'weekday ${endOfWeek}', '-6 days'))`
+    return `strftime('%Y-%m-%d', date(${col}, ${tz}, 'weekday ${endOfWeek}', '-6 days'))`
   }
   // Hour bucket key includes the date so widgets that span more than
   // one calendar day (rare for the day-view, but possible for ranges)
   // don't collapse "Mon 14:00" and "Tue 14:00" into a single bar.
-  if (g === 'hour') return `strftime('%Y-%m-%d %H:00', datetime(ts, ${tz}))`
-  return `strftime('%Y-%m-%d', datetime(ts, ${tz}))`
+  if (g === 'hour') return `strftime('%Y-%m-%d %H:00', datetime(${col}, ${tz}))`
+  return `strftime('%Y-%m-%d', datetime(${col}, ${tz}))`
 }
 
 
@@ -444,6 +449,102 @@ app.get('/api/overview', (req, res) => {
     cache_read: number | null; cache_write: number | null; projects: number;
   }
 
+  // ─── Agent telemetry ───────────────────────────────────────────────
+  // Scoped to the user-curated registry: only sessions whose raw role
+  // is an enabled agent_registry row contribute. Anything the user
+  // hasn't explicitly confirmed as an agent (unregistered, disabled,
+  // `unknown`) is invisible here — per product decision, the widget
+  // shows only what the user has claimed ownership of.
+  const agentProjectFilter = projectKey ? 'AND s.project = ?' : ''
+  const agentParams: unknown[] = projectKey ? [startEpoch, endEpoch, projectKey] : [startEpoch, endEpoch]
+
+  // Common join-filter: session's role must match an enabled registry
+  // row in its own project. The INNER JOIN alone enforces "classified
+  // only" — a session with no matching registry row simply falls out.
+  const agentFromClause = `
+    FROM agent_sessions s
+    INNER JOIN agent_registry r
+      ON r.project = s.project AND r.raw_role = s.role AND r.enabled = 1
+  `
+
+  const agentTotals = d.prepare(`
+    SELECT COUNT(*) AS sessions,
+           COALESCE(SUM(s.input_tokens), 0)        AS input_tokens,
+           COALESCE(SUM(s.cache_create_tokens), 0) AS cache_create,
+           COALESCE(SUM(s.cache_read_tokens), 0)   AS cache_read,
+           COALESCE(SUM(s.output_tokens), 0)       AS output_tokens,
+           COALESCE(SUM(s.total_tokens), 0)        AS total_tokens,
+           COALESCE(SUM(s.cost_usd), 0)            AS cost,
+           COALESCE(SUM(s.tool_uses), 0)           AS tool_uses,
+           COALESCE(SUM(s.duration_s), 0)          AS duration_s
+    ${agentFromClause}
+    WHERE s.ts_start_epoch BETWEEN ? AND ? ${agentProjectFilter}
+  `).get(...agentParams) as {
+    sessions: number; input_tokens: number; cache_create: number; cache_read: number;
+    output_tokens: number; total_tokens: number; cost: number; tool_uses: number; duration_s: number
+  }
+
+  // Effective role = user's display_name (if any) else raw role.
+  // Merge resolution still walks one level to handle aliased roles,
+  // even though the UI doesn't expose merge yet — the SQL is ready.
+  const effectiveRoleExpr = `
+    CASE
+      WHEN r.merged_into IS NOT NULL AND r.merged_into != ''
+        THEN COALESCE(
+          NULLIF((SELECT display_name FROM agent_registry WHERE project = s.project AND raw_role = r.merged_into), ''),
+          r.merged_into
+        )
+      ELSE COALESCE(NULLIF(r.display_name, ''), s.role)
+    END
+  `
+
+  const agentByRole = d.prepare(`
+    SELECT ${effectiveRoleExpr}       AS effective_role,
+           COUNT(*)                   AS sessions,
+           COALESCE(SUM(s.total_tokens), 0) AS tokens,
+           COALESCE(SUM(s.cost_usd), 0)     AS cost,
+           COALESCE(SUM(s.tool_uses), 0)    AS tool_uses
+    ${agentFromClause}
+    WHERE s.ts_start_epoch BETWEEN ? AND ? ${agentProjectFilter}
+    GROUP BY effective_role
+    ORDER BY cost DESC, tokens DESC
+  `).all(...agentParams) as Array<{
+    effective_role: string; sessions: number; tokens: number; cost: number; tool_uses: number
+  }>
+
+  const agentTopSessions = d.prepare(`
+    SELECT s.agent_id, s.source, s.role AS raw_role,
+           ${effectiveRoleExpr}        AS effective_role,
+           s.role_confidence, s.description,
+           s.ts_start, s.duration_s, s.total_tokens, s.cost_usd,
+           s.tool_uses, s.api_calls
+    ${agentFromClause}
+    WHERE s.ts_start_epoch BETWEEN ? AND ? ${agentProjectFilter}
+    ORDER BY s.cost_usd DESC
+    LIMIT 25
+  `).all(...agentParams) as Array<{
+    agent_id: string; source: string; raw_role: string; effective_role: string;
+    role_confidence: string; description: string; ts_start: string;
+    duration_s: number; total_tokens: number; cost_usd: number;
+    tool_uses: number; api_calls: number
+  }>
+
+  // Per-bucket × per-agent cost for the timeline widget. Uses the same
+  // bucketing (day/week/month/hour) as the rest of the dashboard so
+  // users see agent activity aligned with other time-series widgets.
+  const agentBucketExpr = bucketSql(granularity, tzMin, weekStartsOn, 's.ts_start')
+  const agentTimelineRows = d.prepare(`
+    SELECT ${agentBucketExpr}           AS bucket,
+           ${effectiveRoleExpr}          AS effective_role,
+           COALESCE(SUM(s.cost_usd), 0)  AS cost,
+           COUNT(*)                      AS sessions
+    ${agentFromClause}
+    WHERE s.ts_start_epoch BETWEEN ? AND ? ${agentProjectFilter}
+    GROUP BY bucket, effective_role
+  `).all(...agentParams) as Array<{
+    bucket: string; effective_role: string; cost: number; sessions: number
+  }>
+
   const bucketKeys = fillBuckets(startEpoch, endEpoch, granularity, tzMin, weekStartsOn)
   const seriesMap = new Map(seriesRows.map(r => [r.bucket, r]))
   const modelByBucket = new Map<string, Map<string, number>>()
@@ -462,6 +563,25 @@ app.get('/api/overview', (req, res) => {
     m.set(key, (m.get(key) ?? 0) + r.cost)
     projectByBucket.set(r.bucket, m)
   }
+
+  // Agent timeline: group rows by bucket, keyed by effective role name.
+  // The client receives a parallel series array with `agent:<role>`
+  // columns per bucket for recharts stacking.
+  const agentTimelineByBucket = new Map<string, Map<string, number>>()
+  for (const r of agentTimelineRows) {
+    const m = agentTimelineByBucket.get(r.bucket) ?? new Map<string, number>()
+    m.set(r.effective_role, (m.get(r.effective_role) ?? 0) + r.cost)
+    agentTimelineByBucket.set(r.bucket, m)
+  }
+  const agentRoleNames = Array.from(
+    new Set(agentTimelineRows.map(r => r.effective_role))
+  ).sort()
+  const agentTimelineSeries = bucketKeys.map(k => {
+    const row: Record<string, number | string> = { bucket: k }
+    const ab = agentTimelineByBucket.get(k)
+    for (const name of agentRoleNames) row[`agent:${name}`] = roundUsd(ab?.get(name))
+    return row
+  })
 
   const series = bucketKeys.map(k => {
     const s = seriesMap.get(k)
@@ -529,6 +649,44 @@ app.get('/api/overview', (req, res) => {
     otherProjects: projectTotals.length > TOP_N_PROJECTS
       ? { count: projectTotals.length - TOP_N_PROJECTS, cost: roundUsd(projectTotals.slice(TOP_N_PROJECTS).reduce((s, p) => s + p.cost, 0)) }
       : { count: 0, cost: 0 },
+    agentTelemetry: {
+      totals: {
+        sessions: agentTotals.sessions ?? 0,
+        inputTokens: agentTotals.input_tokens ?? 0,
+        cacheCreate: agentTotals.cache_create ?? 0,
+        cacheRead: agentTotals.cache_read ?? 0,
+        outputTokens: agentTotals.output_tokens ?? 0,
+        totalTokens: agentTotals.total_tokens ?? 0,
+        cost: roundUsd(agentTotals.cost),
+        toolUses: agentTotals.tool_uses ?? 0,
+        durationS: agentTotals.duration_s ?? 0,
+      },
+      byRole: agentByRole.map(r => ({
+        role: r.effective_role,
+        sessions: r.sessions,
+        tokens: r.tokens,
+        cost: roundUsd(r.cost),
+        toolUses: r.tool_uses,
+      })),
+      topSessions: agentTopSessions.map(s => ({
+        agentId: s.agent_id,
+        source: s.source,
+        role: s.effective_role,
+        rawRole: s.raw_role,
+        confidence: s.role_confidence,
+        description: s.description,
+        tsStart: s.ts_start,
+        durationS: s.duration_s,
+        totalTokens: s.total_tokens,
+        cost: roundUsd(s.cost_usd),
+        toolUses: s.tool_uses,
+        apiCalls: s.api_calls,
+      })),
+      timeline: {
+        roles: agentRoleNames,
+        series: agentTimelineSeries,
+      },
+    },
     lastIngestAt: getMeta('last_ingest_at'),
   })
 })
@@ -543,8 +701,6 @@ app.get('/api/insights/:projectId', (req, res) => {
   const endRange = localDayRange(req.query.end, tzMin)
   const startEpoch = startRange?.start ?? 0
   const endEpoch = endRange?.end ?? Date.now()
-  const tzSign = tzMin >= 0 ? '+' : '-'
-  const tzShift = `'${tzSign}${Math.abs(tzMin)} minutes'`
   const providers = normalizeProviders(req.query.providers)
   const provFilter = providerFilterSql(providers)
   // tool_events doesn't carry provider — JOIN api_calls when needed
@@ -607,17 +763,6 @@ app.get('/api/insights/:projectId', (req, res) => {
     ORDER BY first_ts ASC
   `).all(projectKey, startEpoch, endEpoch, ...provFilter.params) as Array<{ name: string; calls: number; cost: number; tokens: number; first_ts: string; last_ts: string }>
 
-  // 24x7 hour-of-week heatmap, shifted to client's local timezone.
-  const heatmapRows = d.prepare(`
-    SELECT CAST(strftime('%w', ts, ${tzShift}) AS INTEGER) AS dow,
-           CAST(strftime('%H', ts, ${tzShift}) AS INTEGER) AS hour,
-           COUNT(*) AS calls,
-           SUM(cost_usd) AS cost
-    FROM api_calls
-    WHERE project = ? AND model_short != '<synthetic>' AND ts_epoch BETWEEN ? AND ? ${provFilter.where}
-    GROUP BY dow, hour
-  `).all(projectKey, startEpoch, endEpoch, ...provFilter.params) as Array<{ dow: number; hour: number; calls: number; cost: number }>
-
   res.json({
     project: { key: projectKey },
     range: { start: new Date(startEpoch).toISOString(), end: new Date(endEpoch).toISOString(), tzOffsetMin: tzMin },
@@ -630,8 +775,79 @@ app.get('/api/insights/:projectId', (req, res) => {
     flags,
     branches: branches.map(r => ({ ...r, cost: roundUsd(r.cost) })),
     versions: versions.map(v => ({ ...v, cost: roundUsd(v.cost), tokens: v.tokens ?? 0 })),
-    heatmap: heatmapRows,
   })
+})
+
+// ──────────────────────────────────────────────────────────────────────
+// Agent registry — per-project classification of discovered raw roles.
+// Drives the setup banner and filters the agent-insights widget.
+// ──────────────────────────────────────────────────────────────────────
+
+/** Look up a project by :id → key and ensure it exists. 404s consistently. */
+function requireProjectKey(req: express.Request, res: express.Response): string | null {
+  const id = req.params.projectId
+  const proj = getProjectById(db(), id)
+  if (!proj) { res.status(404).json({ error: 'project not found' }); return null }
+  return proj.key
+}
+
+app.get('/api/agents/unclassified-global', (_req, res) => {
+  res.json({
+    count: countUnclassifiedGlobal(),
+    anyConfigured: isAnyProjectConfigured(),
+  })
+})
+
+app.get('/api/agents/:projectId/detected', (req, res) => {
+  const key = requireProjectKey(req, res)
+  if (!key) return
+  res.json({
+    project: { id: req.params.projectId, key },
+    detected: listDetectedRoles(key),
+    unclassified: countUnclassified(key),
+    configured: isProjectConfigured(key),
+  })
+})
+
+app.get('/api/agents/:projectId/registry', (req, res) => {
+  const key = requireProjectKey(req, res)
+  if (!key) return
+  res.json({ registry: listRegistry(key) })
+})
+
+app.put('/api/agents/:projectId/registry/:rawRole', (req, res) => {
+  const key = requireProjectKey(req, res)
+  if (!key) return
+  const rawRole = req.params.rawRole
+  if (!rawRole || rawRole.length > 200) {
+    return res.status(400).json({ error: 'rawRole must be a non-empty string, <= 200 chars' })
+  }
+  const body = req.body as { displayName?: string | null; enabled?: boolean; mergedInto?: string | null }
+  try {
+    const row = upsertRegistry(key, {
+      rawRole,
+      displayName: body.displayName ?? null,
+      enabled: body.enabled,
+      mergedInto: body.mergedInto ?? null,
+    })
+    res.json({ row })
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message })
+  }
+})
+
+app.delete('/api/agents/:projectId/registry/:rawRole', (req, res) => {
+  const key = requireProjectKey(req, res)
+  if (!key) return
+  deleteRegistry(key, req.params.rawRole)
+  res.json({ ok: true })
+})
+
+app.post('/api/agents/:projectId/registry/acknowledge-all', (req, res) => {
+  const key = requireProjectKey(req, res)
+  if (!key) return
+  const acknowledged = acknowledgeAllUndetected(key)
+  res.json({ acknowledged })
 })
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, lastIngestAt: getMeta('last_ingest_at') }))
