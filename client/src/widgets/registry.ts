@@ -18,6 +18,7 @@ import { callsWidget } from './dashboard/calls'
 import { modelsWidget } from './dashboard/models'
 import { activityWidget } from './dashboard/activity'
 import { topProjectsWidget } from './dashboard/top-projects'
+import { hourTimelineWidget } from './dashboard/hour-timeline'
 
 import { subagentsWidget } from './insights/subagents'
 import { skillsWidget } from './insights/skills'
@@ -65,11 +66,17 @@ export function buildDashboardCatalog(ctx: DashboardCtx): WidgetDef[] {
   // unavailable in the project picker, and reconcile() scrubs them if a
   // stale saved layout still references them.
   if (inProjectView) return shared
-  return [
-    ...shared,
+  // Hour-timeline only meaningful when the series IS hourly — adding it
+  // unconditionally would put a 24-bar chart on the daily dashboard
+  // where the data is one bar per day. Gate on granularity.
+  const cross: WidgetDef[] = [
     costByProjectWidget(t, data, series, granularity, hasAnyData, onSelectProject),
     topProjectsWidget(t, data),
   ]
+  if (granularity === 'hour') {
+    cross.unshift(hourTimelineWidget(t, series, hasAnyData))
+  }
+  return [...shared, ...cross]
 }
 
 export type InsightsCtx = {

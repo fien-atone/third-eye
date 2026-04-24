@@ -1,0 +1,712 @@
+/* ============================================================
+ * Widget grid (Customize / drag-resize dashboards)
+ * ============================================================ */
+
+/* The grid itself — react-grid-layout uses absolute positioning under the
+   hood. We let it. Outside edit mode it's just a normal stack of tiles
+   with a small gap. */
+.widget-grid { position: relative; min-height: 100px; }
+.widget-grid-loading { min-height: 200px; }
+/* In edit mode we synthesize a bottom-row "add widget" placeholder at
+   y=maxY (findEmptySlots). Its DOM element is positioned via calc() so it
+   sits below the last widget row — but GridStack computes the container's
+   inline `height` from engine-known widgets only (we deliberately remove
+   placeholders from the engine so they don't block drag targets). Net
+   effect: the bottom placeholder hangs below the grid's intrinsic height
+   and overlaps whatever follows (the footer in our layout). Reserve one
+   row + margin of trailing space inside the grid container so the
+   placeholder has a home and the footer stays below it. Only in edit mode
+   — view mode doesn't render the placeholder so no extra space needed. */
+.widget-grid.is-editing {
+  margin-bottom: calc(var(--gs-cell-height) + 12px);
+}
+
+/* Grid container: native percentage-based positioning. Previously we
+   used a negative-margin trick (margin: 0 -6px; width: calc(100% + 12px))
+   to neutralize the inner MARGIN/2 inset so widgets appeared flush with
+   the page edges. That trick made left-side widgets land at a slightly
+   different sub-pixel offset than right-side widgets (because the
+   extended container width shifts percentage math), breaking vertical
+   alignment between columns. We remove the trick and accept the
+   symmetric 6px inset on leftmost/rightmost tiles — they now align
+   perfectly with each other on BOTH sides. */
+.widget-grid.grid-stack {
+  padding: 0 !important;
+  margin-left: 0;
+  margin-right: 0;
+  width: 100%;
+  /* GridStack v12 reads its horizontal gutter from these custom properties
+     and applies them as container padding. Zero them out so widgets sit
+     flush with the container's left/right edges. The inter-item gap is
+     still produced by GridStack's per-item `inset` on .grid-stack-item-content
+     using the MARGIN constant we pass to GridStack.init(). */
+  --gs-item-margin-left: 0px;
+  --gs-item-margin-right: 0px;
+}
+/* Second rule with higher specificity — defeats any inline padding
+   GridStack may shim onto the container at runtime (v12 has been
+   observed to set `padding: var(--gs-item-margin)` directly on the
+   element style). The body-prefixed selector wins over element.style
+   for padding because !important on a stylesheet rule trumps inline
+   declarations lacking !important. */
+body .widget-grid.grid-stack,
+.widget-grid.grid-stack[style] {
+  padding: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Each tile: .widget-tile is applied to GridStack's .grid-stack-item.
+   Inside GridStack wraps children in .grid-stack-item-content (which
+   gets positioned absolutely) — our handle + body live in there. */
+.widget-tile > .grid-stack-item-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: transparent;  /* let the inner .panel provide the card surface */
+  inset: 0;
+  padding: 0;
+}
+.widget-tile-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.widget-tile-body > .panel,
+.widget-tile-body > .kpi-group {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Panels inside widget tiles: tighter padding than free-standing panels
+   elsewhere — the grid already provides spacing, so the panel's own
+   padding just eats into the content area without visual benefit. */
+.widget-tile-body > .panel {
+  padding: 10px 12px;
+}
+
+/* KPI groups inside a tile: original .kpi-group already provides the
+   card look. Stretch to fill the body so two KPIs in the same row
+   are identical-looking pixel-for-pixel. Per-metric min-height so
+   cards without subtitles don't look "less filled" than cards with. */
+.widget-tile-body > .kpi-group {
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.widget-tile-body > .kpi-group > .kpi-group-body {
+  flex: 1 1 auto;
+  align-items: stretch;
+}
+.widget-tile .kpi-metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 60px;
+}
+
+/* Edit-mode visual cues: subtle accent outline on every tile; the whole
+   tile is draggable (no handle bar — click anywhere on the widget body
+   to drag). Interactive elements inside (links, buttons in the panel)
+   are disabled during edit so clicks always initiate drag. */
+/* Edit-mode dashed outline lives on the OUTER .grid-stack-item rather
+   than its inner .grid-stack-item-content. The inner content's opaque
+   background (from .panel or .kpi-group) was masking the middle of
+   each side of the outline for KPI-size tiles — only the corners
+   peeked out. Putting the dashed border on the outer item (which has
+   no competing background) shows the full outline uniformly for both
+   KPI and chart widgets. We adjust the border position with a small
+   inset so it visually aligns with the MARGIN/2 gap. */
+.widget-grid.is-editing .grid-stack-item {
+  box-sizing: border-box;
+}
+/* Exclude placeholders from this generic rule — they render their OWN
+   dashed outline via .widget-slot-empty-content. Without this exclusion,
+   placeholders would show two concentric dashed borders. */
+.widget-grid.is-editing .grid-stack-item:not(.widget-slot-empty)::after {
+  content: '';
+  position: absolute;
+  /* Sit on the INNER content rect (GridStack applies `inset: 12px` inline
+     to .grid-stack-item-content from the MARGIN constant). Two reasons:
+     (1) adjacent widgets' outer rects touch edge-to-edge, so `inset: 0`
+     here would paint the dashed outlines directly on top of each other —
+     the "glued borders" effect. (2) placeholders draw their outline on
+     .widget-slot-empty-content (which IS the inner rect), so matching
+     that inset keeps widget and placeholder outlines the same size. */
+  inset: 12px;
+  border: 2px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 10px;
+  pointer-events: none;
+  transition: border-color 0.12s;
+  z-index: 3;
+}
+.widget-grid.is-editing .grid-stack-item:not(.widget-slot-empty):hover::after {
+  border-color: var(--accent);
+}
+
+/* Flush edges: remove the 12px horizontal inset on widgets that sit at the
+   grid's extreme left (gs-x="0") or extreme right (reaching column 4) so
+   the widget block has no visible left/right gutter beyond the page's own
+   padding. Vertical inset (top/bottom) and inset between neighbours are
+   untouched — gaps only collapse at the outer edges. Covers every (x, w)
+   combination that ends at column 4 with COLS=4. */
+.widget-grid .grid-stack-item[gs-x="0"] > .grid-stack-item-content {
+  left: 0 !important;
+}
+.widget-grid .grid-stack-item[gs-x="3"] > .grid-stack-item-content,
+.widget-grid .grid-stack-item[gs-x="2"][gs-w="2"] > .grid-stack-item-content,
+.widget-grid .grid-stack-item[gs-x="1"][gs-w="3"] > .grid-stack-item-content,
+.widget-grid .grid-stack-item[gs-x="0"][gs-w="4"] > .grid-stack-item-content {
+  right: 0 !important;
+}
+/* Mirror the inset override on the edit-mode dashed border so it lines up
+   with the widget's own visible edge rather than sitting 12px inside. */
+.widget-grid.is-editing .grid-stack-item[gs-x="0"]:not(.widget-slot-empty)::after {
+  left: 0;
+}
+.widget-grid.is-editing .grid-stack-item[gs-x="3"]:not(.widget-slot-empty)::after,
+.widget-grid.is-editing .grid-stack-item[gs-x="2"][gs-w="2"]:not(.widget-slot-empty)::after,
+.widget-grid.is-editing .grid-stack-item[gs-x="1"][gs-w="3"]:not(.widget-slot-empty)::after,
+.widget-grid.is-editing .grid-stack-item[gs-x="0"][gs-w="4"]:not(.widget-slot-empty)::after {
+  right: 0;
+}
+/* Same edge-flush rule for empty-slot placeholders (their outline lives on
+   .widget-slot-empty-content rather than an ::after pseudo-element). */
+.widget-grid .widget-slot-empty[gs-x="0"] > .widget-slot-empty-content {
+  left: 0 !important;
+}
+.widget-grid .widget-slot-empty[gs-x="3"] > .widget-slot-empty-content,
+.widget-grid .widget-slot-empty[gs-x="2"][gs-w="2"] > .widget-slot-empty-content,
+.widget-grid .widget-slot-empty[gs-x="1"][gs-w="3"] > .widget-slot-empty-content,
+.widget-grid .widget-slot-empty[gs-x="0"][gs-w="4"] > .widget-slot-empty-content {
+  right: 0 !important;
+}
+.widget-grid.is-editing .grid-stack-item > .grid-stack-item-content {
+  border-radius: 10px;
+  cursor: move;
+}
+/* Disable pointer-events on widget content during edit, so clicks on
+   links/buttons inside don't navigate and instead start a drag. The
+   remove button gets pointer-events re-enabled below. */
+.widget-grid.is-editing .widget-tile-body { pointer-events: none; }
+
+/* Widget corner controls — the × remove button (top-right) and the resize
+   handle (bottom-right) share the same chip visual so they read as a
+   coherent pair of controls owned by the widget. Only hover color diverges:
+   red for destructive remove, accent orange for resize. The icon itself is
+   an SVG mask filled with currentColor — centers perfectly and retints on
+   hover without fighting the font/character-metric differences of raw
+   glyphs like "×". */
+.widget-tile-remove,
+.widget-grid .ui-resizable-se {
+  position: absolute;
+  z-index: 10;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  pointer-events: auto;
+  transition: color 0.12s, border-color 0.12s, background 0.12s, opacity 0.12s;
+}
+/* Shared icon rendering via mask so the glyph follows currentColor. */
+.widget-tile-remove::before,
+.widget-grid .ui-resizable-se::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+  -webkit-mask-position: center;
+          mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+          mask-size: contain;
+}
+/* × glyph for remove */
+.widget-tile-remove::before {
+  -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M2 2 L8 8 M8 2 L2 8" stroke="black" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>');
+          mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M2 2 L8 8 M8 2 L2 8" stroke="black" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>');
+}
+/* ↘ diagonal arrow for resize — line from top-left (2,2) to bottom-right
+   (8,8) with an arrowhead pointing to (8,8). We explicitly force
+   cursor: pointer below (beating GridStack's default se-resize) so the
+   OS cursor is a small hand that doesn't overlap and hide the arrow on
+   hover. The arrow stays a visible icon; the hand cursor still reads as
+   "clickable affordance". */
+.widget-grid .ui-resizable-se::before {
+  -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M2 2 L8 8 M5 8 L8 8 L8 5" stroke="black" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>');
+          mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M2 2 L8 8 M5 8 L8 8 L8 5" stroke="black" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>');
+}
+/* Hide the raw "×" character — the icon now comes from ::before.
+   Positioned at right:0/top:0 of .grid-stack-item-content (its parent).
+   Because the content is itself inset 12px inside the outer .grid-stack-item,
+   the × ends up 12px from the outer right edge — exactly where the resize
+   handle sits (which uses right:12px of the outer rect). Both controls land
+   on the dashed border's right edge and share the same vertical line. The
+   flush-edge rule on .grid-stack-item-content (right:0 for rightmost
+   widgets) automatically propagates here, so no separate override needed. */
+.widget-tile-remove {
+  font-size: 0;
+  line-height: 0;
+  top: 0;
+  right: 0;
+}
+/* Hover: ring + icon color, NOT solid fill. Reason: the resize chip's
+   native cursor (se-resize) visually matches the chip's icon and often
+   sits on top of it — a solid-fill hover then reads as a blank colored
+   blob. Keeping the background white and changing only the border +
+   icon colour leaves a clear "ring" affordance even when the cursor
+   overlays the glyph. Same treatment applied to × for symmetry. */
+.widget-tile-remove:hover {
+  color: var(--bad);
+  border-color: var(--bad);
+  background: var(--panel);
+}
+
+/* GridStack's drag placeholder (the dashed preview slot) — themed to match. */
+.grid-stack-placeholder > .placeholder-content {
+  background: color-mix(in srgb, var(--accent) 18%, transparent) !important;
+  border: 2px dashed var(--accent) !important;
+  border-radius: 10px !important;
+  inset: 0;
+}
+/* Resize handle position — sit on the dashed border's bottom-right corner
+   (inset 12px by default, flush on rightmost widgets — see override
+   below). Kill GridStack's default rotated SVG background so our ::before
+   icon is what shows. !important is required because GridStack ships a
+   same-specificity rule (`.grid-stack-item > .ui-resizable-se { ... }`)
+   that wins source-order when its CSS is imported after index.css — without
+   !important the default chevron SVG peeks through our chip and the user
+   sees a second, rotated arrow through the mask. */
+.widget-grid .ui-resizable-se {
+  background-image: none !important;
+  transform: none !important;
+  /* Force pointer cursor over GridStack's default cursor: se-resize. Same
+     visual shape as our ↘ icon = arrow-on-arrow = icon invisible on hover.
+     A plain hand cursor is smaller and sits to the side of the icon, so
+     the affordance (arrow) stays readable. */
+  cursor: pointer !important;
+  right: 12px;
+  bottom: 12px;
+  z-index: 4;
+}
+.widget-grid .ui-resizable-se:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--panel);
+}
+/* Rightmost widgets: flush-right handle so it sits on the dashed border
+   corner instead of 12px outside it. Covers every (x, w) that reaches
+   column 4 with COLS=4. Bottom-edge widgets don't need an analogous
+   override — layout rows are dynamic and no bottom edge-flush rule
+   exists. */
+.widget-grid .grid-stack-item[gs-x="3"] > .ui-resizable-se,
+.widget-grid .grid-stack-item[gs-x="2"][gs-w="2"] > .ui-resizable-se,
+.widget-grid .grid-stack-item[gs-x="1"][gs-w="3"] > .ui-resizable-se,
+.widget-grid .grid-stack-item[gs-x="0"][gs-w="4"] > .ui-resizable-se {
+  right: 0;
+}
+/* Hide resize handle outside edit mode */
+.widget-grid:not(.is-editing) .ui-resizable-handle { display: none !important; }
+/* Inside edit mode, force the handle to stay visible even when the cursor
+   is not over the widget. GridStack applies `.ui-resizable-autohide` which
+   hides handles on mouse-leave — great default for a view mode, but in
+   edit mode we want every affordance constantly readable so the user can
+   scan the whole layout without chasing elements with the cursor. */
+.widget-grid.is-editing .grid-stack-item.ui-resizable-autohide > .ui-resizable-se {
+  display: flex !important;
+}
+
+/* Mobile: a flat single-column stack, read-only — no edit. */
+.widget-grid-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.widget-tile-mobile { width: 100%; }
+
+/* ─── Widget picker side-panel + empty-slot placeholders ──────────── */
+
+.widget-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.22);
+  /* Above GridStack's .ui-resizable-se handle, which gets an inline
+     z-index: 100 from dd-resizable-handle.js that beats any stylesheet
+     value. Previously backdrop at 49 and panel at 50 meant the resize
+     chips bled through the picker. */
+  z-index: 199;
+  animation: widget-picker-fade 150ms ease-out;
+}
+.widget-picker-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 420px;
+  max-width: 100vw;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  animation: widget-picker-slide-in 150ms ease-out;
+}
+@keyframes widget-picker-slide-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes widget-picker-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.widget-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.widget-picker-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.widget-picker-close {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.widget-picker-close:hover { background: var(--hover); color: var(--text); }
+
+.widget-picker-slot-hint {
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.widget-picker-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.widget-picker-empty {
+  padding: 30px 16px;
+  text-align: center;
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 13px;
+}
+.widget-picker-card {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.widget-picker-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.widget-picker-card-head { display: flex; flex-direction: column; gap: 3px; }
+.widget-picker-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.widget-picker-card-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+.widget-picker-card-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.widget-picker-preview-wrap {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 92px;
+}
+.widget-picker-preview {
+  background: color-mix(in srgb, var(--chart-1) 10%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--chart-1) 55%, var(--border));
+  border-radius: 6px;
+  transition: width 0.15s, height 0.15s;
+}
+/* Mini-grid preview — 4 cols × 6 rows of small cells, where the cells
+   occupied by the selected widget size are highlighted. Replaces the
+   old single-rectangle preview so users can see the widget's footprint
+   relative to the full dashboard grid at a glance. */
+/* Cells use a ~2.2:1 landscape aspect ratio so the preview matches the
+   real dashboard proportions (on a ~1200px dashboard each 1×1 cell is
+   ~300×132, i.e. 2.25:1). A square preview cell would make a 1×1 KPI
+   look square when it's actually very wide on screen. */
+.widget-picker-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 20px);
+  grid-template-rows: repeat(6, 9px);
+  gap: 2px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  width: auto;
+  height: auto;
+}
+.widget-picker-preview-cell {
+  width: 20px;
+  height: 9px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 2px;
+  background: transparent;
+  box-sizing: border-box;
+  transition: background 0.12s, border-color 0.12s;
+}
+.widget-picker-preview-cell.is-filled {
+  background: color-mix(in srgb, var(--chart-1) 20%, transparent);
+  border-color: color-mix(in srgb, var(--chart-1) 70%, var(--border));
+}
+.widget-picker-card-controls {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.widget-picker-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.widget-picker-size-chip {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  cursor: pointer;
+}
+.widget-picker-size-chip:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.widget-picker-size-chip.is-active {
+  background: color-mix(in srgb, var(--chart-1) 18%, transparent);
+  border-color: var(--chart-1);
+  color: var(--text);
+}
+.widget-picker-card-add {
+  background: var(--chart-1);
+  border: 1px solid var(--chart-1);
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  align-self: stretch;
+  transition: filter 0.12s;
+}
+/* Keep orange background + white text on hover. Previously a generic
+   .panel/.btn hover rule elsewhere was painting this white-on-white; the
+   explicit background/border/color here overrides that. Brightness bump
+   provides the hover feedback. */
+.widget-picker-card-add:hover,
+.widget-picker-card-add:focus-visible {
+  background: var(--chart-1);
+  border-color: var(--chart-1);
+  color: #fff;
+  filter: brightness(1.08);
+}
+
+/* Empty-slot placeholders — real GridStack items (.grid-stack-item) that
+   participate in the layout engine. GridStack positions the outer element
+   exactly like a real widget (same left/top/width/height calculation);
+   the inner .grid-stack-item-content already carries the 6px inset that
+   matches neighbouring real tiles, so the dashed outline lines up
+   pixel-perfect without any extra positioning math. Locked + no-move +
+   no-resize keep GridStack from dragging or reshaping the placeholder. */
+.widget-slot-empty-content {
+  /* Match widget-tile's inset:0 so a placeholder and a same-size widget
+     have identical visual footprints. Without this the placeholder
+     defaults to GridStack's 6px-per-side inset and reads as noticeably
+     smaller than adjacent widget panels. */
+  inset: 0;
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  /* Match the widget edit-mode dashed border exactly so the placeholder
+     reads as "same visual system as widgets" — previously the
+     chart-1/border mix produced a very pale peach outline that against
+     the panel background looked almost invisible, making the trailing
+     "+" slot appear detached and floaty, especially at the bottom of
+     the grid below the last real widgets. */
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  border: 2px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 10px;
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-dim));
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  /* Hide GridStack's resize handles entirely — even with gs-no-resize set,
+     some builds still render the handle DOM. Nothing to grab here. */
+  overflow: hidden;
+}
+.widget-slot-empty-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  width: 100%;
+  height: 100%;
+}
+.widget-slot-empty:hover > .widget-slot-empty-content {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* Inert slot: catalog is fully placed, nothing to add. The dashed
+   rectangle stays as a layout guide (so users still see the grid map
+   while dragging) but loses the "+" button and hover affordances. */
+.widget-slot-empty.is-inert > .widget-slot-empty-content {
+  cursor: default;
+  opacity: 0.55;
+}
+.widget-slot-empty.is-inert:hover > .widget-slot-empty-content {
+  background: transparent;
+  border-color: var(--border);
+  color: inherit;
+}
+.widget-slot-empty-plus {
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 300;
+  user-select: none;
+}
+/* GridStack shows a resize handle chevron on every item by default.
+   Placeholders are locked — no resize/drag — so hide the handle. */
+.widget-slot-empty > .ui-resizable-handle { display: none !important; }
+
+/* Per-widget "insert row above" button — small pill centered near the top
+   edge of every widget in edit mode. Positioned INSIDE the widget's
+   content box (top: 4px) so it isn't clipped by the content's
+   overflow: hidden, and sits above adjacent widgets in neighbouring rows.
+   Hover-reveal: invisible at rest, fades into a filled pill on widget hover.
+   The upward intent is conveyed by the "↑+" glyph and tooltip, not by
+   physical position outside the widget. */
+.widget-tile-insert-row-above {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  min-width: 28px;
+  height: 18px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--chart-1) 35%, transparent);
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--chart-1) 85%, var(--text-dim));
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms, background 120ms, color 120ms, border-color 120ms, box-shadow 120ms;
+}
+.widget-tile:hover > .grid-stack-item-content > .widget-tile-insert-row-above,
+.widget-tile-insert-row-above:focus-visible,
+.widget-tile-insert-row-above:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+.widget-tile-insert-row-above:hover,
+.widget-tile-insert-row-above:focus-visible {
+  background: var(--chart-1);
+  border-color: var(--chart-1);
+  border-style: solid;
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.widget-tile-insert-row-above-plus {
+  font-weight: 700;
+  line-height: 1;
+  transform: translateY(-0.5px);
+}
+
+/* Full-width hint shown in the picker when opened from a row-break strip. */
+.widget-picker-slot-hint-rowbreak {
+  margin-top: 6px;
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--chart-1);
+  background: color-mix(in srgb, var(--chart-1) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chart-1) 45%, var(--border));
+  padding: 3px 10px;
+  border-radius: 10px;
+}
+
+/* Disabled picker card — the widget is shown for discoverability but
+   doesn't fit the currently-targeted slot. */
+.widget-picker-card.is-disabled {
+  opacity: 0.5;
+  filter: saturate(0.7);
+}
+.widget-picker-card.is-disabled:hover {
+  border-color: var(--border);
+  box-shadow: none;
+}
+.widget-picker-card-disabled-note {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 4px 0;
+}
+.widget-picker-size-chip.is-disabled {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+@media (max-width: 720px) {
+  .widget-picker-panel { width: 100vw; }
+}

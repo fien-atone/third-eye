@@ -7,7 +7,18 @@ import type { Granularity, InsightsResponse, OverviewResponse } from '../types'
 import { parseLocalDate, useDateLocale } from '../lib/format'
 import { buildDashboardCatalog, buildInsightsCatalog } from '../widgets/registry'
 
+/** Hour buckets arrive as "YYYY-MM-DD HH:00" — split before parseLocalDate
+ *  so the date helper still gets a clean YYYY-MM-DD. */
+function parseHourBucket(b: string): { date: Date; hour: number } {
+  const [d, h] = b.split(' ')
+  return { date: parseLocalDate(d), hour: parseInt(h.slice(0, 2), 10) }
+}
+
 function formatBucket(bucket: string, g: Granularity, dl: Locale): string {
+  if (g === 'hour') {
+    const { hour } = parseHourBucket(bucket)
+    return `${String(hour).padStart(2, '0')}:00`
+  }
   if (g === 'month') return format(parseLocalDate(bucket + '-01'), 'LLL yyyy', { locale: dl })
   if (g === 'week') {
     const start = parseLocalDate(bucket)
@@ -22,6 +33,12 @@ function formatBucket(bucket: string, g: Granularity, dl: Locale): string {
  *  reading the popup don't have to guess what year a "12 Mar" point is.
  *  Axis labels stay compact (formatBucket above) for visual density. */
 function formatBucketFull(bucket: string, g: Granularity, dl: Locale): string {
+  if (g === 'hour') {
+    const { date, hour } = parseHourBucket(bucket)
+    const next = (hour + 1) % 24
+    const day = format(date, 'EEEE, d MMMM yyyy', { locale: dl })
+    return `${day} · ${String(hour).padStart(2, '0')}:00–${String(next).padStart(2, '0')}:00`
+  }
   if (g === 'month') return format(parseLocalDate(bucket + '-01'), 'LLLL yyyy', { locale: dl })
   if (g === 'week') {
     const start = parseLocalDate(bucket)
@@ -32,7 +49,7 @@ function formatBucketFull(bucket: string, g: Granularity, dl: Locale): string {
   return format(parseLocalDate(bucket), 'EEEE, d MMMM yyyy', { locale: dl })
 }
 
-export function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectView, insightsData, insightsProjectKey, editing, layoutEpoch, onLayoutReset }: {
+export function Dashboard({ data, modelNames, granularity, onSelectProject, inProjectView, insightsData, insightsProjectKey, editing, layoutEpoch, onLayoutReset, screenOverride, extraWidgets }: {
   data: OverviewResponse
   modelNames: string[]
   granularity: Granularity
@@ -43,6 +60,15 @@ export function Dashboard({ data, modelNames, granularity, onSelectProject, inPr
   editing: boolean
   layoutEpoch: number
   onLayoutReset: () => void
+  /** Override the default screen-id derivation. Used by the day-view
+   *  to share the Dashboard pipeline (catalog → DashboardView) while
+   *  saving its layout under `screen='today'`. */
+  screenOverride?: string
+  /** Caller-supplied widgets appended to the catalog. Day-view uses
+   *  this for day-only widgets (heatstrip, days-hours-heatmap,
+   *  weekday-hour-heatmap) that need access to selectedDate state
+   *  which lives in the day-view component. */
+  extraWidgets?: WidgetDef[]
 }) {
   const t = useT()
   const dl = useDateLocale()
@@ -101,8 +127,9 @@ export function Dashboard({ data, modelNames, granularity, onSelectProject, inPr
     }
     catalog.push(...buildInsightsCatalog({ t, data: effectiveInsights, projectKey: insightsProjectKey ?? null, dl }))
   }
+  if (extraWidgets && extraWidgets.length > 0) catalog.push(...extraWidgets)
 
-  const screen = inProjectView ? 'project' : 'dashboard'
+  const screen = screenOverride ?? (inProjectView ? 'project' : 'dashboard')
 
   return (
     <DashboardView
@@ -115,7 +142,7 @@ export function Dashboard({ data, modelNames, granularity, onSelectProject, inPr
   )
 }
 
-function DashboardView({ screen, catalog, editing, layoutEpoch, onLayoutReset }: {
+export function DashboardView({ screen, catalog, editing, layoutEpoch, onLayoutReset }: {
   screen: string
   catalog: WidgetDef[]
   editing: boolean

@@ -13,7 +13,7 @@ import { LocaleSwitcher } from './locale-switcher'
 export function AppHeader({
   lastIngestAt, isRefreshing, onRefresh,
   theme, setTheme,
-  showTabs, dashboardTabActive, projectsTabActive,
+  showTabs, dashboardTabActive, projectsTabActive, dayTabActive,
 }: {
   lastIngestAt: string | null
   isRefreshing: boolean
@@ -23,6 +23,7 @@ export function AppHeader({
   showTabs: boolean
   dashboardTabActive: boolean
   projectsTabActive: boolean
+  dayTabActive: boolean
 }) {
   const t = useT()
   return (
@@ -68,6 +69,12 @@ export function AppHeader({
             className={`tab${dashboardTabActive ? ' active' : ''}`}
             href={hrefFor({ name: 'home' })}
           >{t('nav.dashboard')}</a>
+          <a
+            role="tab"
+            aria-selected={dayTabActive}
+            className={`tab${dayTabActive ? ' active' : ''}`}
+            href={hrefFor({ name: 'today' })}
+          >{t('nav.today')}</a>
           <a
             role="tab"
             aria-selected={projectsTabActive}

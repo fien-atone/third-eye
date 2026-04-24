@@ -1,0 +1,136 @@
+.date-range-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+.date-range-sep { color: var(--text-dim); flex-shrink: 0; }
+
+.date-field {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  min-width: 130px;
+  text-align: left;
+}
+.date-field:hover { background: var(--hover); border-color: var(--border-strong); }
+.date-field:focus-visible { outline: none; border-color: var(--accent); }
+
+.date-popover {
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.14), 0 8px 24px rgba(0,0,0,0.1);
+  padding: 10px;
+  width: 280px;
+  z-index: 200;
+  font-variant-numeric: tabular-nums;
+}
+.date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.date-nav-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
+}
+.date-nav-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text-2);
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.date-nav-btn:hover { background: var(--hover); color: var(--text); }
+.date-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.date-weekday {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 4px 0;
+}
+.date-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.date-day {
+  height: 32px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.1s, color 0.1s;
+}
+.date-day:hover { background: var(--hover); }
+.date-day.other { color: var(--text-dim); opacity: 0.5; }
+.date-day.today { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.date-day.selected {
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+}
+.date-day.selected:hover { background: var(--accent-hover); }
+
+/* Reusable date primitives */
+.date-cell {
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+.date-cell--empty { color: var(--border-strong); }
+.date-text {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+.date-text--empty { color: var(--border-strong); }
+
+@media (max-width: 720px) {
+  input[type="date"] { flex: 1 1 0; min-width: 0; }
+  /* Keep "from date → to date" on ONE line on mobile */
+  .date-range-inline {
+    width: 100%;
+    gap: 4px;
+  }
+  .date-range-inline .date-field {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+}

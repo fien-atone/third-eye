@@ -1,0 +1,24 @@
+.recharts-cartesian-axis-tick-value { fill: var(--text-dim); font-size: 11px; }
+.recharts-legend-item-text { color: var(--text-dim) !important; font-size: 12px; }
+.recharts-default-tooltip { display: none !important; }
+/* Chart tooltips should snap to the cursor, not drag behind it like a ghost */
+.recharts-tooltip-wrapper { transition: none !important; }
+.tooltip {
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06);
+}
+.tooltip .tt-title { color: var(--text); font-weight: 600; margin-bottom: 6px; font-size: 12px; }
+.tooltip .tt-row { display: flex; justify-content: space-between; gap: 16px; color: var(--text-dim); line-height: 1.7; align-items: center; }
+.tooltip .tt-row .tt-val { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 500; }
+.tooltip .tt-row .swatch { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 6px; vertical-align: middle; }
+
+@media (max-width: 420px) {
+  /* Recharts tooltip portal can overflow on narrow screens */
+  .recharts-tooltip-wrapper { max-width: 90vw; }
+  .tooltip { min-width: 140px; font-size: 11px; }
+}

@@ -26,7 +26,7 @@ export function costByModelWidget(
       <div className="panel widget-panel">
         <PanelHeader
           title={t('panel.costByModel.title')}
-          sub={t(granularity === 'day' ? 'panel.costByModel.subDay' : granularity === 'week' ? 'panel.costByModel.subWeek' : 'panel.costByModel.subMonth')}
+          sub={t(granularity === 'hour' ? 'panel.costByModel.subHour' : granularity === 'day' ? 'panel.costByModel.subDay' : granularity === 'week' ? 'panel.costByModel.subWeek' : 'panel.costByModel.subMonth')}
           help={t('panel.costByModel.help')}
         />
         <div className="widget-panel-body widget-chart-body">

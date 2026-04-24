@@ -1,0 +1,207 @@
+.summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 4px 14px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.summary strong { color: var(--text); font-weight: 600; }
+.summary .dot { display: inline-block; margin: 0 8px; opacity: 0.5; }
+
+.controls {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.controls .group { display: flex; gap: 5px; align-items: center; }
+.controls .group-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  margin-right: 4px;
+}
+.controls .sep { width: 1px; height: 20px; background: var(--border); }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.12s;
+}
+.chip:hover { background: var(--hover); color: var(--text); }
+.chip.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+.chip .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--chart-4);
+}
+.chip.active .dot { background: var(--bg); }
+
+/* Inline chip-button group used in widget headers (e.g. token view
+   toggle). Restores breathing space between buttons that the previous
+   inline `gap: 5` provided. */
+.chip-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+/* Customize button in the controls bar — gear icon + label, pinned right
+   via `.controls-spacer` flex pushes prior elements together. */
+.controls-spacer { flex: 1 1 auto; }
+.customize-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.customize-btn:hover { color: var(--text); border-color: var(--border-strong); }
+.customize-btn.on { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+/* The three edit-mode buttons stay glued together. The group itself may
+   wrap onto a new line as a unit, but never splits internally — e.g. Save
+   never ends up on a separate line from Reset. */
+.edit-toolbar-group {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  margin-left: auto;
+}
+.customize-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+.customize-cancel-btn:hover { color: var(--text); border-color: var(--border-strong); }
+/* Reset button — destructive, kept visually subtle (light border, muted
+   text) so it doesn't compete with Cancel/Save. Hover reveals the warning
+   color so the destructive nature is clear right before the click. */
+.customize-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+.customize-reset-btn:hover { color: var(--bad); border-color: var(--bad); }
+/* Save button — positive confirmation: green background, white text.
+   Overrides the generic `.customize-btn.on` orange-accent styling above. */
+.customize-save-btn.customize-btn.on,
+.customize-save-btn {
+  background: var(--good);
+  border-color: var(--good);
+  color: #ffffff;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.customize-save-btn.customize-btn.on:hover,
+.customize-save-btn:hover {
+  background: color-mix(in srgb, var(--good) 85%, black);
+  border-color: color-mix(in srgb, var(--good) 85%, black);
+  color: #ffffff;
+}
+.customize-icon { font-size: 14px; line-height: 1; }
+
+/* ─── Edit-mode toolbar (Reset only — add-widget is driven by in-grid
+ *   slot placeholders) ─────────────────────────────────────────────── */
+.edit-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+@media (max-width: 720px) {
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px;
+    gap: 10px;
+  }
+  .controls .sep { display: none; }
+  .controls .group { flex-wrap: wrap; }
+  .controls .group-label { width: 100%; margin-bottom: 4px; }
+  .controls button, .controls .chip { font-size: 12px; padding: 6px 10px; }
+
+  .summary { font-size: 12px; padding: 4px 0 12px; flex-direction: column; align-items: flex-start; gap: 4px; }
+  .summary .dot { display: inline-block; }
+
+  .customize-label { display: none; }
+  .customize-btn { padding: 6px 8px; }
+}
+
+/* Day-view header — page title + date / prev / next / today nav. */
+.day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 24px 0 16px;
+  flex-wrap: wrap;
+}
+.day-header-title h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.day-header-date {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.day-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.day-header-today-btn { margin-left: 4px; }

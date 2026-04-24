@@ -10,6 +10,7 @@ import { apiGet, apiPost, dashboardParams } from './api'
 import { ProjectsPage } from './screens/projects-page'
 import { Dashboard } from './screens/dashboard'
 import { ProjectPage } from './screens/project-page'
+import { DayView } from './screens/day-view'
 import { NotFound } from './screens/not-found'
 import { ConfirmDialog } from './components/confirm-dialog'
 import { ServerDownBanner } from './components/server-down-banner'
@@ -45,6 +46,8 @@ export default function App() {
   const projectId = route.name === 'project' ? route.id : null
   const isNotFound = route.name === 'notfound'
   const isProjectsTab = route.name === 'projects'
+  const isDayTab = route.name === 'today' || route.name === 'day'
+  const dayDate = route.name === 'day' ? route.date : undefined
   // Which top-nav tab should LOOK active. The Projects tab lights up for
   // both the Projects LIST route and the individual PROJECT detail route —
   // a single project is conceptually a sub-view of Projects, not the
@@ -52,6 +55,7 @@ export default function App() {
   // above; this is purely presentation.
   const projectsTabActive = route.name === 'projects' || route.name === 'project'
   const dashboardTabActive = route.name === 'home'
+  const dayTabActive = isDayTab
   const qc = useQueryClient()
 
   useEffect(() => { applyTheme(theme) }, [theme])
@@ -108,7 +112,10 @@ export default function App() {
 
   // Snapshot of the layout at the moment edit mode is entered.
   // Cancel restores this; Done (toggling editing off) keeps current state.
-  const editScreen = projectId ? 'project' : 'dashboard'
+  // Day-view saves under 'today' (matches screenOverride passed to
+  // <Dashboard> from DayView). Without this Reset / Cancel on /today
+  // would silently target the home dashboard layout.
+  const editScreen = isDayTab ? 'today' : projectId ? 'project' : 'dashboard'
   const editLayout = useScreenLayout(editScreen)
   const editSnapshotRef = useRef<ScreenLayout | null>(null)
   // Epoch bumped on Cancel/Reset — used as a React `key` further down to
@@ -181,13 +188,35 @@ export default function App() {
         showTabs={!isNotFound}
         dashboardTabActive={dashboardTabActive}
         projectsTabActive={projectsTabActive}
+        dayTabActive={dayTabActive}
       />
 
       {serverDown && <ServerDownBanner onRetry={retryAll} />}
 
       {isProjectsTab && <ProjectsPage />}
 
-      {!isProjectsTab && (
+      {isDayTab && (
+        <DayView
+          initialDate={dayDate}
+          selectedProviders={selectedProviders}
+          editing={editingLayout}
+          setEditingLayout={setEditingLayout}
+          isNarrow={isNarrow}
+          onResetLayout={resetLayout}
+          onCancelEdit={cancelEdit}
+          layoutEpoch={layoutEpoch}
+          onLayoutReset={() => {
+            const y = window.scrollY
+            setLayoutEpoch(e => e + 1)
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+              window.scrollTo({ top: y, left: 0, behavior: 'instant' as ScrollBehavior })
+            }))
+          }}
+          projectsData={projectsQuery.data}
+        />
+      )}
+
+      {!isProjectsTab && !isDayTab && (
         <>
       <DashboardControls
         granularity={granularity}

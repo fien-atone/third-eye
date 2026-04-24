@@ -1,0 +1,30 @@
+/* ─── Confirm dialog (styled replacement for native confirm()) ─────── */
+.confirm-backdrop {
+  position: fixed; inset: 0; z-index: 90;
+  background: color-mix(in srgb, var(--text) 35%, transparent);
+  backdrop-filter: blur(2px);
+  animation: fade-in 120ms;
+}
+.confirm-dialog {
+  position: fixed; z-index: 91;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 20px 22px; min-width: 340px; max-width: 440px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+  animation: pop-in 160ms;
+}
+.confirm-title { margin: 0 0 8px; font-size: 17px; font-weight: 700; }
+.confirm-message { color: var(--text-dim); font-size: 14px; line-height: 1.45; margin-bottom: 18px; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.confirm-btn-cancel, .confirm-btn-ok {
+  padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text);
+  transition: background 120ms, border-color 120ms;
+}
+.confirm-btn-cancel:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.confirm-btn-ok { background: var(--good); color: #fff; border-color: var(--good); font-weight: 600; }
+.confirm-btn-ok.is-destructive { background: var(--bad, #d23b3b); border-color: var(--bad, #d23b3b); }
+.confirm-btn-ok:hover { filter: brightness(1.08); }
+@keyframes pop-in { from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }

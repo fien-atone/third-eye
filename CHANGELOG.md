@@ -4,6 +4,82 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] — 2026-04-24
+
+### Added
+- **"Today" tab** with hour-by-hour breakdown of a single calendar
+  day (00:00–23:59 in your local timezone, not a rolling 24-hour
+  window). Date picker + ◀ / Today / ▶ shortcuts in the header,
+  URL deep-linking via `#/today` and `#/day/YYYY-MM-DD`.
+- **Hour granularity** added to `/api/overview` (`granularity=hour`).
+  Bucket key is `YYYY-MM-DD HH:00` so multi-day hour ranges don't
+  collapse same-hour bars across days.
+- **Five new day-view widgets**, all customizable like every other
+  widget:
+  - `hour-timeline` — 24 bars of cost across the selected day.
+  - `hours-heatstrip` — single-row 24-cell strip of color intensity.
+  - `days-hours-heatmap` — 30 days × 24 hours grid with click-a-day
+    navigation.
+  - `days-hours-heatmap-week` — 7-day variant of the above for a
+    tighter focus on the recent week.
+  - `weekday-hour-heatmap` — 7×24 day-of-week × hour pattern over
+    the last 90 days, for "when do I usually work" patterns.
+- **Customize toolbar** in the Day-view header (drag/resize widgets,
+  Reset to defaults, Cancel, Save) — same pattern as the home
+  dashboard and project pages.
+- **CI build check** (`.github/workflows/build.yml`) — runs
+  `npm run build` on every push and PR. v2.0.0 shipped with TS
+  errors that blocked `npm start` for fresh installers; this
+  workflow exists so that doesn't happen again.
+
+### Changed
+- **`kpi-scope` widget** now shows `Active hours` on the day-view
+  (was falling back to `Active months` because the widget didn't
+  know about the `hour` granularity).
+- **Per-granularity panel subtitles** for `cost-by-project`,
+  `cost-by-model`, and `calls` widgets gained `subHour` variants
+  in all 5 locales — previously fell through to the monthly fallback
+  when used on the day-view.
+- **Hover ring on heatmap cells** moved to `outline-offset: -2px`
+  (inset) — the previous outset 2px ring got clipped by the panel's
+  `overflow:hidden` boundary on edge cells.
+- **Bottom-row "+" slot** on every dashboard now accepts widgets of
+  any height (was h≤1 only, hiding most chart widgets from the
+  picker). Visual placeholder stays one cell tall; the picker
+  treats the slot as height-unbounded.
+- **Picker preview** for the bottomless slot anchors the highlight
+  to the bottom of the mini-grid instead of trying to draw at
+  y=10+ where nothing is visible.
+- **Project rename** — the pencil now sits next to the H1 title
+  on the project page (was only on the projects list page).
+- **CSS split into per-feature files** under `client/src/styles/`
+  — index.css went from 2948 lines to 17 (just `@import` entries).
+  Dropped 19 dead classes left over from earlier iterations.
+- **App.tsx slimmed from 673 to 283 lines** by extracting:
+  - `screens/project-page.tsx` (project header + insights query)
+  - `components/{app-header,dashboard-controls,date-field,
+    locale-switcher,theme-toggle,footer,server-down-banner}.tsx`
+  - `lib/use-fit-count.ts` was already extracted in 2.0.
+
+### Fixed
+- **Reset to defaults on /today** now actually resets the today
+  layout — previously `editScreen` only knew about `dashboard` and
+  `project`, so Reset on /today silently wiped the home dashboard
+  layout instead.
+- **Widget customize toolbar visible on /today** — the day-view
+  used a custom header that didn't render the standard controls
+  bar, so there was no Customize button at all.
+- **`hours-heatstrip` cells fixed-height (28px)** caused clipping
+  on narrow tiles — now flex-stretch with `min-height: 12px` and
+  `max-height: 64px`.
+- **Days × hours weekly heatmap** date labels now align in
+  columns (day-num right-aligned in 12px slot, month left-aligned
+  in 22px slot, `tabular-nums`) — previously day numbers wandered
+  horizontally based on digit count.
+- **Days × hours heatmap row order** flipped to newest-first
+  (selected day on top, older below) to match how people read
+  date timelines.
+
 ## [2.0.1] — 2026-04-24
 
 ### Fixed

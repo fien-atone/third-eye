@@ -70,7 +70,7 @@ export function CostByProjectPanel({
     <div className="panel widget-panel">
       <PanelHeader
         title={t('panel.costByProject.title')}
-        sub={t(granularity === 'day' ? 'panel.costByProject.subDay' : granularity === 'week' ? 'panel.costByProject.subWeek' : 'panel.costByProject.subMonth')}
+        sub={t(granularity === 'hour' ? 'panel.costByProject.subHour' : granularity === 'day' ? 'panel.costByProject.subDay' : granularity === 'week' ? 'panel.costByProject.subWeek' : 'panel.costByProject.subMonth')}
         help={t('panel.costByProject.help')}
       />
       <div className="widget-panel-body widget-chart-body">

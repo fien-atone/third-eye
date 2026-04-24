@@ -1,0 +1,31 @@
+name: Build
+
+# Run a full production build on every push and PR — catches TS errors,
+# missing imports, and config regressions BEFORE a release tag goes out
+# (the tag-driven Release workflow assumes the build already works). The
+# v2.0.0 release shipped with three TS6133 errors in panels.tsx because
+# we never built the production bundle locally before tagging — this
+# workflow exists so that doesn't happen again.
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['**']  # release.yml handles tags
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npm run build

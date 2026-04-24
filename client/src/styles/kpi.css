@@ -1,0 +1,132 @@
+.kpi-group {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+  /* Container at the TILE level so all KPI tiles use the same value
+     font size at the same widget width — single-metric (kpi-scope)
+     and two-metric tiles stay visually aligned in a row. */
+  container-type: inline-size;
+}
+.kpi-group-title {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--chart-1);
+  z-index: 1;
+}
+.kpi-group-body {
+  display: flex;
+  padding-top: 30px;
+}
+.kpi-metric {
+  flex: 1 1 0;
+  padding: 0 12px 12px;
+  min-width: 0;
+}
+.kpi-metric + .kpi-metric {
+  border-left: 1px solid var(--border);
+}
+/* Values like "15.35M" can be wider than a narrow KPI cell — clip with
+   ellipsis instead of overflowing the panel border. */
+.kpi-metric .label,
+.kpi-metric .value,
+.kpi-metric .sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.kpi-metric .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); font-weight: 600; }
+.kpi-metric .value { font-size: 20px; font-weight: 600; margin-top: 2px; letter-spacing: -0.02em; color: var(--text); }
+.kpi-metric .sub { font-size: 11.5px; color: var(--text-dim); margin-top: 1px; }
+
+/* Shrink the value font as the KPI tile gets narrower so "15.35M" /
+   "$1234" fit without ellipsis on two-metric tiles, and so single-
+   metric tiles (kpi-scope) stay visually aligned with their neighbours
+   at the same widget size. Placed AFTER the base `font-size: 20px` so
+   @container overrides win on source order. */
+@container (max-width: 320px) {
+  .kpi-metric .value { font-size: 18px; }
+}
+@container (max-width: 240px) {
+  .kpi-metric .value { font-size: 16px; }
+  .kpi-metric { padding: 0 10px 10px; }
+}
+@container (max-width: 180px) {
+  .kpi-metric .value { font-size: 14px; }
+  .kpi-metric { padding: 0 8px 8px; }
+}
+
+/* Flags body fills the panel and clips. The inner .flag-grid stretches
+   to use whatever vertical space is available without escaping the
+   widget bounds at h=2. `container-type: size` (not just inline-size)
+   so we can query the body height and drop the optional `.flag-sub`
+   line when the tile is too short to fit it. */
+.flag-grid-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  container-type: size;
+}
+.flag-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.flag-stat {
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  /* Anchor at the top so when content gets cropped it loses the
+     subtitle (least important) instead of decapitating the value. */
+  justify-content: flex-start;
+  min-height: 0;
+  overflow: hidden;
+}
+.flag-label,
+.flag-value,
+.flag-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.flag-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: var(--chart-1); }
+.flag-value { font-size: 22px; font-weight: 600; margin-top: 2px; letter-spacing: -0.02em; }
+.flag-sub { font-size: 11.5px; color: var(--text-dim); margin-top: 1px; }
+/* Shrink number on narrow flag tiles. */
+@container (max-width: 320px) {
+  .flag-value { font-size: 18px; }
+}
+@container (max-width: 240px) {
+  .flag-value { font-size: 16px; }
+  .flag-stat { padding: 8px 10px; }
+}
+/* Drop the subtitle line at heights where it won't fit alongside
+   label + value (h=2 typically gives the body ~80–110px). */
+@container (max-height: 110px) {
+  .flag-sub { display: none; }
+  .flag-stat { padding: 8px 10px; }
+}
+@container (max-height: 70px) {
+  .flag-value { font-size: 15px; margin-top: 0; }
+}
+
+@media (max-width: 720px) {
+  .kpi-group-body { padding-top: 28px; }
+  .kpi-metric .value { font-size: 18px; }
+  .kpi-group-title { font-size: 9px; }
+  .flag-grid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,99 @@
+/* Project-view page header — sits ABOVE the controls row so a single
+   project screen is visually distinct from the all-projects dashboard. */
+.project-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 20px 0 14px;
+  padding: 0;
+}
+.project-header-back {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 2px 6px;
+  margin: 0 0 -2px -6px;
+  border-radius: 6px;
+  transition: background 0.12s, color 0.12s;
+}
+.project-header-back:hover,
+.project-header-back:focus-visible {
+  color: var(--text);
+  background: var(--hover);
+  outline: none;
+}
+.project-header-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  letter-spacing: -0.01em;
+}
+.project-header-title-label {
+  color: var(--text);
+  font-weight: 700;
+}
+.project-header-rename {
+  /* Borderless pencil that sits centred next to the title (.project-
+     header-title uses align-items: baseline for its label, so we lift
+     the pencil with translateY to optically centre on the cap height
+     rather than the baseline). */
+  align-self: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  color: var(--text-dim);
+  border-radius: 6px;
+  margin-left: 6px;
+  transform: translateY(-0.18em);
+}
+.project-header-rename:hover {
+  background: var(--hover);
+  color: var(--text);
+  border-color: transparent;
+}
+.project-header-title-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.project-header-title-edit input {
+  font-size: 22px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  min-width: 240px;
+}
+.project-header-title-edit input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.project-header-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+.project-header-sub-label {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+.project-header-sub-value {
+  font-family: var(--mono, monospace);
+  color: var(--text-dim);
+}
+@media (max-width: 720px) {
+  .project-header-title { font-size: 22px; }
+  .project-header { margin: 16px 0 12px; }
+}

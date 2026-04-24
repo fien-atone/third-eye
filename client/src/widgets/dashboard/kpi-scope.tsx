@@ -15,7 +15,7 @@ export function kpiScopeWidget(t: T, data: OverviewResponse, granularity: Granul
     render: () => (
       <KpiGroup title={t('kpi.scope')}>
         {!inProjectView && <KpiMetric label={t('kpi.projects')} value={String(data.totals.projects)} />}
-        <KpiMetric label={`${t('kpi.active')} ${t(granularity === 'day' ? 'summary.days' : granularity === 'week' ? 'summary.weeks' : 'summary.months')}`} value={`${activeBuckets} / ${data.frame.bucketCount}`} />
+        <KpiMetric label={`${t('kpi.active')} ${t(granularity === 'hour' ? 'summary.hours' : granularity === 'day' ? 'summary.days' : granularity === 'week' ? 'summary.weeks' : 'summary.months')}`} value={`${activeBuckets} / ${data.frame.bucketCount}`} />
       </KpiGroup>
     ),
   }

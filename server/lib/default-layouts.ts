@@ -73,9 +73,39 @@ export const PROJECT_DEFAULT: ScreenLayout = {
   hidden: [],
 }
 
+/** Day-view screen — single calendar day, hour-by-hour breakdown.
+ *  Hour-timeline replaces the daily charts (cost-by-* / tokens /
+ *  calls / activity); KPIs and top-projects stay because they make
+ *  sense scoped to a day too. */
+export const TODAY_DEFAULT: ScreenLayout = {
+  widgets: [
+    // Hours strip on top — quickest "when did anything happen today" read.
+    { i: 'hours-heatstrip',         x: 0, y: 0, w: 4, h: 1, minW: 2, minH: 1 },
+    // KPIs row.
+    { i: 'kpi-spend',  x: 0, y: 1, w: 1, h: 1, minW: 1, minH: 1 },
+    { i: 'kpi-tokens', x: 1, y: 1, w: 1, h: 1, minW: 1, minH: 1 },
+    { i: 'kpi-cache',  x: 2, y: 1, w: 1, h: 1, minW: 1, minH: 1 },
+    { i: 'kpi-scope',  x: 3, y: 1, w: 1, h: 1, minW: 1, minH: 1 },
+    // Last week × hours next to models for context.
+    { i: 'days-hours-heatmap-week', x: 0, y: 2, w: 2, h: 2, minW: 2, minH: 2 },
+    { i: 'models',                  x: 2, y: 2, w: 2, h: 2, minW: 2, minH: 2 },
+    // Cost charts side-by-side.
+    { i: 'cost-by-project', x: 0, y: 4, w: 2, h: 3, minW: 2, minH: 3 },
+    { i: 'cost-by-model',   x: 2, y: 4, w: 2, h: 3, minW: 2, minH: 2 },
+    // Bottom row — top-projects + calls.
+    { i: 'top-projects', x: 0, y: 7, w: 2, h: 2, minW: 2, minH: 2 },
+    { i: 'calls',        x: 2, y: 7, w: 2, h: 2, minW: 2, minH: 2 },
+    // Activity full-width below.
+    { i: 'activity',     x: 0, y: 9, w: 2, h: 2, minW: 2, minH: 2 },
+  ],
+  // Available via the picker but not in the default layout.
+  hidden: ['hour-timeline', 'tokens', 'days-hours-heatmap', 'weekday-hour-heatmap'],
+}
+
 export const DEFAULT_LAYOUTS: Record<string, ScreenLayout> = {
   dashboard: DASHBOARD_DEFAULT,
   project: PROJECT_DEFAULT,
+  today: TODAY_DEFAULT,
 }
 
 export const KNOWN_SCREENS = new Set(Object.keys(DEFAULT_LAYOUTS))

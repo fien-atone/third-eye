@@ -15,6 +15,7 @@ export const en = {
 
   // Controls / toolbar
   'controls.view': 'View',
+  'controls.hour': 'Hour',
   'controls.day': 'Day',
   'controls.week': 'Week',
   'controls.month': 'Month',
@@ -41,6 +42,31 @@ export const en = {
   'widget.listMore.allFmt': 'All {total} shown',
   'insights.heatmap.tooSmall': 'Not enough space — make the widget larger to show the heatmap',
   'insights.heatmap.cellCalls': 'API calls',
+  'nav.today': 'Today',
+  'dayView.title': 'Today at a glance',
+  'dayView.today': 'Today',
+  'dayView.prevDay': 'Previous day',
+  'dayView.nextDay': 'Next day',
+  'panel.hourTimeline.title': 'Hour timeline',
+  'panel.hourTimeline.sub': 'Cost per hour for the selected day',
+  'panel.hourTimeline.help': 'Each bar is one hour of the day, in your local timezone. Helps spot when you actually work — not the rolling last-24-hour window.',
+  'panel.hourTimeline.empty': 'No activity recorded for this day yet.',
+  'widgets.hour-timeline.description': 'Cost per hour for the selected calendar day.',
+  'panel.hoursHeatstrip.title': 'Hours strip',
+  'panel.hoursHeatstrip.sub': 'Color-intensity strip — see breaks at a glance',
+  'panel.hoursHeatstrip.help': 'Single row of 24 cells (one per hour). Color intensity = cost; gaps = breaks. Same data as Hour timeline, just compact.',
+  'widgets.hours-heatstrip.description': 'Compact 24-cell strip showing hourly cost intensity.',
+  'panel.daysHoursHeatmap.title': 'Days × hours heatmap',
+  'panel.daysHoursHeatmap.subFmt': 'last {days} days · click any day to jump',
+  'panel.daysHoursHeatmap.help': 'Each row is one calendar day, each cell one hour of that day. Color intensity scales with cost. Click a day label or any of its cells to navigate to that day.',
+  'widgets.days-hours-heatmap.description': 'Last 30 days × 24 hours, click a day to navigate.',
+  'panel.daysHoursHeatmapWeek.title': 'Last week × hours',
+  'panel.daysHoursHeatmapWeek.subFmt': 'last {days} days · click any day to jump',
+  'widgets.days-hours-heatmap-week.description': 'Last 7 days × 24 hours — tighter focus than the 30-day variant.',
+  'panel.weekdayHourHeatmap.title': 'Weekday × hour pattern',
+  'panel.weekdayHourHeatmap.subFmt': 'aggregated over the last {days} days',
+  'panel.weekdayHourHeatmap.help': '7 rows (days of the week) × 24 columns (hours). Cells aggregate cost across the recent window so weekly patterns become visible — e.g. weekend mornings vs weekday afternoons.',
+  'widgets.weekday-hour-heatmap.description': '7×24 day-of-week × hour pattern across the recent window.',
   'customize.pickerClose': 'Close',
   'customize.pickerSlotHintFmt': 'Filling slot at row {row}, columns {colStart}–{colEnd}',
   'customize.notFitSlot': "Doesn't fit this slot",
@@ -75,6 +101,7 @@ export const en = {
   'widgets.heatmap.description': '7×24 heatmap of call volume by day-of-week and hour.',
 
   // Summary
+  'summary.hours': 'hours',
   'summary.days': 'days',
   'summary.weeks': 'weeks',
   'summary.months': 'months',
@@ -139,6 +166,7 @@ export const en = {
 
   // Panel: cost by model
   'panel.costByProject.title': 'Project activity',
+  'panel.costByProject.subHour': 'USD per hour, stacked by project',
   'panel.costByProject.subDay': 'USD per day, stacked by project',
   'panel.costByProject.subWeek': 'USD per week, stacked by project',
   'panel.costByProject.subMonth': 'USD per month, stacked by project',
@@ -147,6 +175,7 @@ export const en = {
   'panel.costByProject.otherWith': '{count} more projects',
 
   'panel.costByModel.title': 'Cost by model',
+  'panel.costByModel.subHour': 'Hourly totals, stacked',
   'panel.costByModel.subDay': 'Daily totals, stacked',
   'panel.costByModel.subWeek': 'Weekly totals, stacked',
   'panel.costByModel.subMonth': 'Monthly totals, stacked',
@@ -154,6 +183,7 @@ export const en = {
 
   // Panel: API calls over time
   'panel.calls.title': 'API calls over time',
+  'panel.calls.subHour': 'Requests per hour',
   'panel.calls.subDay': 'Requests per day',
   'panel.calls.subWeek': 'Requests per week',
   'panel.calls.subMonth': 'Requests per month',

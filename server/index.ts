@@ -13,7 +13,7 @@ seedScreenLayouts(DEFAULT_LAYOUTS)
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-type Granularity = 'day' | 'week' | 'month'
+type Granularity = 'hour' | 'day' | 'week' | 'month'
 
 function parseTzMin(q: unknown): number {
   const n = parseInt(String(q ?? '0'), 10)
@@ -51,6 +51,10 @@ function bucketSql(g: Granularity, tzMin: number, weekStartsOn: number): string 
     const endOfWeek = (weekStartsOn + 6) % 7
     return `strftime('%Y-%m-%d', date(ts, ${tz}, 'weekday ${endOfWeek}', '-6 days'))`
   }
+  // Hour bucket key includes the date so widgets that span more than
+  // one calendar day (rare for the day-view, but possible for ranges)
+  // don't collapse "Mon 14:00" and "Tue 14:00" into a single bar.
+  if (g === 'hour') return `strftime('%Y-%m-%d %H:00', datetime(ts, ${tz}))`
   return `strftime('%Y-%m-%d', datetime(ts, ${tz}))`
 }
 
@@ -65,7 +69,16 @@ function fillBuckets(startEpoch: number, endEpoch: number, g: Granularity, tzMin
   const cur = new Date(startEpoch + offsetMs)
   cur.setUTCHours(0, 0, 0, 0)
 
-  if (g === 'day') {
+  if (g === 'hour') {
+    // Walk hour-by-hour from the start. Same epoch-shifted scheme as
+    // day buckets — the cursor is held in the client's local frame
+    // (UTC math on the shifted date) and we shift back when emitting.
+    while (cur.getTime() - offsetMs <= endEpoch) {
+      const ms = cur.getTime() - offsetMs
+      keys.push(`${fmtClientDate(ms, tzMin)} ${String(cur.getUTCHours()).padStart(2, '0')}:00`)
+      cur.setUTCHours(cur.getUTCHours() + 1)
+    }
+  } else if (g === 'day') {
     while (cur.getTime() - offsetMs <= endEpoch) {
       keys.push(fmtClientDate(cur.getTime() - offsetMs, tzMin))
       cur.setUTCDate(cur.getUTCDate() + 1)

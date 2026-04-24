@@ -140,7 +140,14 @@ function reconcile(layout: ScreenLayout, catalog: WidgetDef[]): ScreenLayout {
 
 // ─── Empty-slot detection ─────────────────────────────────────────────
 
-type EmptySlot = { x: number; y: number; w: number; h: number }
+type EmptySlot = {
+  x: number; y: number; w: number; h: number
+  /** Marks the trailing bottom-row slot. Visually it stays h=1 (one
+   *  cell tall, just an "add here" target) but the picker treats it
+   *  as height-unbounded — anything in the catalog can be dropped at
+   *  the bottom regardless of its natural h. */
+  bottomless?: boolean
+}
 
 // Prefix used to identify placeholder (empty-slot) GridStack items in
 // serialized output. Real widget ids never start with this, so filtering
@@ -190,8 +197,11 @@ function findEmptySlots(widgets: Placed[]): EmptySlot[] {
       x = runEnd
     }
   }
-  // Always emit bottom row spanning all columns.
-  slots.push({ x: 0, y: maxY, w: COLS, h: 1 })
+  // Always emit bottom row spanning all columns. Marked bottomless so
+  // the picker accepts widgets of any height (nothing is below to
+  // collide with) — without this, the bottom "+" only accepted h=1
+  // widgets, hiding everything else from the catalog.
+  slots.push({ x: 0, y: maxY, w: COLS, h: 1, bottomless: true })
   return slots
 }
 
@@ -209,7 +219,7 @@ type WidgetGridProps = {
   /** Optional: when editing, clicking an empty-slot placeholder invokes
    *  this with the slot's (x, y, maxW, maxH). The parent (dashboard.tsx)
    *  uses it to open the side-panel picker pre-targeted to that slot. */
-  onSlotPick?: (slot: { x: number; y: number; maxW: number; maxH: number; insertMode?: 'gap' | 'row-break' }) => void
+  onSlotPick?: (slot: { x: number; y: number; maxW: number; maxH: number; insertMode?: 'gap' | 'row-break'; bottomless?: boolean }) => void
 }
 
 export function WidgetGrid({ screen, catalog, editing, onLayoutSettled, onSlotPick }: WidgetGridProps) {
@@ -549,7 +559,7 @@ export function WidgetGrid({ screen, catalog, editing, onLayoutSettled, onSlotPi
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation()
-                    onSlotPick({ x: s.x, y: s.y, maxW: s.w, maxH: s.h, insertMode: 'gap' })
+                    onSlotPick({ x: s.x, y: s.y, maxW: s.w, maxH: s.h, insertMode: 'gap', bottomless: s.bottomless })
                   }}
                   aria-label="Add widget to empty slot"
                 >
@@ -577,7 +587,7 @@ type AddPickerProps = {
    *  the slot's (x, y) with the chosen size. Required — no free-floating
    *  "add to bottom" mode anymore; that's covered by the bottom-row slot
    *  placeholder emitted by findEmptySlots. */
-  slot: { x: number; y: number; maxW: number; maxH: number; insertMode?: 'gap' | 'row-break' }
+  slot: { x: number; y: number; maxW: number; maxH: number; insertMode?: 'gap' | 'row-break'; bottomless?: boolean }
   /** Called after a successful add so the parent can remount the WidgetGrid
    *  (bump layoutEpoch). Without this, GridStack engine stays pinned to the
    *  old DOM while React renders new widgets → visual overlap. */
@@ -611,14 +621,17 @@ export function AddWidgetPicker({ screen, catalog, open, onClose, slot, onAdded 
 
   // Filter by slot constraints. For regular 'gap' slots: the size must
   // fit inside maxW × maxH. For 'row-break' slots: the size must span
-  // all COLS (full-width). minW/minH must also be honored.
+  // all COLS (full-width). For the bottomless trailing slot: any
+  // height is allowed (nothing below to collide with). minW/minH must
+  // also be honored.
   const isRowBreak = slot.insertMode === 'row-break'
+  const effectiveMaxH = slot.bottomless ? Infinity : slot.maxH
   const fitsSlot = (def: WidgetDef, size: WidgetSize): boolean => {
     const minW = def.minW ?? 1
     const minH = def.minH ?? 1
     if (size.w < minW || size.h < minH) return false
-    if (isRowBreak) return size.w <= COLS && size.h <= slot.maxH
-    return size.w <= slot.maxW && size.h <= slot.maxH
+    if (isRowBreak) return size.w <= COLS && size.h <= effectiveMaxH
+    return size.w <= slot.maxW && size.h <= effectiveMaxH
   }
 
   const fittingSizesFor = (def: WidgetDef): WidgetSize[] => {
@@ -722,7 +735,16 @@ export function AddWidgetPicker({ screen, catalog, open, onClose, slot, onAdded 
             // (x, y) so users see where on the grid the widget will land.
             const PREVIEW_ROWS = 6
             const highlightX = doesFit ? slot.x : 0
-            const highlightY = doesFit ? slot.y : 0
+            // Clamp the preview-Y so the highlight is always visible.
+            // The dashboard's actual y can be > PREVIEW_ROWS (e.g. the
+            // bottomless trailing slot at y = maxY ≫ 6), in which case
+            // the cells used to drop entirely out of the 6-row mini-grid
+            // and nothing was painted. Anchor the highlight to the
+            // bottom of the preview instead.
+            const rawY = doesFit ? slot.y : 0
+            const highlightY = doesFit && rawY + current.h > PREVIEW_ROWS
+              ? Math.max(0, PREVIEW_ROWS - current.h)
+              : rawY
             return (
               <div
                 key={def.id}

@@ -1,6 +1,6 @@
 /** Shared types used across screens, widgets, panels. */
 
-export type Granularity = 'day' | 'week' | 'month'
+export type Granularity = 'hour' | 'day' | 'week' | 'month'
 
 export type Provider = {
   id: string

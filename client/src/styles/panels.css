@@ -1,0 +1,174 @@
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.panel h3 {
+  margin: 0 0 10px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.panel .panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.panel .panel-head h3 { margin: 0; }
+.panel .panel-sub {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.panel-head .panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.help-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: help;
+  position: relative;
+  user-select: none;
+}
+.help-tip:hover, .help-tip:focus-visible {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  outline: none;
+}
+.help-bubble-floating {
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.14), 0 8px 24px rgba(0,0,0,0.1);
+  white-space: normal;
+  text-align: left;
+  line-height: 1.45;
+  z-index: 200;
+  pointer-events: none;
+}
+.help-bubble-floating code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  background: var(--bg-2);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* Force panels inside a tile to fill height and clip cleanly */
+.widget-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 0 !important;
+  overflow: hidden;
+}
+/* Clamp the subtitle to one line in widgets — otherwise long subs (e.g.
+   "12 unique files, showing 89 most touched") wrap to 2-3 lines on
+   narrow tiles, eating half the panel body and starving useFitCount. */
+.widget-panel .panel-head .panel-sub {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.widget-panel-body {
+  flex: 1 1 auto;
+  /* min-height: 1px (not 0) so Recharts ResponsiveContainer never sees
+     a 0-by-0 parent on first paint and stops emitting the
+     "width(-1) and height(-1) of chart should be greater than 0"
+     warning. After ResizeObserver fires the chart fills the real
+     available space normally. */
+  min-height: 1px;
+  position: relative;
+}
+/* Fit-to-height list/table body: we render only as many rows as fit
+   (via useFitCount) plus an "+N more" chip. Hidden overflow prevents
+   any partial row from leaking past the panel edge during the brief
+   measure → resize lag. */
+.widget-panel-body-fit {
+  overflow: hidden;
+  /* flex column so the "+N more" chip can margin-top:auto down to the
+     bottom edge, leaving a real visual gap above the divider. */
+  display: flex;
+  flex-direction: column;
+}
+/* Chart-bearing body: flex column with a bounded chart area so the
+   ResponsiveContainer's height:100% computes against real pixels
+   (panel.body − legend), not the panel.body alone. Without this the
+   chart claims the full body height AND the legend stacks on top,
+   pushing rendered pixels past the widget edge. */
+.widget-chart-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.widget-chart-legend { flex: 0 0 auto; }
+.widget-chart-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+.widget-chart-area .recharts-responsive-container { height: 100% !important; }
+
+.widget-list-more {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 8px 8px 0;
+  /* margin-top:auto pushes the chip to the bottom edge of the panel
+     body so the divider sits in clear space, not glued to the table. */
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  letter-spacing: 0.02em;
+  display: block;
+  /* Single-line guarantee: keeps the chip's height predictable across
+     locales/widget widths, so useFitCount's height reservation never
+     gets out of sync with what's actually rendered. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 0 auto;
+}
+.widget-list-more-count { color: var(--text); }
+/* "All N shown" state — chip stays as a constant signal of the dataset
+   size, but the divider/emphasis fade so it doesn't compete with the
+   real attention-grabbing truncation state. */
+.widget-list-more.is-complete {
+  border-top-color: transparent;
+  opacity: 0.6;
+}
+.widget-list-more.is-complete .widget-list-more-count { color: var(--muted); }
+
+/* Recharts ResponsiveContainer needs an actual height — flex child with
+   min-height: 0 gives it one. */
+.widget-panel-body .recharts-responsive-container { height: 100% !important; }
+
+@media (max-width: 720px) {
+  .panel { padding: 12px 12px; }
+  .panel h3 { font-size: 10px; }
+  .panel-head { flex-direction: column; align-items: flex-start; gap: 6px; }
+}
