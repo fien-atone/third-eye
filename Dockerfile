@@ -26,7 +26,7 @@ COPY --from=client-build /build/client/dist ../client/dist
 
 ENV NODE_ENV=production
 ENV PORT=4317
-ENV CODEBURN_DB=/app/server/data/third-eye.db
+ENV THIRD_EYE_DB=/app/server/data/third-eye.db
 ENV CLAUDE_CONFIG_DIR=/data/claude
 ENV CODEX_HOME=/data/codex
 

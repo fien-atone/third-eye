@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import { db, getMeta, seedScreenLayouts } from './db.ts'
 import { runIngest } from './ingest.ts'
 import { DEFAULT_LAYOUTS, KNOWN_SCREENS, type ScreenLayout } from './lib/default-layouts.ts'
+import { envRead, envReadNumber } from './lib/env.ts'
 
 // Seed default screen layouts on first start (idempotent — never overwrites
 // user customizations once they exist).
@@ -116,8 +117,9 @@ function normalizeProviders(q: unknown): string[] {
 
 const app = express()
 // CORS: allow only the vite dev server and same-origin Docker/static use.
-// Override via CODEBURN_CORS_ORIGIN="https://your.host" if you ever expose this publicly (not recommended).
-const corsOrigin = process.env.CODEBURN_CORS_ORIGIN ?? [
+// Override via THIRD_EYE_CORS_ORIGIN="https://your.host" if you ever expose this publicly (not recommended).
+// Legacy CODEBURN_CORS_ORIGIN is still read for backwards compat (see server/lib/env.ts).
+const corsOrigin = envRead('THIRD_EYE_CORS_ORIGIN', 'CODEBURN_CORS_ORIGIN') ?? [
   'http://localhost:5173', 'http://127.0.0.1:5173',
   'http://localhost:5180', 'http://127.0.0.1:5180',
 ]
@@ -672,8 +674,8 @@ async function boot() {
     console.log(`[ingest] last ingest: ${last}`)
   }
 
-  const intervalMin = Number(process.env.CODEBURN_INGEST_INTERVAL_MIN ?? 0)
-  const intervalSince = process.env.CODEBURN_INGEST_SINCE ?? '2h'
+  const intervalMin = envReadNumber('THIRD_EYE_INGEST_INTERVAL_MIN', 'CODEBURN_INGEST_INTERVAL_MIN') ?? 0
+  const intervalSince = envRead('THIRD_EYE_INGEST_SINCE', 'CODEBURN_INGEST_SINCE') ?? '2h'
   if (intervalMin > 0) {
     console.log(`[ingest] auto-refresh every ${intervalMin}m (since=${intervalSince})`)
     setInterval(() => {
@@ -684,8 +686,9 @@ async function boot() {
   }
 
   // Bind to loopback by default — the server reads your session data, so it should not be LAN-accessible
-  // without intent. Override via CODEBURN_HOST=0.0.0.0 for Docker / container scenarios.
-  const host = process.env.CODEBURN_HOST ?? '127.0.0.1'
+  // without intent. Override via THIRD_EYE_HOST=0.0.0.0 for Docker / container scenarios.
+  // Legacy CODEBURN_HOST still honored (see server/lib/env.ts).
+  const host = envRead('THIRD_EYE_HOST', 'CODEBURN_HOST') ?? '127.0.0.1'
   const server = app.listen(port, host, () => console.log(`Third Eye server on http://${host}:${port}`))
 
   // Keep-alive tuning. Node's default keepAliveTimeout is 5s, but browsers

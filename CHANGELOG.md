@@ -4,6 +4,21 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] — 2026-04-24
+
+### Changed
+- **Env-var namespace renamed** from `CODEBURN_*` (legacy from the
+  CodeBurn fork) to `THIRD_EYE_*`. All call-sites, `docker-compose.yml`,
+  `Dockerfile`, and `DOCS.md` now use the new prefix. Old names still
+  read silently as a fallback via `server/lib/env.ts` — existing
+  deployments continue to work with no action required. The default
+  SQLite filename is now `third-eye.db`; an existing `codeburn.db` in
+  `server/data/` is auto-discovered and kept in place.
+- **Planned for v3.0**: drop the `CODEBURN_*` legacy fallback and the
+  `codeburn.db` filename autodetect. A single CHANGELOG note will
+  announce the breaking change; users on the default docker-compose
+  or Dockerfile will have migrated naturally by then.
+
 ## [2.1.1] — 2026-04-24
 
 ### Fixed

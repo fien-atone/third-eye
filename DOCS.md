@@ -37,8 +37,8 @@ The compose file:
 - Mounts `~/.claude` and `~/.codex` read-only into the container via
   `${USER_HOME:-${HOME:-${USERPROFILE}}}` — picks the right home on any shell
 - Persists SQLite to `./server/data/` on the host
-- Runs incremental ingest every 15 minutes (`CODEBURN_INGEST_INTERVAL_MIN`,
-  window `CODEBURN_INGEST_SINCE=2h`)
+- Runs incremental ingest every 15 minutes (`THIRD_EYE_INGEST_INTERVAL_MIN`,
+  window `THIRD_EYE_INGEST_SINCE=2h`)
 - Health check via `/api/health`
 - Binds the in-container server to `0.0.0.0` (only what you list under `ports:`
   gets exposed on the host)
@@ -59,8 +59,8 @@ docker run -d --name third-eye -p 4317:4317 \
   -v "$HOME/.claude:/data/claude:ro" \
   -v "$HOME/.codex:/data/codex:ro" \
   -v "$PWD/server/data:/app/server/data" \
-  -e CODEBURN_INGEST_INTERVAL_MIN=15 \
-  -e CODEBURN_HOST=0.0.0.0 \
+  -e THIRD_EYE_INGEST_INTERVAL_MIN=15 \
+  -e THIRD_EYE_HOST=0.0.0.0 \
   third-eye
 ```
 
@@ -133,7 +133,7 @@ Runs `npm run ingest:hour` every hour. Absolute npm path resolved at install
 time, so nvm / fnm / Homebrew keep working. Log: `~/.third-eye-ingest.log`.
 Idempotent — safe to re-run.
 
-Inside Docker, use `CODEBURN_INGEST_INTERVAL_MIN` instead (default 15 min).
+Inside Docker, use `THIRD_EYE_INGEST_INTERVAL_MIN` instead (default 15 min).
 
 ### Destructive rebuild
 
@@ -215,7 +215,7 @@ SQLite is a single file: `server/data/codeburn.db`.
 1. Copy it to the target machine.
 2. Run Third Eye there without mounting `~/.claude` / `~/.codex` — the data is
    in the DB already. In Docker, remove those volume lines.
-3. Disable auto-ingest (`CODEBURN_INGEST_INTERVAL_MIN=0`) so it doesn't try to
+3. Disable auto-ingest (`THIRD_EYE_INGEST_INTERVAL_MIN=0`) so it doesn't try to
    scan non-existent session folders.
 
 **Privacy note**: for Cowork ephemeral projects, labels are the first user

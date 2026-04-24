@@ -1,10 +1,29 @@
 import Database from 'better-sqlite3'
-import { mkdirSync } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
+import { envRead } from './lib/env.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-export const DB_PATH = process.env.CODEBURN_DB ?? join(__dirname, '..', 'data', 'codeburn.db')
+
+/** Resolve the default DB path for in-tree installs. Autodetects a pre-
+ *  existing `codeburn.db` (from before the CodeBurn→third-eye rename)
+ *  so upgrading users keep their history without touching anything.
+ *  When no DB exists yet, always creates the new `third-eye.db`.
+ *  An explicit env override (THIRD_EYE_DB / CODEBURN_DB) wins over both. */
+function resolveDefaultDbPath(): string {
+  const dataDir = join(__dirname, '..', 'data')
+  const newPath = join(dataDir, 'third-eye.db')
+  const legacyPath = join(dataDir, 'codeburn.db')
+  // If the legacy file is present AND the new file is not, keep reading
+  // the legacy file. Rename would require WAL/SHM sidecars to move atomically
+  // AND be safe across process restarts — simpler to just point at the
+  // existing file until the user deletes it or we drop legacy in v3.0.
+  if (!existsSync(newPath) && existsSync(legacyPath)) return legacyPath
+  return newPath
+}
+
+export const DB_PATH = envRead('THIRD_EYE_DB', 'CODEBURN_DB') ?? resolveDefaultDbPath()
 
 let _db: Database.Database | null = null
 
