@@ -1,0 +1,53 @@
+name: Bug report
+description: Something broken? Let's fix it.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What went wrong?
+      description: What did you expect to happen vs what actually happened?
+      placeholder: |
+        I clicked the ✎ on the project page to rename a project. The
+        modal opened but the Save button did nothing. Nothing in
+        the browser console.
+    validations: { required: true }
+
+  - type: input
+    id: version
+    attributes:
+      label: Third Eye version
+      description: Shown in the header (e.g. v2.1.1) or in `package.json`.
+      placeholder: v2.1.1
+    validations: { required: true }
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install method
+      options: [Docker, Node (npm start), Other]
+    validations: { required: true }
+
+  - type: input
+    id: os
+    attributes:
+      label: OS + browser
+      placeholder: macOS 14.5, Chrome 129
+    validations: { required: true }
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the Projects tab
+        2. Click ✎ next to any project
+        3. Type a new name, hit Save
+    validations: { required: true }
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server / console logs
+      description: Paste anything relevant from the browser console, the terminal where `npm start` runs, or `docker logs third-eye`. Redact paths / data you don't want to share.
+      render: shell
