@@ -4,6 +4,17 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] — 2026-04-24
+
+### Fixed
+- **GitHub couldn't detect the MIT license** — an extra attribution
+  paragraph at the bottom of `LICENSE` made GitHub's `licensee`
+  classifier flag the file as `NOASSERTION` ("Other"), so the
+  repo's sidebar showed no license badge. The paragraph moved into
+  a new `## Acknowledgements` section in README.md that links to
+  the already-existing `THIRD_PARTY_NOTICES.md`. `LICENSE` now
+  matches the canonical MIT template verbatim.
+
 ## [2.1.0] — 2026-04-24
 
 ### Added

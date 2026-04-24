@@ -106,6 +106,14 @@ from their own sessions.
 *Coming soon — this dashboard is designed for your real data, so the most
 honest screenshots are the ones you make yourself once it's running.*
 
+## Acknowledgements
+
+Third Eye incorporates portions of
+[CodeBurn](https://github.com/AgentSeal/codeburn) and pricing data from
+[LiteLLM](https://github.com/BerriAI/litellm). See
+[THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for full upstream
+attributions and license texts.
+
 ## Documentation
 
 - **[DOCS.md](./DOCS.md)** — tech stack, API reference, full ingest / scheduler
