@@ -1,0 +1,161 @@
+/* "New version available" pill next to the version badge in the
+   header. Version numbers are intentionally absent here — they live
+   in the modal. Keep the pill visual-minimal: single accent color,
+   no border, just enough background to read as an action target. */
+.version-update-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  margin-left: 4px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: none;
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.version-update-pill:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* Modal — shares the confirm-dialog backdrop treatment but has its
+   own tighter layout so copy-paste-able commands dominate the space. */
+.update-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.48);
+  z-index: 900;
+  backdrop-filter: blur(2px);
+}
+.update-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 32px));
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  z-index: 901;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+}
+.update-modal-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.update-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.update-modal-subtitle {
+  font-size: 13px;
+  color: var(--accent);
+  margin-top: 2px;
+  font-weight: 600;
+}
+.update-modal-ago { color: var(--text-dim); font-weight: 400; }
+.update-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-top: -4px;
+}
+.update-modal-close:hover { color: var(--text); }
+
+.update-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.update-modal-running {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.update-modal-section-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.update-modal-tabs { margin-bottom: 2px; }
+
+.update-modal-cmd {
+  position: relative;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 40px 10px 12px;
+  font-family: ui-monospace, monospace;
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.5;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+.update-modal-cmd code {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+.update-modal-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.update-modal-copy:hover {
+  background: var(--hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.update-modal-note {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.update-modal-release-link {
+  font-size: 12.5px;
+  color: var(--accent);
+  text-decoration: none;
+  align-self: flex-start;
+}
+.update-modal-release-link:hover { text-decoration: underline; }
+
+.update-modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

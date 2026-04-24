@@ -1,11 +1,12 @@
 import express from 'express'
 import cors from 'cors'
-import { existsSync, statSync } from 'fs'
+import { existsSync, readFileSync, statSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { db, getMeta, seedScreenLayouts } from './db.ts'
 import { runIngest } from './ingest.ts'
 import { DEFAULT_LAYOUTS, KNOWN_SCREENS, type ScreenLayout } from './lib/default-layouts.ts'
+import { getLatestRelease, startVersionCheck } from './lib/version-check.ts'
 
 // Seed default screen layouts on first start (idempotent — never overwrites
 // user customizations once they exist).
@@ -634,6 +635,41 @@ app.get('/api/insights/:projectId', (req, res) => {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, lastIngestAt: getMeta('last_ingest_at') }))
 
+// Read package.json version once at module load — it's the only place
+// that knows what version of Third Eye is actually running.
+const SERVER_VERSION: string = (() => {
+  try {
+    const pkgPath = join(__dirname, '..', 'package.json')
+    return JSON.parse(readFileSync(pkgPath, 'utf8')).version as string
+  } catch {
+    return '0.0.0'
+  }
+})()
+
+/** Compare semver triples (X.Y.Z). Returns >0 if a > b, <0 if a < b,
+ *  0 if equal. Pre-release suffixes ignored. */
+function semverCompare(a: string, b: string): number {
+  const pa = a.replace(/^v/, '').split(/[-+]/, 1)[0].split('.').map(n => parseInt(n, 10) || 0)
+  const pb = b.replace(/^v/, '').split(/[-+]/, 1)[0].split('.').map(n => parseInt(n, 10) || 0)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0)
+    if (d !== 0) return d
+  }
+  return 0
+}
+
+app.get('/api/version', (_req, res) => {
+  const latest = getLatestRelease()
+  res.json({
+    current: SERVER_VERSION,
+    latest: latest?.version ?? null,
+    latestUrl: latest?.htmlUrl ?? null,
+    latestName: latest?.name ?? null,
+    latestPublishedAt: latest?.publishedAt ?? null,
+    isOutdated: latest ? semverCompare(latest.version, SERVER_VERSION) > 0 : false,
+  })
+})
+
 const clientDistCandidates = [
   join(__dirname, '..', 'client', 'dist'),
   join(__dirname, 'public'),
@@ -650,6 +686,9 @@ for (const dist of clientDistCandidates) {
 const port = Number(process.env.PORT ?? 4317)
 
 async function boot() {
+  // Background poll of GitHub Releases — first hit lands ~30s after
+  // boot, then every 6h. Failures keep the cache stale, never crash.
+  startVersionCheck()
   const d = db()
   // Warm SQLite's page cache so the first user request doesn't eat a
   // 5–15 second cold-query hit. Cost: ~50 ms of extra boot latency for a

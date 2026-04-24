@@ -15,7 +15,7 @@ export function Footer() {
           <>
             <a
               className="footer-version"
-              href="https://github.com/inoise/third-eye/releases"
+              href="https://github.com/fien-atone/third-eye/releases"
               target="_blank"
               rel="noopener noreferrer"
               title="Compare to the latest release on GitHub"

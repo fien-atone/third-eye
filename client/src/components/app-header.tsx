@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { useT } from '../i18n'
 import { hrefFor, navigate } from '../router'
 import { Logo } from '../Logo'
 import { fmtRel } from '../lib/format'
 import type { Theme } from '../theme'
+import type { VersionResponse } from '../types'
 import { ThemeToggle } from './theme-toggle'
 import { LocaleSwitcher } from './locale-switcher'
+import { UpdateModal } from './update-modal'
 
 /** Top app shell: brand + version + last-refresh, refresh button,
  *  locale + theme controls, and the dashboard/projects tabs. Tabs hide
@@ -14,6 +17,7 @@ export function AppHeader({
   lastIngestAt, isRefreshing, onRefresh,
   theme, setTheme,
   showTabs, dashboardTabActive, projectsTabActive, dayTabActive,
+  version,
 }: {
   lastIngestAt: string | null
   isRefreshing: boolean
@@ -24,8 +28,11 @@ export function AppHeader({
   dashboardTabActive: boolean
   projectsTabActive: boolean
   dayTabActive: boolean
+  version: VersionResponse | undefined
 }) {
   const t = useT()
+  const [updateOpen, setUpdateOpen] = useState(false)
+  const outdated = !!version?.isOutdated
   return (
     <>
       <div className="header">
@@ -41,6 +48,19 @@ export function AppHeader({
           </a>
           {typeof __APP_VERSION__ !== 'undefined' && (
             <span className="version-badge" title={`v${__APP_VERSION__}`}>v{__APP_VERSION__}</span>
+          )}
+          {outdated && version?.latest && (
+            /* Just "↑ New version available" — no numbers, no arrow.
+               Version specifics live inside the modal where they're
+               actually useful. */
+            <button
+              className="version-update-pill"
+              onClick={() => setUpdateOpen(true)}
+              title={t('update.pillTooltip', { current: version.current, latest: version.latest })}
+            >
+              <span aria-hidden="true">↑</span>
+              <span>{t('update.pillLabel')}</span>
+            </button>
           )}
           <span className="tagline">{t('header.tagline')}</span>
           <span className="meta">
@@ -83,6 +103,7 @@ export function AppHeader({
           >{t('nav.projects')}</a>
         </div>
       )}
+      {updateOpen && version && <UpdateModal version={version} onClose={() => setUpdateOpen(false)} />}
     </>
   )
 }

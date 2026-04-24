@@ -12,6 +12,15 @@ export type Provider = {
 }
 export type ProvidersResponse = { providers: Provider[]; lastIngestAt: string | null }
 
+export type VersionResponse = {
+  current: string
+  latest: string | null
+  latestUrl: string | null
+  latestName: string | null
+  latestPublishedAt: string | null
+  isOutdated: boolean
+}
+
 export type ProjectInfo = {
   id: string
   key: string

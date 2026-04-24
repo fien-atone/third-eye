@@ -4,7 +4,7 @@ import { applyTheme, getStoredTheme, type Theme } from './theme'
 import { useRoute, navigate } from './router'
 import { useScreenLayout, type ScreenLayout } from './widgets/grid'
 import { useT } from './i18n'
-import type { Granularity, OverviewResponse, ProvidersResponse, ProjectsResponse } from './types'
+import type { Granularity, OverviewResponse, ProvidersResponse, ProjectsResponse, VersionResponse } from './types'
 import { useDateLocale } from './lib/format'
 import { apiGet, apiPost, dashboardParams } from './api'
 import { ProjectsPage } from './screens/projects-page'
@@ -77,6 +77,18 @@ export default function App() {
   const projectsQuery = useQuery<ProjectsResponse>({
     queryKey: ['projects'],
     queryFn: () => apiGet<ProjectsResponse>('/api/projects'),
+  })
+
+  // Version check — server background-polls GitHub releases every 6h
+  // and caches the result, so this is a cheap GET that never blocks
+  // on an outbound request. Refetch every 30min so a new release that
+  // drops while the user has the tab open shows up without a page
+  // reload.
+  const versionQuery = useQuery<VersionResponse>({
+    queryKey: ['version'],
+    queryFn: () => apiGet<VersionResponse>('/api/version'),
+    refetchInterval: 30 * 60_000,
+    staleTime: 30 * 60_000,
   })
 
   const providersParam = selectedProviders.length === 0 ? 'all' : selectedProviders.join(',')
@@ -189,6 +201,7 @@ export default function App() {
         dashboardTabActive={dashboardTabActive}
         projectsTabActive={projectsTabActive}
         dayTabActive={dayTabActive}
+        version={versionQuery.data}
       />
 
       {serverDown && <ServerDownBanner onRetry={retryAll} />}
