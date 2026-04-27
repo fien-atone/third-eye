@@ -97,16 +97,25 @@ export default function App() {
     queryKey: ['version'],
     queryFn: () => apiGet<VersionResponse>('/api/version'),
     refetchInterval: q => {
+      // If a request is still in flight (slow network), wait it out
+      // before scheduling the next tick — prevents the stack-of-three
+      // visible under DevTools throttling.
+      if (q.state.fetchStatus === 'fetching') return 1_000
       const d = q.state.data
-      if (d?.checking) return 400
+      if (d?.checking) return 800
       if (!d?.nextCheckAt) return 30_000
       const msUntilNext = new Date(d.nextCheckAt).getTime() - Date.now()
-      if (msUntilNext < 1_500) return 400          // about to fire
+      if (msUntilNext < 1_500) return 800           // about to fire
       // Wake ~500 ms before the next poll, but never sleep more than
       // 60 s — keeps long cadences from staying stale across UI
       // interactions like settings save / manual refresh.
-      return Math.min(60_000, Math.max(400, msUntilNext - 500))
+      return Math.min(60_000, Math.max(800, msUntilNext - 500))
     },
+    // /api/version is a status indicator, not data the user is
+    // staring at. No need to spam an extra fetch when they tab
+    // back in — the regular refetchInterval will catch up shortly.
+    refetchOnWindowFocus: false,
+    refetchIntervalInBackground: false,
     staleTime: 0,
   })
 
