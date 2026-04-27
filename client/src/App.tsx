@@ -81,15 +81,19 @@ export default function App() {
 
   // Version check — server background-polls GitHub on its own
   // schedule (default every 6h) and caches the result, so this is a
-  // cheap memory read on the server. Refetch every 2 s so the
-  // header's "checking…" spinner / "up to date" checkmark flip
-  // promptly when the server's poll cycle changes state. The endpoint
-  // is ~150 bytes and never hits the DB, so 30 req/min is fine.
+  // cheap memory read on the server. Refetch is adaptive:
+  //   - while server is mid-poll (checking:true): 500 ms, to catch the
+  //     spinner-to-checkmark transition smoothly;
+  //   - otherwise: 30 s, since the next state change can only happen
+  //     at the next scheduled poll (≥1 h apart in production).
+  // 30 s × 1 user × ~hours_in_session = a tiny fraction of what 2 s
+  // generated; the spinner is still caught reliably because the
+  // server holds checking:true for ≥1.2 s (see version-check.ts).
   const versionQuery = useQuery<VersionResponse>({
     queryKey: ['version'],
     queryFn: () => apiGet<VersionResponse>('/api/version'),
-    refetchInterval: 2_000,
-    staleTime: 2_000,
+    refetchInterval: q => (q.state.data?.checking ? 500 : 30_000),
+    staleTime: 0,
   })
 
   const providersParam = selectedProviders.length === 0 ? 'all' : selectedProviders.join(',')

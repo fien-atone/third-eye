@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url'
 import { db, getMeta, seedScreenLayouts } from './db.ts'
 import { runIngest } from './ingest.ts'
 import { DEFAULT_LAYOUTS, KNOWN_SCREENS, type ScreenLayout } from './lib/default-layouts.ts'
-import { getLatestRelease, getCheckState, startVersionCheck, applyVersionCheckSettings } from './lib/version-check.ts'
+import { getLatestRelease, getCheckState, startVersionCheck, applyVersionCheckSettings, seedLatestRelease } from './lib/version-check.ts'
 import { envRead, envReadNumber } from './lib/env.ts'
 import { getSettings, patchUpdates, IS_DEV } from './lib/settings.ts'
 
@@ -671,6 +671,26 @@ app.get('/api/settings', (_req, res) => {
   // 1 h floor enforced server-side regardless of what the UI sends.
   res.json({ ...getSettings(), mode: IS_DEV ? 'dev' : 'prod' })
 })
+
+// Dev-only: seed the version-check cache without hitting GitHub.
+// Lets us demo the outdated / up-to-date / checking UI states
+// without burning the unauthenticated 60 req/h rate limit. The 404
+// in production keeps the surface area honest — there's no way to
+// inject a fake "new version available" signal on real users.
+if (IS_DEV) {
+  app.post('/api/_dev/seed-version', (req, res) => {
+    const body = (req.body ?? {}) as { version?: string | null; name?: string; htmlUrl?: string; publishedAt?: string }
+    if (body.version === null) {
+      seedLatestRelease(null)
+      return res.json({ ok: true, cleared: true })
+    }
+    if (typeof body.version !== 'string' || !body.version.match(/^\d+\.\d+\.\d+/)) {
+      return res.status(400).json({ error: 'version must be "X.Y.Z" or null' })
+    }
+    seedLatestRelease({ version: body.version, name: body.name, htmlUrl: body.htmlUrl, publishedAt: body.publishedAt })
+    res.json({ ok: true, latest: getLatestRelease() })
+  })
+}
 
 app.patch('/api/settings', (req, res) => {
   const body = (req.body ?? {}) as { updates?: Partial<{ enabled: boolean; intervalSeconds: number }> }

@@ -40,6 +40,27 @@ export function getLatestRelease(): LatestRelease {
   return cache
 }
 
+/** Seed the cache directly without hitting GitHub. Used by the
+ *  /api/_dev/seed-version endpoint to test outdated/up-to-date UI
+ *  states locally and avoid burning the unauthenticated 60 req/h
+ *  rate limit while iterating on the indicators. Gated to dev mode
+ *  by the route handler — never exposed in production. */
+export function seedLatestRelease(value: { version: string; name?: string; htmlUrl?: string; publishedAt?: string } | null) {
+  if (value === null) {
+    cache = null
+    return
+  }
+  cache = {
+    tag: `v${value.version.replace(/^v/, '')}`,
+    version: value.version.replace(/^v/, ''),
+    name: value.name ?? `v${value.version.replace(/^v/, '')}`,
+    htmlUrl: value.htmlUrl ?? `https://github.com/fien-atone/third-eye/releases/tag/v${value.version}`,
+    publishedAt: value.publishedAt ?? new Date().toISOString(),
+  }
+  lastCheckedAt = new Date().toISOString()
+  lastError = null
+}
+
 export function getLastError(): string | null {
   return lastError
 }
