@@ -29,12 +29,13 @@
   font-weight: 700;
   color: var(--text);
   line-height: 1.2;
-  display: inline-flex;
-  /* center-align children uniformly. Previously this was `baseline`
-     with a translateY hack on the pencil to optically recenter —
-     adding a second action button next to the title (Manage agents)
-     made the mismatched alignment visible, so we normalize here and
-     drop the per-child transforms below. */
+  /* display:flex + max-width:100% lets the label flex-shrink so very
+     long auto-labels (raw filesystem paths) collapse to a MidEllipsis
+     instead of pushing buttons off the right edge. align-items:center
+     unifies vertical position of label, star, pencil, and Manage —
+     no per-child transform hacks needed below. */
+  display: flex;
+  max-width: 100%;
   align-items: center;
   gap: 8px;
   letter-spacing: -0.01em;
@@ -42,6 +43,8 @@
 .project-header-title-label {
   color: var(--text);
   font-weight: 700;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .project-header-rename {
   /* Borderless icon button next to the title. Parent uses
@@ -64,7 +67,6 @@
   color: var(--text);
   border-color: transparent;
 }
-
 /* Secondary action buttons in the project header (e.g. "Manage agents").
    Base look is set inline on the element; this rule just adds hover/
    focus states that inline styles can't express. Keeps the experimental
@@ -83,6 +85,28 @@
 .project-header-action:active {
   background: var(--experimental-strong, var(--hover)) !important;
 }
+
+/* Favorite star next to the title — same borderless visual as the
+   pencil so the two button affordances feel like a pair. Filled
+   accent when on, dim when off. Parent uses align-items:center so no
+   translateY compensation needed (unlike older baseline-aligned variant). */
+.project-header-fav {
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  color: var(--text-dim);
+  border-radius: 6px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.project-header-fav.on { color: var(--accent); }
+.project-header-fav:hover { background: var(--hover); color: var(--text); }
+.project-header-fav.on:hover { color: var(--accent-hover); background: var(--hover); }
 .project-header-title-edit {
   display: inline-flex;
   align-items: center;

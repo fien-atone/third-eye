@@ -18,6 +18,7 @@ import { toInputDate } from '../lib/format'
 import { AgentsRegistryModal } from '../components/agents-registry-modal'
 import { useDetectedRoles } from '../lib/agents'
 import { SettingsIcon, PencilIcon } from '../components/icons'
+import { MidEllipsis } from '../components/widgets-misc'
 
 type DashboardSharedProps = {
   modelNames: string[]
@@ -103,16 +104,18 @@ function ProjectHeader({ projectId, frameProject, lookedUp, onManageAgents }: {
   const isRenamed = lookedUp ? (lookedUp.customLabel != null && lookedUp.customLabel.trim() !== '') : false
 
   const mutation = useMutation({
-    mutationFn: (body: { customLabel: string | null }) =>
+    mutationFn: (body: Partial<{ customLabel: string | null; favorite: boolean }>) =>
       apiPatch<ProjectInfo>(`/api/projects/${projectId}`, body),
     onSuccess: () => {
       // Both the projects list and the overview (which feeds
       // frameProject.label here) carry the project label — refetch both
-      // so the rename shows up everywhere immediately.
+      // so the rename / favorite shows up everywhere immediately.
       qc.invalidateQueries({ queryKey: ['projects'] })
       qc.invalidateQueries({ queryKey: ['overview'] })
     },
   })
+  const isFavorite = lookedUp?.favorite ?? false
+  const toggleFavorite = () => mutation.mutate({ favorite: !isFavorite })
 
   const startEdit = () => {
     setValue(lookedUp?.customLabel ?? lookedUp?.autoLabel ?? frameProject.label)
@@ -161,7 +164,16 @@ function ProjectHeader({ projectId, frameProject, lookedUp, onManageAgents }: {
           </span>
         ) : (
           <>
-            <span className="project-header-title-label">{frameProject.label}</span>
+            <button
+              className={`btn-star${isFavorite ? ' on' : ''} project-header-fav`}
+              onClick={toggleFavorite}
+              title={isFavorite ? t('projects.unfavorite') : t('projects.favorite')}
+              aria-label={isFavorite ? t('projects.unfavorite') : t('projects.favorite')}
+              aria-pressed={isFavorite}
+            >{isFavorite ? '★' : '☆'}</button>
+            <span className="project-header-title-label">
+              <MidEllipsis text={frameProject.label} />
+            </span>
             <button
               className="project-header-rename"
               onClick={startEdit}

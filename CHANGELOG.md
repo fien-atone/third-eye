@@ -4,6 +4,24 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] — 2026-04-27
+
+### Fixed
+- **Project page header overflowed on long auto-labels** (raw
+  filesystem paths from Cowork ephemeral sessions). Title now
+  flex-shrinks and uses `MidEllipsis` so the rename button never gets
+  pushed off the right edge.
+- **Top file hotspots widget leaked a thin strip** below each row
+  from a hidden `.file-full` overlay that was clipped by the cell's
+  `overflow: hidden`. Removed the custom overlay; the native `title`
+  tooltip already handled full-path disclosure cross-browser.
+
+### Added
+- **Favorite toggle on the project page header** — a star button next
+  to the title pins/unpins the project, mirroring the toggle in the
+  projects list. Reuses the existing `PATCH /api/projects/:id { favorite }`
+  endpoint.
+
 ## [2.2.1] — 2026-04-27
 
 ### Fixed
