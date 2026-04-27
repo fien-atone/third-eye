@@ -49,8 +49,16 @@ import type { VersionResponse } from '../types'
 
 const ERROR_BACKOFF_MS = 10_000
 const FALLBACK_INTERVAL_MS = 5 * 60_000
-const HEAD_START_MS = 500
-const MIN_DELAY_MS = 250
+// Wake up AFTER the server's next scheduled poll, so the response we
+// get has fresh nextCheckAt + lastCheckedAt. Waking BEFORE produced
+// a tight loop on the cycle boundary: we'd see stale nextCheckAt,
+// compute msUntilNext ≈ 0, schedule via the floor, see stale data
+// again, and burn 3–4 requests catching up.
+const POST_POLL_BUFFER_MS = 500
+// Floor on the schedule delay. Generous (5 s, not 250 ms) so that if
+// nextCheckAt is genuinely in the past for any reason we wait long
+// enough for the server to recover instead of hammering it.
+const MIN_DELAY_MS = 5_000
 const MIN_SPINNER_MS = 1200
 const INITIAL_DELAY_MS = 1_500
 
@@ -120,7 +128,10 @@ async function tick() {
 
 function computeNextDelay(data: VersionResponse): number {
   if (!data.nextCheckAt) return FALLBACK_INTERVAL_MS
-  const msUntilNext = new Date(data.nextCheckAt).getTime() - Date.now() - HEAD_START_MS
+  // Wake up POST_POLL_BUFFER_MS AFTER nextCheckAt so the server has
+  // already done its poll and updated lastCheckedAt + nextCheckAt by
+  // the time our request lands.
+  const msUntilNext = new Date(data.nextCheckAt).getTime() - Date.now() + POST_POLL_BUFFER_MS
   return Math.min(FALLBACK_INTERVAL_MS, Math.max(MIN_DELAY_MS, msUntilNext))
 }
 
