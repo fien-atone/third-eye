@@ -46,7 +46,7 @@ function ActivityBody({ categories }: { categories: OverviewResponse['categories
     <>
       <div className="widget-chart-area" ref={areaRef}>
         {visibleCount > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <BarChart data={visibleCats} layout="vertical" margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
               <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" tickFormatter={v => `$${v}`} tickLine={false} axisLine={{ stroke: 'var(--grid)' }} hide={!showXAxis} />
