@@ -31,6 +31,7 @@ export type LatestRelease = {
 let cache: LatestRelease = null
 let lastError: string | null = null
 let lastCheckedAt: string | null = null
+let nextCheckAt: string | null = null
 let checking = false
 let intervalHandle: ReturnType<typeof setInterval> | null = null
 let firstPollHandle: ReturnType<typeof setTimeout> | null = null
@@ -65,8 +66,8 @@ export function getLastError(): string | null {
   return lastError
 }
 
-export function getCheckState(): { checking: boolean; lastCheckedAt: string | null } {
-  return { checking, lastCheckedAt }
+export function getCheckState(): { checking: boolean; lastCheckedAt: string | null; nextCheckAt: string | null } {
+  return { checking, lastCheckedAt, nextCheckAt }
 }
 
 async function fetchLatest(): Promise<LatestRelease> {
@@ -135,10 +136,19 @@ function clearTimers() {
 function scheduleLoop(intervalSeconds: number, firstPollMs: number) {
   clearTimers()
   const intervalMs = Math.max(1, intervalSeconds) * 1000
+  // Publish the next-poll wallclock so the client can wake up just in
+  // time to catch the checking-flag flip. Updated again inside poll()
+  // after each cycle.
+  nextCheckAt = new Date(Date.now() + firstPollMs).toISOString()
   firstPollHandle = setTimeout(() => {
-    void poll()
-    intervalHandle = setInterval(poll, intervalMs)
+    void runAndScheduleNext(intervalMs)
+    intervalHandle = setInterval(() => void runAndScheduleNext(intervalMs), intervalMs)
   }, firstPollMs)
+}
+
+async function runAndScheduleNext(intervalMs: number) {
+  await poll()
+  nextCheckAt = new Date(Date.now() + intervalMs).toISOString()
 }
 
 /** Kick off the polling loop. Idempotent — safe to call from boot()
@@ -168,6 +178,7 @@ export function applyVersionCheckSettings() {
     cache = null
     lastError = null
     lastCheckedAt = null
+    nextCheckAt = null
     return
   }
   scheduleLoop(updates.intervalSeconds, FIRST_POLL_DELAY_MS)

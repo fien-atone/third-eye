@@ -26,6 +26,10 @@ export type VersionResponse = {
   /** ISO timestamp of the last poll attempt (success OR failure). null
    *  before the first poll. Tooltip text on the up-to-date checkmark. */
   lastCheckedAt: string | null
+  /** ISO timestamp of the next scheduled server-side poll. Lets the
+   *  client wake up just before, so the 1.2 s "checking" flicker is
+   *  caught reliably without polling /api/version constantly. */
+  nextCheckAt: string | null
 }
 
 export type UpdatesSettings = {

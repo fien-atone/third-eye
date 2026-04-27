@@ -648,17 +648,19 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, lastIngestAt: getMeta
 // lie if the two package.json files ever drifted.
 app.get('/api/version', (_req, res) => {
   const latest = getLatestRelease()
-  const { checking, lastCheckedAt } = getCheckState()
+  const { checking, lastCheckedAt, nextCheckAt } = getCheckState()
   res.json({
     latest: latest?.version ?? null,
     latestUrl: latest?.htmlUrl ?? null,
     latestName: latest?.name ?? null,
     latestPublishedAt: latest?.publishedAt ?? null,
-    // UI signals: a poll currently in flight (spinner) and when the
-    // last successful or attempted poll happened (tooltip on the
-    // "up to date" checkmark).
+    // UI signals: a poll currently in flight (spinner), when the
+    // last poll attempt happened (tooltip on the up-to-date dot),
+    // and when the next poll is scheduled (lets the client wake up
+    // just before to catch the spinner flicker reliably).
     checking,
     lastCheckedAt,
+    nextCheckAt,
   })
 })
 

@@ -79,20 +79,34 @@ export default function App() {
     queryFn: () => apiGet<ProjectsResponse>('/api/projects'),
   })
 
-  // Version check — server background-polls GitHub on its own
-  // schedule (default every 6h) and caches the result, so this is a
-  // cheap memory read on the server. Refetch is adaptive:
-  //   - while server is mid-poll (checking:true): 500 ms, to catch the
-  //     spinner-to-checkmark transition smoothly;
-  //   - otherwise: 30 s, since the next state change can only happen
-  //     at the next scheduled poll (≥1 h apart in production).
-  // 30 s × 1 user × ~hours_in_session = a tiny fraction of what 2 s
-  // generated; the spinner is still caught reliably because the
-  // server holds checking:true for ≥1.2 s (see version-check.ts).
+  // Version check. The server publishes nextCheckAt (when the next
+  // GitHub poll fires), so the client can wake up just-in-time
+  // instead of polling at a fixed cadence:
+  //   - mid-poll (checking:true)         → 400 ms (catch the
+  //     checking → up-to-date transition smoothly).
+  //   - <1 s before next scheduled poll  → 400 ms (catch the
+  //     idle → checking transition).
+  //   - otherwise                        → wake ~500 ms before
+  //     nextCheckAt, capped at 60 s minimum so a 6h cadence still
+  //     pings periodically (handles server-side cache invalidations
+  //     we'd miss if we only fired once per cycle).
+  // Net effect: the spinner is reliably visible regardless of the
+  // configured interval, while the steady-state request rate is
+  // ~1 req/min instead of ~30 req/min from a flat 2 s refetch.
   const versionQuery = useQuery<VersionResponse>({
     queryKey: ['version'],
     queryFn: () => apiGet<VersionResponse>('/api/version'),
-    refetchInterval: q => (q.state.data?.checking ? 500 : 30_000),
+    refetchInterval: q => {
+      const d = q.state.data
+      if (d?.checking) return 400
+      if (!d?.nextCheckAt) return 30_000
+      const msUntilNext = new Date(d.nextCheckAt).getTime() - Date.now()
+      if (msUntilNext < 1_500) return 400          // about to fire
+      // Wake ~500 ms before the next poll, but never sleep more than
+      // 60 s — keeps long cadences from staying stale across UI
+      // interactions like settings save / manual refresh.
+      return Math.min(60_000, Math.max(400, msUntilNext - 500))
+    },
     staleTime: 0,
   })
 
