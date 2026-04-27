@@ -6,8 +6,9 @@ import { fileURLToPath } from 'url'
 import { db, getMeta, seedScreenLayouts } from './db.ts'
 import { runIngest } from './ingest.ts'
 import { DEFAULT_LAYOUTS, KNOWN_SCREENS, type ScreenLayout } from './lib/default-layouts.ts'
-import { getLatestRelease, startVersionCheck } from './lib/version-check.ts'
+import { getLatestRelease, startVersionCheck, applyVersionCheckSettings } from './lib/version-check.ts'
 import { envRead, envReadNumber } from './lib/env.ts'
+import { getSettings, patchUpdates } from './lib/settings.ts'
 
 // Seed default screen layouts on first start (idempotent — never overwrites
 // user customizations once they exist).
@@ -653,6 +654,25 @@ app.get('/api/version', (_req, res) => {
     latestName: latest?.name ?? null,
     latestPublishedAt: latest?.publishedAt ?? null,
   })
+})
+
+// User-controlled settings (gear icon in header). Currently exposes
+// only the Updates section; new sections are added by extending
+// lib/settings.ts and surfacing them here.
+app.get('/api/settings', (_req, res) => {
+  res.json(getSettings())
+})
+
+app.patch('/api/settings', (req, res) => {
+  const body = (req.body ?? {}) as { updates?: Partial<{ enabled: boolean; intervalHours: number }> }
+  if (body.updates) {
+    patchUpdates(body.updates)
+    // Settings drive the version-check loop directly — apply them now
+    // so the user never has to restart the server (or wait 6h for the
+    // change to take effect).
+    applyVersionCheckSettings()
+  }
+  res.json(getSettings())
 })
 
 const clientDistCandidates = [

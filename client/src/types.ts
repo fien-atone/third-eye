@@ -22,6 +22,14 @@ export type VersionResponse = {
   latestPublishedAt: string | null
 }
 
+export type UpdatesSettings = {
+  enabled: boolean
+  intervalHours: number
+}
+export type SettingsResponse = {
+  updates: UpdatesSettings
+}
+
 export type ProjectInfo = {
   id: string
   key: string
