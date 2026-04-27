@@ -223,17 +223,97 @@
   font-size: 13px;
   color: var(--text);
 }
-.settings-row select {
+/* Layout for the boolean toggle row: label on the left, switch on
+   the right. The whole <label> is clickable. */
+.settings-row-toggle {
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Custom toggle switch. Native <input type="checkbox"> is kept for
+   keyboard + a11y semantics but visually hidden; track + thumb are
+   styled siblings that react to the .is-on class on the wrapper.
+   (We could also drive it via :has(:checked) instead of the class,
+   but Safari support there is too recent for a self-host audience.) */
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+.toggle-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border-strong, var(--border));
+  border-radius: 999px;
+  transition: background 0.16s ease;
+}
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--panel);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.16s ease;
+}
+.toggle.is-on .toggle-track { background: var(--accent); }
+.toggle.is-on .toggle-thumb { transform: translateX(16px); }
+.toggle-input:focus-visible + .toggle-track {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Custom select. appearance:none drops the native chevron; we render
+   our own SVG positioned absolutely on the right, with pointer-events
+   off so clicks pass through to the select. Width/min-width is on
+   the wrapper so the chevron stays glued to the right edge. */
+.select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 220px;
+}
+.select-styled {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  font: inherit;
   font-size: 13px;
-  padding: 5px 8px;
+  padding: 7px 32px 7px 10px;
+  width: 100%;
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
-  min-width: 180px;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
 }
-.settings-row select:focus {
+.select-styled:hover { border-color: var(--border-strong, var(--accent)); }
+.select-styled:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.select-styled:disabled {
+  cursor: not-allowed;
+  background: var(--hover);
+}
+.select-chevron {
+  position: absolute;
+  right: 10px;
+  color: var(--text-dim);
+  pointer-events: none;
 }

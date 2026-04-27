@@ -68,27 +68,39 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             <h3 className="settings-section-title">{t('settings.updates.title')}</h3>
             <p className="settings-section-help">{t('settings.updates.help')}</p>
 
-            <label className="settings-row">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={e => setDraftEnabled(e.target.checked)}
-              />
+            <label className="settings-row settings-row-toggle">
               <span className="settings-row-label">{t('settings.updates.enabledLabel')}</span>
+              <span className={`toggle${enabled ? ' is-on' : ''}`}>
+                <input
+                  type="checkbox"
+                  className="toggle-input"
+                  checked={enabled}
+                  onChange={e => setDraftEnabled(e.target.checked)}
+                />
+                <span className="toggle-track" aria-hidden="true">
+                  <span className="toggle-thumb" />
+                </span>
+              </span>
             </label>
 
             <div className={`settings-row settings-row-stacked${enabled ? '' : ' is-disabled'}`}>
               <span className="settings-row-label">{t('settings.updates.frequencyLabel')}</span>
-              <select
-                value={intervalHours}
-                disabled={!enabled}
-                onChange={e => setDraftInterval(parseInt(e.target.value, 10))}
-              >
-                <option value={1}>{t('settings.updates.freq.hourly')}</option>
-                <option value={6}>{t('settings.updates.freq.every6h')}</option>
-                <option value={24}>{t('settings.updates.freq.daily')}</option>
-                <option value={168}>{t('settings.updates.freq.weekly')}</option>
-              </select>
+              <span className="select-wrap">
+                <select
+                  className="select-styled"
+                  value={intervalHours}
+                  disabled={!enabled}
+                  onChange={e => setDraftInterval(parseInt(e.target.value, 10))}
+                >
+                  <option value={1}>{t('settings.updates.freq.hourly')}</option>
+                  <option value={6}>{t('settings.updates.freq.every6h')}</option>
+                  <option value={24}>{t('settings.updates.freq.daily')}</option>
+                  <option value={168}>{t('settings.updates.freq.weekly')}</option>
+                </select>
+                <svg className="select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </span>
             </div>
           </section>
         </div>
