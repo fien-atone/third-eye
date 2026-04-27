@@ -118,6 +118,12 @@ function normalizeProviders(q: unknown): string[] {
 }
 
 const app = express()
+// Disable Express's automatic ETag / 304 dance for JSON endpoints.
+// We're a self-hosted localhost dashboard — saving the body bytes
+// of a small response is a non-feature, while the resulting 304s
+// vs 200s in DevTools just confuse the picture when debugging
+// polling cadence.
+app.set('etag', false)
 // CORS: allow only the vite dev server and same-origin Docker/static use.
 // Override via THIRD_EYE_CORS_ORIGIN="https://your.host" if you ever expose this publicly (not recommended).
 // Legacy CODEBURN_CORS_ORIGIN is still read for backwards compat (see server/lib/env.ts).

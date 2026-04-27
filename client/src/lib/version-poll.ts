@@ -1,16 +1,23 @@
 /** Singleton version-check poller.
  *
- *  Lives outside the React tree so it's bulletproof against:
- *    - StrictMode dev double-mount (each mount would otherwise spin
- *      its own refetch timer);
- *    - HMR retaining stale observers;
- *    - any consumer accidentally adding another observer with the
- *      same queryKey and getting a duplicate timer.
+ *  Lives outside the React tree so it's bulletproof against StrictMode
+ *  dev double-mount and any consumer accidentally adding another
+ *  observer with the same queryKey.
  *
  *  Boots once from main.tsx via startVersionPoll(). Owns the only
  *  /api/version timer in the app. Pushes results into the
  *  QueryClient cache so any number of useQuery(['version']) calls
  *  observe the same data with zero polling of their own.
+ *
+ *  ──────────  STATE LIVES ON `window`  ──────────
+ *  We attach state to window.__thirdEyeVersionPoll instead of holding
+ *  it in module scope. Vite HMR can replay this module's top-level
+ *  code more than once per page session (we proved it with a Math-
+ *  random module ID — same ID printed twice within seconds). With
+ *  module-scoped `started`, each replay launched its own timer and
+ *  we ended up with 2-3 ticks per cycle. Window-scoped state means
+ *  every module instance reads the same flag and the second one
+ *  short-circuits cleanly.
  *
  *  Cadence: sleep until the server's next scheduled poll
  *  (data.nextCheckAt), minus a 500 ms head-start. That's the only
@@ -41,41 +48,46 @@ import { apiGet } from '../api'
 import type { VersionResponse } from '../types'
 
 const ERROR_BACKOFF_MS = 10_000
-// Safety net when nextCheckAt is missing or way too far in the
-// future. 5 min keeps a long-term server cadence visible while
-// surviving stale timestamps after a server restart.
 const FALLBACK_INTERVAL_MS = 5 * 60_000
 const HEAD_START_MS = 500
-// Floor on the schedule delay — a slightly-past nextCheckAt mustn't
-// produce a busy-loop. 250 ms is small enough to feel "right after"
-// but large enough to never thrash.
 const MIN_DELAY_MS = 250
-// Minimum spinner visibility so a 30 ms LAN roundtrip still produces
-// a perceptible "checking…" beat in the header.
 const MIN_SPINNER_MS = 1200
+const INITIAL_DELAY_MS = 1_500
 
-let started = false
-let timer: ReturnType<typeof setTimeout> | null = null
-let qc: QueryClient | null = null
-let inFlight = false
+type PollState = {
+  started: boolean
+  timer: ReturnType<typeof setTimeout> | null
+  qc: QueryClient | null
+  inFlight: boolean
+}
+declare global {
+  interface Window { __thirdEyeVersionPoll?: PollState }
+}
+const state: PollState = (window.__thirdEyeVersionPoll ??= {
+  started: false,
+  timer: null,
+  qc: null,
+  inFlight: false,
+})
 
 function schedule(ms: number) {
-  if (timer) clearTimeout(timer)
-  timer = setTimeout(tick, ms)
+  if (state.timer) clearTimeout(state.timer)
+  state.timer = setTimeout(tick, ms)
 }
 
 async function tick() {
-  if (!qc) return
+  if (!state.qc) return
   // Belt + braces: shouldn't be reachable since we always clear the
   // timer before scheduling, but if a poke races a scheduled tick
   // we'd rather skip than double-fire.
-  if (inFlight) return
-  inFlight = true
+  if (state.inFlight) return
+  state.inFlight = true
 
   // Synthetic checking:true — flip the header dot to a spinner
   // BEFORE the request leaves the client, so the user sees activity
   // immediately on slow networks too. We merge into existing data so
   // latest/url/etc don't blink to undefined.
+  const qc = state.qc
   const previous = qc.getQueryData<VersionResponse>(['version'])
   qc.setQueryData<VersionResponse>(['version'], {
     latest: previous?.latest ?? null,
@@ -99,54 +111,38 @@ async function tick() {
     qc.setQueryData<VersionResponse>(['version'], { ...data, checking: false })
     schedule(computeNextDelay(data))
   } catch {
-    // On error: drop the spinner, leave the previous data alone.
     if (previous) qc.setQueryData<VersionResponse>(['version'], { ...previous, checking: false })
     schedule(ERROR_BACKOFF_MS)
   } finally {
-    inFlight = false
+    state.inFlight = false
   }
 }
 
 function computeNextDelay(data: VersionResponse): number {
-  // No nextCheckAt published (e.g. updates disabled, or server hasn't
-  // scheduled a first poll yet) → stay quiet on the fallback cadence
-  // and rely on pokeVersionPoll for explicit triggers.
   if (!data.nextCheckAt) return FALLBACK_INTERVAL_MS
   const msUntilNext = new Date(data.nextCheckAt).getTime() - Date.now() - HEAD_START_MS
   return Math.min(FALLBACK_INTERVAL_MS, Math.max(MIN_DELAY_MS, msUntilNext))
 }
 
 /** Idempotent boot. Call once from main.tsx before the first render.
- *  Subsequent calls (e.g. from HMR module reload) are no-ops — the
- *  original timer keeps running and the QueryClient reference stays
- *  the same instance shared across the app. */
+ *  Window-scoped `state.started` means subsequent calls — including
+ *  those from HMR module reloads — are guaranteed no-ops.
+ *
+ *  Initial tick is deferred by INITIAL_DELAY_MS so it doesn't fight
+ *  with the rest of the page-load fetches (overview / projects /
+ *  providers / layout). The badge renders immediately with the local
+ *  version number; the indicator dot just waits a beat. */
 export function startVersionPoll(client: QueryClient) {
-  if (started) return
-  started = true
-  qc = client
-  void tick()
+  if (state.started) return
+  state.started = true
+  state.qc = client
+  schedule(INITIAL_DELAY_MS)
 }
 
 /** Refetch right now, cancelling any pending tick. Used after the
  *  user saves Updates settings: the server schedules a fresh poll in
  *  ~1 s, and this brings the UI in line within a single round-trip. */
 export function pokeVersionPoll() {
-  if (!started) return
+  if (!state.started) return
   schedule(0)
-}
-
-// HMR resilience: when Vite hot-replaces this module the new copy
-// gets a fresh `started=false` and would launch a second timer
-// alongside the original one (which keeps firing because its
-// closure captured the old `timer` ref). dispose() runs against
-// the OUTGOING module right before the new one takes over, giving
-// us a chance to cancel the active timeout and release the started
-// flag so the swap stays single-instance.
-if (typeof import.meta !== 'undefined' && (import.meta as ImportMeta & { hot?: { dispose: (cb: () => void) => void } }).hot) {
-  (import.meta as ImportMeta & { hot: { dispose: (cb: () => void) => void } }).hot.dispose(() => {
-    if (timer) clearTimeout(timer)
-    timer = null
-    started = false
-    qc = null
-  })
 }
