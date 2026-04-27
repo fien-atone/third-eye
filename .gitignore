@@ -32,3 +32,11 @@ logs/
 # OS cache
 .cache/
 Thumbs.db
+
+# Per-package npm lockfiles. The project uses npm workspaces — the
+# authoritative lockfile lives at the repo root. Per-package lockfiles
+# in client/ or server/ subdirs (created accidentally by `cd client &&
+# npm install`) drift out of sync with the root and break `npm ci` in
+# Docker (issue #2). Keep them out of the repo entirely.
+client/package-lock.json
+server/package-lock.json

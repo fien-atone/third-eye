@@ -4,6 +4,26 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] — 2026-04-27
+
+### Fixed
+- **`docker compose up --build` failed at `npm ci`** ([#2]) due to stale
+  per-package `client/package-lock.json` and `server/package-lock.json`
+  that drifted out of sync with the authoritative root lockfile after
+  workspaces deps were added (e.g. `gridstack`). The Dockerfile now
+  installs from the root via `npm ci -w <workspace>`, the per-package
+  lockfiles are gone from the repo, and `.gitignore` blocks them so
+  they can't be reintroduced by accident. Local `npm install` and
+  `npm run dev` are unaffected — they were already using the root
+  lockfile via npm workspaces; the per-package files were dead weight.
+
+### Added
+- **Release checklist** in `DOCS.md` for maintainers — explicit Docker
+  build + run + health-check step, so future releases can't ship with
+  a broken container the way v2.2.0 did.
+
+[#2]: https://github.com/fien-atone/third-eye/issues/2
+
 ## [2.2.0] — 2026-04-24
 
 ### Changed
