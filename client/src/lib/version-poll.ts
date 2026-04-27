@@ -12,10 +12,17 @@
  *  QueryClient cache so any number of useQuery(['version']) calls
  *  observe the same data with zero polling of their own.
  *
- *  Two-speed cadence:
+ *  Cadence:
  *    - while server reports checking:true → 800 ms (catches the
  *      1.2 s spinner-flicker window reliably);
- *    - otherwise → 5 s.
+ *    - otherwise → sleep until the server's next scheduled poll
+ *      (data.nextCheckAt), minus a 500 ms head-start. That's the
+ *      only moment server-side state can change, so polling more
+ *      often is pure waste. With a default 6 h cadence the steady-
+ *      state cost is one /api/version per 6 h, not one per 5 s.
+ *  Capped at 5 min to defend against stale nextCheckAt across server
+ *  restarts (UI catches up within minutes, not hours), floored at
+ *  FAST_INTERVAL_MS so a slightly-past timestamp doesn't busy-loop.
  *  On error we back off to 10 s so a transient network blip doesn't
  *  hammer the endpoint.
  *
@@ -29,8 +36,12 @@ import { apiGet } from '../api'
 import type { VersionResponse } from '../types'
 
 const FAST_INTERVAL_MS = 800
-const SLOW_INTERVAL_MS = 5_000
 const ERROR_BACKOFF_MS = 10_000
+// Safety net when nextCheckAt is missing or way too far in the
+// future. 5 min keeps a long-term server cadence visible while
+// surviving stale timestamps after a server restart.
+const FALLBACK_INTERVAL_MS = 5 * 60_000
+const HEAD_START_MS = 500
 
 let started = false
 let timer: ReturnType<typeof setTimeout> | null = null
@@ -55,12 +66,23 @@ async function tick() {
   try {
     const data = await apiGet<VersionResponse>('/api/version')
     qc.setQueryData<VersionResponse>(['version'], data)
-    schedule(data.checking ? FAST_INTERVAL_MS : SLOW_INTERVAL_MS)
+    schedule(computeNextDelay(data))
   } catch {
     schedule(ERROR_BACKOFF_MS)
   } finally {
     inFlight = false
   }
+}
+
+function computeNextDelay(data: VersionResponse): number {
+  // Server is mid-poll → ride the 800 ms loop until it flips back.
+  if (data.checking) return FAST_INTERVAL_MS
+  // No nextCheckAt published (e.g. updates disabled, or server hasn't
+  // scheduled a first poll yet) → stay quiet, rely on pokeVersionPoll
+  // for explicit triggers.
+  if (!data.nextCheckAt) return FALLBACK_INTERVAL_MS
+  const msUntilNext = new Date(data.nextCheckAt).getTime() - Date.now() - HEAD_START_MS
+  return Math.min(FALLBACK_INTERVAL_MS, Math.max(FAST_INTERVAL_MS, msUntilNext))
 }
 
 /** Idempotent boot. Call once from main.tsx before the first render.
