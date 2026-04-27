@@ -20,14 +20,24 @@ export type VersionResponse = {
   latestUrl: string | null
   latestName: string | null
   latestPublishedAt: string | null
+  /** True while a GitHub poll is currently in flight — used to render
+   *  a "checking…" spinner next to the version badge. */
+  checking: boolean
+  /** ISO timestamp of the last poll attempt (success OR failure). null
+   *  before the first poll. Tooltip text on the up-to-date checkmark. */
+  lastCheckedAt: string | null
 }
 
 export type UpdatesSettings = {
   enabled: boolean
-  intervalHours: number
+  intervalSeconds: number
 }
 export type SettingsResponse = {
   updates: UpdatesSettings
+  /** 'dev' unlocks sub-hour polling presets in the settings UI for
+   *  testing. Production builds always get 'prod' regardless of what
+   *  the client sends — the floor is enforced server-side too. */
+  mode: 'dev' | 'prod'
 }
 
 export type ProjectInfo = {

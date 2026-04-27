@@ -2,23 +2,22 @@
  *  this repo. Caches the result in memory so /api/version returns
  *  instantly without hitting GitHub on every request.
  *
- *  - First poll runs 30 s after import (lets the server finish its
- *    boot warmup before the first outbound HTTP call).
- *  - Subsequent polls every N hours, where N comes from user settings
- *    (`updates.intervalHours`, default 6h).
+ *  - First poll runs 1 s after import or settings change (so the user
+ *    sees a fresh result right after enabling / changing frequency).
+ *  - Subsequent polls every N seconds, where N comes from user
+ *    settings (`updates.intervalSeconds`, default 6 h).
  *  - On error we keep the previous cache and log a single warning;
  *    the next poll retries.
- *  - If the user disables updates in settings, the loop stops, the
- *    cache is cleared, and /api/version returns latest:null so the
- *    "new version available" pill disappears.
- *  - applySettings() (called from the /api/settings PATCH handler)
- *    restarts the loop with the new interval — no server restart
- *    needed. */
+ *  - Disabling updates stops the loop and clears the cache so the
+ *    pill disappears on the next /api/version refetch.
+ *  - The poller exposes `checking` + `lastCheckedAt` so the UI can
+ *    show a "checking…" spinner while a request is in flight and an
+ *    "up to date" checkmark when the cached result is fresh. */
 
 import { getSettings } from './settings.ts'
 
 const REPO = 'fien-atone/third-eye'
-const FIRST_POLL_DELAY_MS = 30_000
+const FIRST_POLL_DELAY_MS = 1_000
 const REQUEST_TIMEOUT_MS = 8_000
 
 export type LatestRelease = {
@@ -31,6 +30,8 @@ export type LatestRelease = {
 
 let cache: LatestRelease = null
 let lastError: string | null = null
+let lastCheckedAt: string | null = null
+let checking = false
 let intervalHandle: ReturnType<typeof setInterval> | null = null
 let firstPollHandle: ReturnType<typeof setTimeout> | null = null
 let started = false
@@ -41,6 +42,10 @@ export function getLatestRelease(): LatestRelease {
 
 export function getLastError(): string | null {
   return lastError
+}
+
+export function getCheckState(): { checking: boolean; lastCheckedAt: string | null } {
+  return { checking, lastCheckedAt }
 }
 
 async function fetchLatest(): Promise<LatestRelease> {
@@ -76,13 +81,28 @@ async function fetchLatest(): Promise<LatestRelease> {
   }
 }
 
+// GitHub responds in 100–800 ms, but we want the "checking…" spinner
+// in the header to register visually. Hold the checking flag for at
+// least this long so a 2-second client refetch catches it reliably.
+const MIN_CHECKING_VISIBLE_MS = 1200
+
 async function poll() {
-  const next = await fetchLatest()
-  if (next) cache = next
-  if (lastError) {
-    // Single warning per failure — don't spam logs every interval of
-    // permanent network outage.
-    console.warn(`[version-check] failed: ${lastError}`)
+  checking = true
+  const startedAt = Date.now()
+  try {
+    const next = await fetchLatest()
+    if (next) cache = next
+    lastCheckedAt = new Date().toISOString()
+    if (lastError) {
+      console.warn(`[version-check] failed: ${lastError}`)
+    }
+  } finally {
+    const elapsed = Date.now() - startedAt
+    if (elapsed < MIN_CHECKING_VISIBLE_MS) {
+      setTimeout(() => { checking = false }, MIN_CHECKING_VISIBLE_MS - elapsed)
+    } else {
+      checking = false
+    }
   }
 }
 
@@ -91,9 +111,9 @@ function clearTimers() {
   if (intervalHandle) { clearInterval(intervalHandle); intervalHandle = null }
 }
 
-function scheduleLoop(intervalHours: number, firstPollMs: number) {
+function scheduleLoop(intervalSeconds: number, firstPollMs: number) {
   clearTimers()
-  const intervalMs = Math.max(1, intervalHours) * 60 * 60_000
+  const intervalMs = Math.max(1, intervalSeconds) * 1000
   firstPollHandle = setTimeout(() => {
     void poll()
     intervalHandle = setInterval(poll, intervalMs)
@@ -101,22 +121,24 @@ function scheduleLoop(intervalHours: number, firstPollMs: number) {
 }
 
 /** Kick off the polling loop. Idempotent — safe to call from boot()
- *  multiple times. Reads enabled/intervalHours from user settings.
+ *  multiple times. Reads enabled/intervalSeconds from user settings.
  *  If updates are disabled, this is a no-op (no timers, empty cache). */
 export function startVersionCheck() {
   if (started) return
   started = true
   const { updates } = getSettings()
   if (!updates.enabled) return
-  scheduleLoop(updates.intervalHours, FIRST_POLL_DELAY_MS)
+  // First poll runs 1 s after boot to keep startup snappy without
+  // making the user wait a full interval to see anything.
+  scheduleLoop(updates.intervalSeconds, FIRST_POLL_DELAY_MS)
 }
 
 /** Apply new settings on the fly. Called from the /api/settings PATCH
  *  handler so the user never has to restart the server.
- *  - enabled flipped on  → start polling now (no 30 s warmup wait;
- *    the user just clicked the toggle, they expect a fresh check).
- *  - enabled flipped off → stop polling, clear cache, the pill
- *    disappears on the next /api/version refetch.
+ *  - enabled flipped on  → start polling now (the user just clicked
+ *    the toggle, they expect a fresh check immediately).
+ *  - enabled flipped off → stop polling, clear cache + check state,
+ *    the pill disappears on the next /api/version refetch.
  *  - interval changed    → reschedule with the new value. */
 export function applyVersionCheckSettings() {
   const { updates } = getSettings()
@@ -124,9 +146,8 @@ export function applyVersionCheckSettings() {
   if (!updates.enabled) {
     cache = null
     lastError = null
+    lastCheckedAt = null
     return
   }
-  // First poll fires almost immediately (1 s) so the user sees the
-  // freshly-fetched state right after clicking Save.
-  scheduleLoop(updates.intervalHours, 1_000)
+  scheduleLoop(updates.intervalSeconds, FIRST_POLL_DELAY_MS)
 }

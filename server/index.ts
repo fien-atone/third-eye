@@ -6,9 +6,9 @@ import { fileURLToPath } from 'url'
 import { db, getMeta, seedScreenLayouts } from './db.ts'
 import { runIngest } from './ingest.ts'
 import { DEFAULT_LAYOUTS, KNOWN_SCREENS, type ScreenLayout } from './lib/default-layouts.ts'
-import { getLatestRelease, startVersionCheck, applyVersionCheckSettings } from './lib/version-check.ts'
+import { getLatestRelease, getCheckState, startVersionCheck, applyVersionCheckSettings } from './lib/version-check.ts'
 import { envRead, envReadNumber } from './lib/env.ts'
-import { getSettings, patchUpdates } from './lib/settings.ts'
+import { getSettings, patchUpdates, IS_DEV } from './lib/settings.ts'
 
 // Seed default screen layouts on first start (idempotent — never overwrites
 // user customizations once they exist).
@@ -648,11 +648,17 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, lastIngestAt: getMeta
 // lie if the two package.json files ever drifted.
 app.get('/api/version', (_req, res) => {
   const latest = getLatestRelease()
+  const { checking, lastCheckedAt } = getCheckState()
   res.json({
     latest: latest?.version ?? null,
     latestUrl: latest?.htmlUrl ?? null,
     latestName: latest?.name ?? null,
     latestPublishedAt: latest?.publishedAt ?? null,
+    // UI signals: a poll currently in flight (spinner) and when the
+    // last successful or attempted poll happened (tooltip on the
+    // "up to date" checkmark).
+    checking,
+    lastCheckedAt,
   })
 })
 
@@ -660,19 +666,22 @@ app.get('/api/version', (_req, res) => {
 // only the Updates section; new sections are added by extending
 // lib/settings.ts and surfacing them here.
 app.get('/api/settings', (_req, res) => {
-  res.json(getSettings())
+  // mode: 'dev' lets the client expose sub-hour polling presets
+  // (30 s / 1 min / 5 min) for testing. Production builds get the
+  // 1 h floor enforced server-side regardless of what the UI sends.
+  res.json({ ...getSettings(), mode: IS_DEV ? 'dev' : 'prod' })
 })
 
 app.patch('/api/settings', (req, res) => {
-  const body = (req.body ?? {}) as { updates?: Partial<{ enabled: boolean; intervalHours: number }> }
+  const body = (req.body ?? {}) as { updates?: Partial<{ enabled: boolean; intervalSeconds: number }> }
   if (body.updates) {
     patchUpdates(body.updates)
     // Settings drive the version-check loop directly — apply them now
-    // so the user never has to restart the server (or wait 6h for the
-    // change to take effect).
+    // so the user never has to restart the server (or wait an interval
+    // for the change to take effect).
     applyVersionCheckSettings()
   }
-  res.json(getSettings())
+  res.json({ ...getSettings(), mode: IS_DEV ? 'dev' : 'prod' })
 })
 
 const clientDistCandidates = [

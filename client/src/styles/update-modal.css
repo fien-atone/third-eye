@@ -317,3 +317,58 @@
   color: var(--text-dim);
   pointer-events: none;
 }
+
+/* Status indicators next to the version-badge in the header. Three
+   mutually-exclusive states (only one renders at a time):
+     .version-status-checking — soft spinner while the server is
+       fetching from GitHub.
+     .version-update-pill (above) — orange, outdated.
+     .version-status-uptodate — green checkmark, latest release. */
+.version-status-checking,
+.version-status-uptodate {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 4px;
+  padding: 3px 10px;
+  border: none;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-family: inherit;
+}
+.version-status-checking {
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--text-dim) 10%, transparent);
+}
+.version-status-uptodate {
+  color: var(--success, #10b981);
+  background: color-mix(in srgb, var(--success, #10b981) 14%, transparent);
+}
+.version-status-label { line-height: 1; }
+
+/* Spinner — 11px circle that matches the pill text height. Animation
+   uses a conic-gradient fade so it reads as "in progress" without the
+   jaggy pixel hop you get from a borrowed border-spinner at this size. */
+.spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Dev-only hint under the frequency dropdown. Reminds the user the
+   short presets ship only because NODE_ENV != production. */
+.settings-dev-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-top: 4px;
+}

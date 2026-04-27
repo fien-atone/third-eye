@@ -79,16 +79,17 @@ export default function App() {
     queryFn: () => apiGet<ProjectsResponse>('/api/projects'),
   })
 
-  // Version check — server background-polls GitHub releases every 6h
-  // and caches the result, so this is a cheap GET that never blocks
-  // on an outbound request. Refetch every 30min so a new release that
-  // drops while the user has the tab open shows up without a page
-  // reload.
+  // Version check — server background-polls GitHub on its own
+  // schedule (default every 6h) and caches the result, so this is a
+  // cheap memory read on the server. Refetch every 2 s so the
+  // header's "checking…" spinner / "up to date" checkmark flip
+  // promptly when the server's poll cycle changes state. The endpoint
+  // is ~150 bytes and never hits the DB, so 30 req/min is fine.
   const versionQuery = useQuery<VersionResponse>({
     queryKey: ['version'],
     queryFn: () => apiGet<VersionResponse>('/api/version'),
-    refetchInterval: 30 * 60_000,
-    staleTime: 30 * 60_000,
+    refetchInterval: 2_000,
+    staleTime: 2_000,
   })
 
   const providersParam = selectedProviders.length === 0 ? 'all' : selectedProviders.join(',')

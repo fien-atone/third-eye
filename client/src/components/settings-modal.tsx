@@ -23,18 +23,19 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const [draftEnabled, setDraftEnabled] = useState<boolean | null>(null)
   const [draftInterval, setDraftInterval] = useState<number | null>(null)
   const enabled = draftEnabled ?? settings.data?.updates.enabled ?? true
-  const intervalHours = draftInterval ?? settings.data?.updates.intervalHours ?? 6
+  const intervalSeconds = draftInterval ?? settings.data?.updates.intervalSeconds ?? 6 * 3600
+  const isDev = settings.data?.mode === 'dev'
 
   const mutation = useMutation({
-    mutationFn: (next: { enabled: boolean; intervalHours: number }) =>
+    mutationFn: (next: { enabled: boolean; intervalSeconds: number }) =>
       apiPatch<SettingsResponse>('/api/settings', { updates: next }),
     onSuccess: data => {
       qc.setQueryData(['settings'], data)
       // Server may have just (re)started the version-check loop with
-      // a 1 s first-poll delay — refetch /api/version shortly after to
-      // pick up the result, so the pill appears/disappears without
-      // waiting for the 30 min React Query refetchInterval.
-      setTimeout(() => qc.invalidateQueries({ queryKey: ['version'] }), 2_000)
+      // a 1 s first-poll delay — refetch /api/version shortly after so
+      // the pill / spinner / checkmark react without waiting for the
+      // React Query background refetch.
+      setTimeout(() => qc.invalidateQueries({ queryKey: ['version'] }), 1_500)
       onClose()
     },
   })
@@ -47,9 +48,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
 
   const dirty =
     (draftEnabled !== null && draftEnabled !== settings.data?.updates.enabled) ||
-    (draftInterval !== null && draftInterval !== settings.data?.updates.intervalHours)
+    (draftInterval !== null && draftInterval !== settings.data?.updates.intervalSeconds)
 
-  const save = () => mutation.mutate({ enabled, intervalHours })
+  const save = () => mutation.mutate({ enabled, intervalSeconds })
 
   return (
     <>
@@ -88,19 +89,28 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               <span className="select-wrap">
                 <select
                   className="select-styled"
-                  value={intervalHours}
+                  value={intervalSeconds}
                   disabled={!enabled}
                   onChange={e => setDraftInterval(parseInt(e.target.value, 10))}
                 >
-                  <option value={1}>{t('settings.updates.freq.hourly')}</option>
-                  <option value={6}>{t('settings.updates.freq.every6h')}</option>
-                  <option value={24}>{t('settings.updates.freq.daily')}</option>
-                  <option value={168}>{t('settings.updates.freq.weekly')}</option>
+                  {/* Dev-only sub-hour presets at the top — stripped
+                      from the prod UI and floor-clamped server-side
+                      so a tampered-with request can't hammer GitHub. */}
+                  {isDev && <option value={30}>{t('settings.updates.freq.dev30s')}</option>}
+                  {isDev && <option value={60}>{t('settings.updates.freq.dev1m')}</option>}
+                  {isDev && <option value={300}>{t('settings.updates.freq.dev5m')}</option>}
+                  <option value={3600}>{t('settings.updates.freq.hourly')}</option>
+                  <option value={6 * 3600}>{t('settings.updates.freq.every6h')}</option>
+                  <option value={24 * 3600}>{t('settings.updates.freq.daily')}</option>
+                  <option value={168 * 3600}>{t('settings.updates.freq.weekly')}</option>
                 </select>
                 <svg className="select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
               </span>
+              {isDev && (
+                <span className="settings-dev-hint">{t('settings.updates.devHint')}</span>
+              )}
             </div>
           </section>
         </div>

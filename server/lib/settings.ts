@@ -10,15 +10,22 @@
  *  getter, and update /api/settings to surface it. */
 import { db } from '../db.ts'
 
+/** Server is in dev mode when NODE_ENV is anything other than
+ *  "production". The Dockerfile sets NODE_ENV=production explicitly,
+ *  so "production" here means "running from a container or other
+ *  intentional prod start". Used to gate sub-hour polling intervals
+ *  (which would hammer GitHub if shipped to real users). */
+export const IS_DEV = process.env.NODE_ENV !== 'production'
+
 export type UpdatesSettings = {
   /** Master switch for the GitHub release poller and the "new version
    *  available" pill in the header. Off → server stops polling and
    *  /api/version returns latest:null, so the pill disappears. */
   enabled: boolean
-  /** Polling interval in hours. Allowed: 1, 6 (default), 24, 168.
-   *  Free-form numbers also accepted at the API boundary — UI just
-   *  doesn't expose them. */
-  intervalHours: number
+  /** Polling interval in seconds. Allowed minimum: 30 in dev, 3600
+   *  (1 hour) in prod. UI exposes a curated set of presets (per
+   *  client/src/components/settings-modal.tsx). */
+  intervalSeconds: number
 }
 
 export type Settings = {
@@ -28,9 +35,13 @@ export type Settings = {
 const DEFAULTS: Settings = {
   updates: {
     enabled: true,
-    intervalHours: 6,
+    intervalSeconds: 6 * 3600, // 6 hours
   },
 }
+
+const MIN_INTERVAL_DEV_S = 30
+const MIN_INTERVAL_PROD_S = 3600
+const MAX_INTERVAL_S = 30 * 24 * 3600 // 30 days
 
 function readSection<K extends keyof Settings>(key: K): Settings[K] {
   const row = db().prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
@@ -59,15 +70,14 @@ export function patchUpdates(patch: Partial<UpdatesSettings>): UpdatesSettings {
   const current = readSection('updates')
   const next: UpdatesSettings = {
     enabled: typeof patch.enabled === 'boolean' ? patch.enabled : current.enabled,
-    intervalHours: clampInterval(patch.intervalHours ?? current.intervalHours),
+    intervalSeconds: clampInterval(patch.intervalSeconds ?? current.intervalSeconds),
   }
   writeSection('updates', next)
   return next
 }
 
 function clampInterval(n: unknown): number {
-  const v = typeof n === 'number' && Number.isFinite(n) ? n : 6
-  // Sane bounds: minimum 1h (GitHub rate-limit headroom on a single
-  // server), maximum 30 days (longer = effectively "never check").
-  return Math.max(1, Math.min(720, v))
+  const v = typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : DEFAULTS.updates.intervalSeconds
+  const min = IS_DEV ? MIN_INTERVAL_DEV_S : MIN_INTERVAL_PROD_S
+  return Math.max(min, Math.min(MAX_INTERVAL_S, v))
 }

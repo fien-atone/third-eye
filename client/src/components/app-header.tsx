@@ -42,6 +42,13 @@ export function AppHeader({
   // the server restarted but Vite didn't (or vice versa).
   const currentVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : null
   const outdated = !!(currentVersion && version?.latest && semverCompare(version.latest, currentVersion) > 0)
+  // "Up to date" badge: only show once we have a definitive answer
+  // from GitHub (latest !== null) AND we're not currently outdated.
+  // Suppressed while a poll is in flight so the user sees the spinner
+  // instead of a stale "all good" indicator that might flip seconds
+  // later.
+  const upToDate = !!(version?.latest && !outdated && !version.checking)
+  const checking = !!version?.checking
   return (
     <>
       <div className="header">
@@ -58,10 +65,24 @@ export function AppHeader({
           {typeof __APP_VERSION__ !== 'undefined' && (
             <span className="version-badge" title={`v${__APP_VERSION__}`}>v{__APP_VERSION__}</span>
           )}
-          {outdated && version?.latest && (
-            /* Just "↑ New version available" — no numbers, no arrow.
-               Version specifics live inside the modal where they're
-               actually useful. */
+          {/* Three mutually-exclusive update indicators next to the
+              version badge:
+                - checking → spinner ("checking GitHub right now")
+                - outdated → orange pill with "New version available"
+                - up to date → green checkmark with "running latest" tooltip
+              Only one renders at a time; precedence is checking > outdated > up-to-date. */}
+          {checking && (
+            <span
+              className="version-status-checking"
+              role="status"
+              aria-live="polite"
+              title={t('update.checking')}
+            >
+              <span className="spinner" aria-hidden="true" />
+              <span className="version-status-label">{t('update.checking')}</span>
+            </span>
+          )}
+          {!checking && outdated && version?.latest && (
             <button
               className="version-update-pill"
               onClick={() => setUpdateOpen(true)}
@@ -70,6 +91,19 @@ export function AppHeader({
               <span aria-hidden="true">↑</span>
               <span>{t('update.pillLabel')}</span>
             </button>
+          )}
+          {!checking && upToDate && (
+            <span
+              className="version-status-uptodate"
+              title={version?.lastCheckedAt
+                ? t('update.upToDateAt', { when: new Date(version.lastCheckedAt).toLocaleString() })
+                : t('update.upToDate')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span className="version-status-label">{t('update.upToDate')}</span>
+            </span>
           )}
           <span className="tagline">{t('header.tagline')}</span>
           <span className="meta">
