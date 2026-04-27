@@ -63,23 +63,27 @@ export function AppHeader({
             <h1>Third Eye</h1>
           </a>
           {typeof __APP_VERSION__ !== 'undefined' && (
-            <span className="version-badge" title={`v${__APP_VERSION__}`}>v{__APP_VERSION__}</span>
-          )}
-          {/* Three mutually-exclusive update indicators next to the
-              version badge:
-                - checking → spinner ("checking GitHub right now")
-                - outdated → orange pill with "New version available"
-                - up to date → green checkmark with "running latest" tooltip
-              Only one renders at a time; precedence is checking > outdated > up-to-date. */}
-          {checking && (
+            /* Version badge now hosts the up-to-date / checking
+               indicators as small dot / spinner adornments in its top-
+               right corner — like a notification dot on an app icon.
+               Outdated stays a separate labeled pill (CTA) so it grabs
+               attention; the informational states (running latest,
+               actively polling) stay quiet and out of the user's way. */
             <span
-              className="version-status-checking"
-              role="status"
-              aria-live="polite"
-              title={t('update.checking')}
+              className={`version-badge${checking ? ' is-checking' : upToDate ? ' is-up-to-date' : ''}`}
+              title={
+                checking
+                  ? t('update.checking')
+                  : upToDate
+                    ? (version?.lastCheckedAt
+                        ? t('update.upToDateAt', { when: new Date(version.lastCheckedAt).toLocaleString() })
+                        : t('update.upToDate'))
+                    : `v${__APP_VERSION__}`
+              }
             >
-              <span className="spinner" aria-hidden="true" />
-              <span className="version-status-label">{t('update.checking')}</span>
+              v{__APP_VERSION__}
+              {checking && <span className="version-badge-indicator is-checking" aria-hidden="true" />}
+              {!checking && upToDate && <span className="version-badge-indicator is-up-to-date" aria-hidden="true" />}
             </span>
           )}
           {!checking && outdated && version?.latest && (
@@ -92,26 +96,18 @@ export function AppHeader({
               <span>{t('update.pillLabel')}</span>
             </button>
           )}
-          {!checking && upToDate && (
-            <span
-              className="version-status-uptodate"
-              title={version?.lastCheckedAt
-                ? t('update.upToDateAt', { when: new Date(version.lastCheckedAt).toLocaleString() })
-                : t('update.upToDate')}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span className="version-status-label">{t('update.upToDate')}</span>
-            </span>
-          )}
           <span className="tagline">{t('header.tagline')}</span>
-          <span className="meta">
-            <span className="pulse" />
-            {t('header.lastRefresh')}: {fmtRel(lastIngestAt, t)}
-          </span>
         </div>
         <div className="right">
+          {/* Last data refresh — moved here from the brand cluster so
+              "data freshness" sits next to the Refresh button (which
+              acts on data) and is visually separated from "app version
+              freshness" on the left. The pulse dot already implies
+              live-data; tooltip spells out what the timestamp means. */}
+          <span className="meta" title={t('header.lastRefresh')}>
+            <span className="pulse" />
+            {fmtRel(lastIngestAt, t)}
+          </span>
           <button
             className="ghost"
             onClick={onRefresh}
