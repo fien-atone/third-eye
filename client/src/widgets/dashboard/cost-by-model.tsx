@@ -32,7 +32,7 @@ export function costByModelWidget(
         <div className="widget-panel-body widget-chart-body">
           {hasAnyData ? (
             <div className="widget-chart-area">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <BarChart data={series} margin={TIMESERIES_MARGIN} barCategoryGap="15%">
                   <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" hide={h <= 1} />

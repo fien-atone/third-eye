@@ -4,7 +4,7 @@ import { applyTheme, getStoredTheme, type Theme } from './theme'
 import { useRoute, navigate } from './router'
 import { useScreenLayout, type ScreenLayout } from './widgets/grid'
 import { useT } from './i18n'
-import type { Granularity, OverviewResponse, ProvidersResponse, ProjectsResponse } from './types'
+import type { Granularity, OverviewResponse, ProvidersResponse, ProjectsResponse, VersionResponse } from './types'
 import { useDateLocale } from './lib/format'
 import { apiGet, apiPost, dashboardParams } from './api'
 import { ProjectsPage } from './screens/projects-page'
@@ -77,6 +77,18 @@ export default function App() {
   const projectsQuery = useQuery<ProjectsResponse>({
     queryKey: ['projects'],
     queryFn: () => apiGet<ProjectsResponse>('/api/projects'),
+  })
+
+  // Strictly passive observer of the version cache. enabled:false
+  // means RQ NEVER calls queryFn — no initial mount fetch, no
+  // StrictMode double-fetch, nothing. The component only re-renders
+  // when the singleton in lib/version-poll.ts pushes new data via
+  // setQueryData. queryFn is required by the type system but is
+  // unreachable.
+  const versionQuery = useQuery<VersionResponse>({
+    queryKey: ['version'],
+    queryFn: () => apiGet<VersionResponse>('/api/version'),
+    enabled: false,
   })
 
   const providersParam = selectedProviders.length === 0 ? 'all' : selectedProviders.join(',')
@@ -189,6 +201,7 @@ export default function App() {
         dashboardTabActive={dashboardTabActive}
         projectsTabActive={projectsTabActive}
         dayTabActive={dayTabActive}
+        version={versionQuery.data}
       />
 
       {serverDown && <ServerDownBanner onRetry={retryAll} />}

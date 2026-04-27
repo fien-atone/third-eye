@@ -12,6 +12,40 @@ export type Provider = {
 }
 export type ProvidersResponse = { providers: Provider[]; lastIngestAt: string | null }
 
+/** Server reports only what it learned from GitHub. The "current"
+ *  version (and therefore the outdated check) is computed on the client
+ *  from __APP_VERSION__ — see lib/semver.ts and AppHeader. */
+export type VersionResponse = {
+  latest: string | null
+  latestUrl: string | null
+  latestName: string | null
+  latestPublishedAt: string | null
+  /** True while the client is in the middle of fetching /api/version
+   *  (plus a min-visible buffer). Synthesized client-side by
+   *  lib/version-poll.ts — the server does NOT include this field.
+   *  Drives the header spinner. */
+  checking: boolean
+  /** ISO timestamp of the last poll attempt (success OR failure). null
+   *  before the first poll. Tooltip text on the up-to-date checkmark. */
+  lastCheckedAt: string | null
+  /** ISO timestamp of the next scheduled server-side poll. The client
+   *  uses it to schedule its own refetch precisely, instead of
+   *  polling at a fixed cadence — one /api/version per cycle. */
+  nextCheckAt: string | null
+}
+
+export type UpdatesSettings = {
+  enabled: boolean
+  intervalSeconds: number
+}
+export type SettingsResponse = {
+  updates: UpdatesSettings
+  /** 'dev' unlocks sub-hour polling presets in the settings UI for
+   *  testing. Production builds always get 'prod' regardless of what
+   *  the client sends — the floor is enforced server-side too. */
+  mode: 'dev' | 'prod'
+}
+
 export type ProjectInfo = {
   id: string
   key: string

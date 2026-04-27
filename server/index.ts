@@ -6,7 +6,9 @@ import { fileURLToPath } from 'url'
 import { db, getMeta, seedScreenLayouts } from './db.ts'
 import { runIngest } from './ingest.ts'
 import { DEFAULT_LAYOUTS, KNOWN_SCREENS, type ScreenLayout } from './lib/default-layouts.ts'
+import { getLatestRelease, getCheckState, startVersionCheck, applyVersionCheckSettings, seedLatestRelease } from './lib/version-check.ts'
 import { envRead, envReadNumber } from './lib/env.ts'
+import { getSettings, patchUpdates, IS_DEV } from './lib/settings.ts'
 
 // Seed default screen layouts on first start (idempotent — never overwrites
 // user customizations once they exist).
@@ -116,6 +118,12 @@ function normalizeProviders(q: unknown): string[] {
 }
 
 const app = express()
+// Disable Express's automatic ETag / 304 dance for JSON endpoints.
+// We're a self-hosted localhost dashboard — saving the body bytes
+// of a small response is a non-feature, while the resulting 304s
+// vs 200s in DevTools just confuse the picture when debugging
+// polling cadence.
+app.set('etag', false)
 // CORS: allow only the vite dev server and same-origin Docker/static use.
 // Override via THIRD_EYE_CORS_ORIGIN="https://your.host" if you ever expose this publicly (not recommended).
 // Legacy CODEBURN_CORS_ORIGIN is still read for backwards compat (see server/lib/env.ts).
@@ -636,6 +644,74 @@ app.get('/api/insights/:projectId', (req, res) => {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, lastIngestAt: getMeta('last_ingest_at') }))
 
+// /api/version reports ONLY what the server learned from GitHub. The
+// "current" version and the outdated comparison live entirely on the
+// client, which uses its build-time __APP_VERSION__ constant — that's
+// the version the user is actually looking at in the browser. Splitting
+// "current" between server (reads server/package.json) and client
+// (reads client/package.json at Vite build) used to produce mismatched
+// UI in dev when one restarted and the other didn't, and would silently
+// lie if the two package.json files ever drifted.
+app.get('/api/version', (_req, res) => {
+  const latest = getLatestRelease()
+  const { lastCheckedAt, nextCheckAt } = getCheckState()
+  res.json({
+    latest: latest?.version ?? null,
+    latestUrl: latest?.htmlUrl ?? null,
+    latestName: latest?.name ?? null,
+    latestPublishedAt: latest?.publishedAt ?? null,
+    // lastCheckedAt — tooltip on the up-to-date dot.
+    // nextCheckAt   — lets the client schedule its next refetch
+    //                 instead of polling at a fixed cadence.
+    // (No `checking` field: the spinner is driven by the client's
+    // own in-flight state. One request per cycle, no bursts.)
+    lastCheckedAt,
+    nextCheckAt,
+  })
+})
+
+// User-controlled settings (gear icon in header). Currently exposes
+// only the Updates section; new sections are added by extending
+// lib/settings.ts and surfacing them here.
+app.get('/api/settings', (_req, res) => {
+  // mode: 'dev' lets the client expose sub-hour polling presets
+  // (30 s / 1 min / 5 min) for testing. Production builds get the
+  // 1 h floor enforced server-side regardless of what the UI sends.
+  res.json({ ...getSettings(), mode: IS_DEV ? 'dev' : 'prod' })
+})
+
+// Dev-only: seed the version-check cache without hitting GitHub.
+// Lets us demo the outdated / up-to-date / checking UI states
+// without burning the unauthenticated 60 req/h rate limit. The 404
+// in production keeps the surface area honest — there's no way to
+// inject a fake "new version available" signal on real users.
+if (IS_DEV) {
+  app.post('/api/_dev/seed-version', (req, res) => {
+    const body = (req.body ?? {}) as { version?: string | null; name?: string; htmlUrl?: string; publishedAt?: string }
+    if (body.version === null) {
+      seedLatestRelease(null)
+      return res.json({ ok: true, cleared: true })
+    }
+    if (typeof body.version !== 'string' || !body.version.match(/^\d+\.\d+\.\d+/)) {
+      return res.status(400).json({ error: 'version must be "X.Y.Z" or null' })
+    }
+    seedLatestRelease({ version: body.version, name: body.name, htmlUrl: body.htmlUrl, publishedAt: body.publishedAt })
+    res.json({ ok: true, latest: getLatestRelease() })
+  })
+}
+
+app.patch('/api/settings', (req, res) => {
+  const body = (req.body ?? {}) as { updates?: Partial<{ enabled: boolean; intervalSeconds: number }> }
+  if (body.updates) {
+    patchUpdates(body.updates)
+    // Settings drive the version-check loop directly — apply them now
+    // so the user never has to restart the server (or wait an interval
+    // for the change to take effect).
+    applyVersionCheckSettings()
+  }
+  res.json({ ...getSettings(), mode: IS_DEV ? 'dev' : 'prod' })
+})
+
 const clientDistCandidates = [
   join(__dirname, '..', 'client', 'dist'),
   join(__dirname, 'public'),
@@ -652,6 +728,9 @@ for (const dist of clientDistCandidates) {
 const port = Number(process.env.PORT ?? 4317)
 
 async function boot() {
+  // Background poll of GitHub Releases — first hit lands ~30s after
+  // boot, then every 6h. Failures keep the cache stale, never crash.
+  startVersionCheck()
   const d = db()
   // Warm SQLite's page cache so the first user request doesn't eat a
   // 5–15 second cold-query hit. Cost: ~50 ms of extra boot latency for a

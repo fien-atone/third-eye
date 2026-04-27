@@ -4,6 +4,67 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] — 2026-04-27
+
+### Added
+- **"New version available" awareness in the header.** The server
+  polls the GitHub Releases API on its own schedule (default once
+  per hour, never more often than once per hour in production) and
+  the client surfaces three states next to the version badge:
+  - tiny green dot — running latest, with a "last checked X" tooltip;
+  - tiny spinner — a check is in flight;
+  - orange "↑ New version available" pill — opens a modal with
+    copy-paste install commands for Docker and Node, plus a link
+    to the GitHub release notes.
+  All three are localized in en/ru/es/de/zh.
+- **Settings modal.** A gear icon next to the theme toggle opens a
+  settings dialog. Currently hosts the *Updates* section (master
+  toggle + frequency dropdown). Section/grid scaffolding is ready
+  for future settings groups. Custom-styled toggle switch and
+  dropdown so the form matches the rest of the dashboard's look,
+  not 2003 browser defaults.
+- **Multi-tab coordination.** When the dashboard is open in more
+  than one tab, exactly ONE of them polls `/api/version` — it
+  holds a Web Lock and broadcasts each result over a
+  `BroadcastChannel` so follower tabs stay in sync without making
+  their own requests. When the leader tab closes the lock auto-
+  releases and one of the waiting tabs gets promoted.
+- **`THIRD_EYE_GITHUB_REPO` env var** to override the default
+  `fien-atone/third-eye` repository (forks / private mirrors).
+  GitHub auth tokens are intentionally NOT supported — the
+  dashboard ships to end users and an embedded shared token would
+  leak across installs.
+
+### Changed
+- **Header layout: data freshness moves right, version freshness
+  stays left.** The "Last refresh: Xm ago" indicator (data-ingest
+  freshness) now sits next to the Refresh button on the right of
+  the header, instead of floating in the brand cluster on the
+  left. Version freshness (the dot / spinner / pill described
+  above) stays adjacent to the version badge. Two domains, two
+  locations — no more "is this about app version or about data?"
+  confusion.
+- **Single source of truth for "current version".** The client's
+  build-time `__APP_VERSION__` is now the only thing used to
+  decide whether the running bundle is up to date — the server no
+  longer reports a `current` field. Eliminates a class of dev-mode
+  skew where the server and Vite could disagree about what version
+  was running.
+
+### Fixed
+- **Recharts `width(-1)`/`height(-1)` console warnings** silenced by
+  passing `minWidth={0} minHeight={0}` on every `ResponsiveContainer`.
+  These fired on every page load because GridStack sizes its tiles
+  after children mount; the noisy warning had nothing to do with
+  the actual chart but drowned out real errors during debugging.
+
+### Internal
+- **Defensive interval clamp on read.** Settings rows storing
+  `intervalSeconds` are clamped to the production floor (1 h) on
+  read, not just on write, so a `data/third-eye.db` that was
+  configured in dev with a 30-second cadence can't burn the GitHub
+  rate limit when shipped inside a production Docker image.
+
 ## [2.2.2] — 2026-04-27
 
 ### Fixed

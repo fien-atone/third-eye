@@ -122,6 +122,14 @@ function migrate(d: Database.Database) {
     layout_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`)
+
+  // User-controlled settings (versioned via key/value JSON so adding a
+  // new field doesn't need a migration). One key per top-level section
+  // — `lib/settings.ts` reads/writes typed objects.
+  d.exec(`CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )`)
 }
 
 /** Seed default layouts on first startup. Idempotent: INSERT OR IGNORE

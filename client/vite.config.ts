@@ -30,7 +30,10 @@ export default defineConfig({
     ],
   },
   server: {
-    port: 5180,
+    // Honor PORT from the environment (lets external tooling like
+    // Claude Preview pick a port) but fall back to 5180 for our
+    // documented local dev convention.
+    port: Number(process.env.PORT ?? 5180),
     strictPort: true,
   },
 })
