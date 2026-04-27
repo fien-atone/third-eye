@@ -103,3 +103,19 @@ export function pokeVersionPoll() {
   if (!started) return
   schedule(0)
 }
+
+// HMR resilience: when Vite hot-replaces this module the new copy
+// gets a fresh `started=false` and would launch a second timer
+// alongside the original one (which keeps firing because its
+// closure captured the old `timer` ref). dispose() runs against
+// the OUTGOING module right before the new one takes over, giving
+// us a chance to cancel the active timeout and release the started
+// flag so the swap stays single-instance.
+if (typeof import.meta !== 'undefined' && (import.meta as ImportMeta & { hot?: { dispose: (cb: () => void) => void } }).hot) {
+  (import.meta as ImportMeta & { hot: { dispose: (cb: () => void) => void } }).hot.dispose(() => {
+    if (timer) clearTimeout(timer)
+    timer = null
+    started = false
+    qc = null
+  })
+}

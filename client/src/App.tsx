@@ -79,21 +79,16 @@ export default function App() {
     queryFn: () => apiGet<ProjectsResponse>('/api/projects'),
   })
 
-  // Passive observer of the version cache — all polling lives in
-  // the singleton in lib/version-poll.ts (booted from main.tsx).
-  // The singleton owns the only /api/version timer in the app, so
-  // StrictMode double-mount, HMR, and accidental extra observers
-  // can't multiply requests. queryFn is a one-shot fallback for the
-  // unlikely race where the cache is empty when this hook first
-  // subscribes; in practice the singleton has populated it before
-  // App's first render.
+  // Strictly passive observer of the version cache. enabled:false
+  // means RQ NEVER calls queryFn — no initial mount fetch, no
+  // StrictMode double-fetch, nothing. The component only re-renders
+  // when the singleton in lib/version-poll.ts pushes new data via
+  // setQueryData. queryFn is required by the type system but is
+  // unreachable.
   const versionQuery = useQuery<VersionResponse>({
     queryKey: ['version'],
     queryFn: () => apiGet<VersionResponse>('/api/version'),
-    refetchInterval: false,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    staleTime: Infinity,
+    enabled: false,
   })
 
   const providersParam = selectedProviders.length === 0 ? 'all' : selectedProviders.join(',')
