@@ -15,8 +15,18 @@
  *    "up to date" checkmark when the cached result is fresh. */
 
 import { getSettings } from './settings.ts'
+import { envRead } from './env.ts'
 
-const REPO = 'fien-atone/third-eye'
+// Which GitHub repo to poll for the "latest" release. Defaults to
+// the canonical fien-atone/third-eye, but a fork or a custom mirror
+// can override via THIRD_EYE_GITHUB_REPO=owner/name. NB: GitHub
+// auth tokens are intentionally NOT supported — this dashboard
+// ships to end users who set up their own self-host, and embedding
+// or accepting a token would either leak a shared secret across
+// installs or push every user to manage one. The 60 req/h
+// unauthenticated limit is enough headroom for the ≥1 h cadence
+// enforced server-side in production.
+const REPO = envRead('THIRD_EYE_GITHUB_REPO') ?? 'fien-atone/third-eye'
 const FIRST_POLL_DELAY_MS = 1_000
 const REQUEST_TIMEOUT_MS = 8_000
 

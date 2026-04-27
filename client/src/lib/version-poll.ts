@@ -1,47 +1,62 @@
-/** Singleton version-check poller.
+/** Singleton version-check poller, with cross-tab leader election.
  *
- *  Lives outside the React tree so it's bulletproof against StrictMode
- *  dev double-mount and any consumer accidentally adding another
- *  observer with the same queryKey.
+ *  Boots once from main.tsx via startVersionPoll(). At most ONE tab
+ *  in the browser actually polls /api/version at a time — the
+ *  others sit silent and receive cached results via BroadcastChannel.
+ *  When the leader tab closes, a Web Lock is released and the next
+ *  waiting tab promotes itself.
  *
- *  Boots once from main.tsx via startVersionPoll(). Owns the only
- *  /api/version timer in the app. Pushes results into the
- *  QueryClient cache so any number of useQuery(['version']) calls
- *  observe the same data with zero polling of their own.
+ *  ──────────  WHY THIS MUCH MACHINERY  ──────────
  *
- *  ──────────  STATE LIVES ON `window`  ──────────
- *  We attach state to window.__thirdEyeVersionPoll instead of holding
- *  it in module scope. Vite HMR can replay this module's top-level
- *  code more than once per page session (we proved it with a Math-
- *  random module ID — same ID printed twice within seconds). With
- *  module-scoped `started`, each replay launched its own timer and
- *  we ended up with 2-3 ticks per cycle. Window-scoped state means
- *  every module instance reads the same flag and the second one
- *  short-circuits cleanly.
+ *  Without coordination:
+ *    - Multiple tabs of the dashboard each spin their own polling
+ *      timer. With N tabs and a 1 h cadence, that's still N requests
+ *      per hour — not a load problem, but an obvious correctness
+ *      smell. Real users WILL open the dashboard in two tabs.
  *
- *  Cadence: sleep until the server's next scheduled poll
- *  (data.nextCheckAt), minus a 500 ms head-start. That's the only
- *  moment server-side data can change, so polling more often is
- *  pure waste. With a default 6 h cadence the steady-state cost is
- *  one /api/version per 6 h, not one per 5 s.
+ *  Without window-scoped state:
+ *    - Vite HMR can replay this module's top-level code more than
+ *      once per page session (proven empirically — same Math-random
+ *      ID printed twice within seconds). Module-scoped `started`
+ *      flags get bypassed, multiple timers stack, request count
+ *      goes 2-3x.
  *
- *  Spinner UX: the spinner is purely a CLIENT-side affordance for
- *  "request in flight". When tick() starts, we synthesize
- *  checking:true into the cached version data so the header dot
- *  flips to the spinner. After the response settles AND a minimum
- *  visible time elapses (so a fast network roundtrip doesn't
- *  produce a 30 ms flicker the user can't see), we set
- *  checking:false and write the fresh data. One request per cycle.
+ *  Both fixed here:
+ *    - State on `window.__thirdEyeVersionPoll`: shared across module
+ *      instances within the same tab. Second module-replay sees
+ *      `started=true` and short-circuits.
+ *    - Web Lock: shared across tabs of the same origin in the same
+ *      browser. Only one tab holds it at a time; followers wait.
+ *    - BroadcastChannel: leader broadcasts every cache update so
+ *      followers' QueryClient stays in sync without making their
+ *      own requests.
  *
- *  Capped at 5 min to defend against stale nextCheckAt across
- *  server restarts (UI catches up within minutes, not hours).
- *  On error we back off to 10 s so a transient network blip doesn't
- *  hammer the endpoint.
+ *  ──────────  CADENCE  ──────────
+ *
+ *  Wake POST_POLL_BUFFER_MS AFTER server's nextCheckAt so the
+ *  response carries a fresh server poll. Waking BEFORE used to
+ *  produce a tight loop: stale nextCheckAt → msUntilNext ≈ 0 →
+ *  floored to MIN_DELAY → tick again with still-stale data → 3-4
+ *  bursts per cycle. Capped at 5 min as a safety net for stale
+ *  nextCheckAt across server restarts; floored at MIN_DELAY (5 s)
+ *  so a slightly-past timestamp never thrashes.
+ *
+ *  ──────────  SPINNER UX  ──────────
+ *
+ *  Pure client-side affordance for "request in flight". When tick()
+ *  starts, we synthesize checking:true into the cached version data
+ *  so the header dot flips to the spinner. After the response
+ *  settles AND a minimum visible time elapses (so a fast network
+ *  roundtrip doesn't produce an invisible 30 ms flicker), we set
+ *  checking:false and write the fresh data. Broadcast both states
+ *  so other tabs animate the same way.
  *
  *  pokeVersionPoll() jumps the queue: the next tick fires now,
- *  cancelling the pending one. Used right after the user saves the
- *  Updates settings — the server schedules a fresh poll within 1 s,
- *  and we want the UI to reflect it without a 5 s lag. */
+ *  cancelling the pending one. Used after the user saves Updates
+ *  settings — the server schedules a fresh poll in ~1 s, and this
+ *  brings the UI in line within a single round-trip. If the saving
+ *  tab isn't the leader, the poke is broadcast to the leader tab
+ *  via BroadcastChannel. */
 
 import type { QueryClient } from '@tanstack/react-query'
 import { apiGet } from '../api'
@@ -49,21 +64,16 @@ import type { VersionResponse } from '../types'
 
 const ERROR_BACKOFF_MS = 10_000
 const FALLBACK_INTERVAL_MS = 5 * 60_000
-// Wake up AFTER the server's next scheduled poll, so the response we
-// get has fresh nextCheckAt + lastCheckedAt. Waking BEFORE produced
-// a tight loop on the cycle boundary: we'd see stale nextCheckAt,
-// compute msUntilNext ≈ 0, schedule via the floor, see stale data
-// again, and burn 3–4 requests catching up.
 const POST_POLL_BUFFER_MS = 500
-// Floor on the schedule delay. Generous (5 s, not 250 ms) so that if
-// nextCheckAt is genuinely in the past for any reason we wait long
-// enough for the server to recover instead of hammering it.
 const MIN_DELAY_MS = 5_000
 const MIN_SPINNER_MS = 1200
 const INITIAL_DELAY_MS = 1_500
+const LOCK_NAME = 'third-eye-version-poll-leader'
+const CHANNEL_NAME = 'third-eye-version-poll'
 
 type PollState = {
   started: boolean
+  isLeader: boolean
   timer: ReturnType<typeof setTimeout> | null
   qc: QueryClient | null
   inFlight: boolean
@@ -73,10 +83,23 @@ declare global {
 }
 const state: PollState = (window.__thirdEyeVersionPoll ??= {
   started: false,
+  isLeader: false,
   timer: null,
   qc: null,
   inFlight: false,
 })
+
+type CrossTabMsg =
+  | { type: 'version-data'; payload: VersionResponse }
+  | { type: 'poke' }
+  | { type: 'hello' }
+
+let channel: BroadcastChannel | null = null
+function getChannel(): BroadcastChannel | null {
+  if (typeof BroadcastChannel === 'undefined') return null
+  if (!channel) channel = new BroadcastChannel(CHANNEL_NAME)
+  return channel
+}
 
 function schedule(ms: number) {
   if (state.timer) clearTimeout(state.timer)
@@ -85,19 +108,13 @@ function schedule(ms: number) {
 
 async function tick() {
   if (!state.qc) return
-  // Belt + braces: shouldn't be reachable since we always clear the
-  // timer before scheduling, but if a poke races a scheduled tick
-  // we'd rather skip than double-fire.
   if (state.inFlight) return
   state.inFlight = true
 
-  // Synthetic checking:true — flip the header dot to a spinner
-  // BEFORE the request leaves the client, so the user sees activity
-  // immediately on slow networks too. We merge into existing data so
-  // latest/url/etc don't blink to undefined.
   const qc = state.qc
+  const ch = getChannel()
   const previous = qc.getQueryData<VersionResponse>(['version'])
-  qc.setQueryData<VersionResponse>(['version'], {
+  const inflight: VersionResponse = {
     latest: previous?.latest ?? null,
     latestUrl: previous?.latestUrl ?? null,
     latestName: previous?.latestName ?? null,
@@ -105,21 +122,27 @@ async function tick() {
     lastCheckedAt: previous?.lastCheckedAt ?? null,
     nextCheckAt: previous?.nextCheckAt ?? null,
     checking: true,
-  })
+  }
+  qc.setQueryData<VersionResponse>(['version'], inflight)
+  ch?.postMessage({ type: 'version-data', payload: inflight } satisfies CrossTabMsg)
 
   const startedAt = Date.now()
   try {
     const data = await apiGet<VersionResponse>('/api/version')
-    // Hold the spinner for a minimum visible duration — on a LAN
-    // the round-trip is 20–50 ms, way too fast for the eye.
     const elapsed = Date.now() - startedAt
     if (elapsed < MIN_SPINNER_MS) {
       await new Promise<void>(r => setTimeout(r, MIN_SPINNER_MS - elapsed))
     }
-    qc.setQueryData<VersionResponse>(['version'], { ...data, checking: false })
+    const next: VersionResponse = { ...data, checking: false }
+    qc.setQueryData<VersionResponse>(['version'], next)
+    ch?.postMessage({ type: 'version-data', payload: next } satisfies CrossTabMsg)
     schedule(computeNextDelay(data))
   } catch {
-    if (previous) qc.setQueryData<VersionResponse>(['version'], { ...previous, checking: false })
+    if (previous) {
+      const restored = { ...previous, checking: false }
+      qc.setQueryData<VersionResponse>(['version'], restored)
+      ch?.postMessage({ type: 'version-data', payload: restored } satisfies CrossTabMsg)
+    }
     schedule(ERROR_BACKOFF_MS)
   } finally {
     state.inFlight = false
@@ -128,32 +151,78 @@ async function tick() {
 
 function computeNextDelay(data: VersionResponse): number {
   if (!data.nextCheckAt) return FALLBACK_INTERVAL_MS
-  // Wake up POST_POLL_BUFFER_MS AFTER nextCheckAt so the server has
-  // already done its poll and updated lastCheckedAt + nextCheckAt by
-  // the time our request lands.
   const msUntilNext = new Date(data.nextCheckAt).getTime() - Date.now() + POST_POLL_BUFFER_MS
   return Math.min(FALLBACK_INTERVAL_MS, Math.max(MIN_DELAY_MS, msUntilNext))
 }
 
 /** Idempotent boot. Call once from main.tsx before the first render.
- *  Window-scoped `state.started` means subsequent calls — including
- *  those from HMR module reloads — are guaranteed no-ops.
  *
- *  Initial tick is deferred by INITIAL_DELAY_MS so it doesn't fight
- *  with the rest of the page-load fetches (overview / projects /
- *  providers / layout). The badge renders immediately with the local
- *  version number; the indicator dot just waits a beat. */
+ *  Subscribes to the cross-tab BroadcastChannel either way (so a
+ *  follower receives leader broadcasts, and a leader notices when
+ *  another tab posts a `hello` or a `poke`). Then attempts to
+ *  acquire the leader lock — if granted, kicks off the polling loop
+ *  with INITIAL_DELAY_MS; if not, sits silent and waits. When the
+ *  current leader's tab closes, the lock auto-releases and one of
+ *  the waiting tabs gets the callback fired. */
 export function startVersionPoll(client: QueryClient) {
   if (state.started) return
   state.started = true
   state.qc = client
-  schedule(INITIAL_DELAY_MS)
+
+  const ch = getChannel()
+  if (ch) {
+    ch.onmessage = (e: MessageEvent<CrossTabMsg>) => {
+      const msg = e.data
+      if (!msg || !state.qc) return
+      if (msg.type === 'version-data') {
+        // Mirror the leader's cache update locally. This is how the
+        // header indicator stays in sync across tabs without each
+        // tab making its own /api/version request.
+        state.qc.setQueryData<VersionResponse>(['version'], msg.payload)
+      } else if (msg.type === 'poke' && state.isLeader) {
+        // Settings was just saved in another tab; jump our queue.
+        schedule(0)
+      } else if (msg.type === 'hello' && state.isLeader) {
+        // A new tab opened. Re-broadcast our latest cached data so
+        // they don't have to wait until the next poll for content.
+        const data = state.qc.getQueryData<VersionResponse>(['version'])
+        if (data) ch.postMessage({ type: 'version-data', payload: data } satisfies CrossTabMsg)
+      }
+    }
+    // Announce ourselves to the existing leader (if any), so we get
+    // the latest cached payload immediately instead of waiting for
+    // the next poll cycle.
+    ch.postMessage({ type: 'hello' } satisfies CrossTabMsg)
+  }
+
+  // Try to become leader. The lock is held for the lifetime of this
+  // tab — the inner promise never resolves, so the callback runs
+  // until the tab unloads. Followers' callbacks queue and only fire
+  // when the current leader releases (i.e. its tab closes).
+  if (typeof navigator !== 'undefined' && 'locks' in navigator) {
+    void navigator.locks.request(LOCK_NAME, { mode: 'exclusive' }, async () => {
+      state.isLeader = true
+      schedule(INITIAL_DELAY_MS)
+      await new Promise<void>(() => {
+        // Intentionally never resolves. The lock is released when
+        // the tab unloads, which the browser does for us — no
+        // explicit cleanup needed.
+      })
+    })
+  } else {
+    // No Web Locks support (very old browser). Each tab polls
+    // independently. Better than nothing.
+    state.isLeader = true
+    schedule(INITIAL_DELAY_MS)
+  }
 }
 
-/** Refetch right now, cancelling any pending tick. Used after the
- *  user saves Updates settings: the server schedules a fresh poll in
- *  ~1 s, and this brings the UI in line within a single round-trip. */
+/** Refetch right now. If we're the leader, fire immediately. If
+ *  we're a follower, broadcast the request — the actual leader will
+ *  pick it up off the channel and fire its tick. Either way the
+ *  whole tab group ends up showing fresh data within ~1 RTT. */
 export function pokeVersionPoll() {
   if (!state.started) return
-  schedule(0)
+  getChannel()?.postMessage({ type: 'poke' } satisfies CrossTabMsg)
+  if (state.isLeader) schedule(0)
 }

@@ -24,7 +24,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const [draftEnabled, setDraftEnabled] = useState<boolean | null>(null)
   const [draftInterval, setDraftInterval] = useState<number | null>(null)
   const enabled = draftEnabled ?? settings.data?.updates.enabled ?? true
-  const intervalSeconds = draftInterval ?? settings.data?.updates.intervalSeconds ?? 6 * 3600
+  const intervalSeconds = draftInterval ?? settings.data?.updates.intervalSeconds ?? 3600
   const isDev = settings.data?.mode === 'dev'
 
   const mutation = useMutation({

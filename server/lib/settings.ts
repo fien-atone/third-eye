@@ -35,7 +35,12 @@ export type Settings = {
 const DEFAULTS: Settings = {
   updates: {
     enabled: true,
-    intervalSeconds: 6 * 3600, // 6 hours
+    // 1 hour. Default needs to be tame enough that even a forgetful
+    // user with the dashboard pinned in a browser tab won't burn
+    // GitHub's 60 req/h unauthenticated rate limit. Saving the
+    // explicit "6h" default would have been fine in isolation, but
+    // 1h is an easier number for users to reason about.
+    intervalSeconds: 3600,
   },
 }
 
@@ -50,7 +55,18 @@ function readSection<K extends keyof Settings>(key: K): Settings[K] {
     const parsed = JSON.parse(row.value) as Partial<Settings[K]>
     // Spread default first so a row missing a newly-added field still
     // gets the default value — no migration needed when fields land.
-    return { ...DEFAULTS[key], ...parsed } as Settings[K]
+    const merged = { ...DEFAULTS[key], ...parsed } as Settings[K]
+    // Defensive clamp on read. Scenario: user runs in dev with
+    // intervalSeconds=30, ships data/third-eye.db to a prod
+    // container. Without this, the prod server would happily poll
+    // GitHub every 30 s and hit rate limits. The clamp here mirrors
+    // patchUpdates so a stale dev row gets transparently upgraded
+    // to a prod-safe value at read time.
+    if (key === 'updates') {
+      const m = merged as UpdatesSettings
+      return { ...m, intervalSeconds: clampInterval(m.intervalSeconds) } as Settings[K]
+    }
+    return merged
   } catch {
     return DEFAULTS[key]
   }
