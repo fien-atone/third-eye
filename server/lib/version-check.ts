@@ -103,14 +103,14 @@ async function fetchLatest(): Promise<LatestRelease> {
   }
 }
 
-// GitHub responds in 100–800 ms, but we want the "checking…" spinner
-// in the header to register visually. Hold the checking flag for at
-// least this long so a 2-second client refetch catches it reliably.
-const MIN_CHECKING_VISIBLE_MS = 1200
-
 async function poll() {
+  // Server-side flag still tracked for diagnostics + the dev seed
+  // endpoint, but the UI no longer reads it: the spinner is driven
+  // entirely by the client's own in-flight state (see
+  // client/src/lib/version-poll.ts). That removes the burst of
+  // 2–3 client refetches per server poll cycle that we used to
+  // need to "catch" the checking flicker.
   checking = true
-  const startedAt = Date.now()
   try {
     const next = await fetchLatest()
     if (next) cache = next
@@ -119,12 +119,7 @@ async function poll() {
       console.warn(`[version-check] failed: ${lastError}`)
     }
   } finally {
-    const elapsed = Date.now() - startedAt
-    if (elapsed < MIN_CHECKING_VISIBLE_MS) {
-      setTimeout(() => { checking = false }, MIN_CHECKING_VISIBLE_MS - elapsed)
-    } else {
-      checking = false
-    }
+    checking = false
   }
 }
 

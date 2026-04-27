@@ -20,15 +20,17 @@ export type VersionResponse = {
   latestUrl: string | null
   latestName: string | null
   latestPublishedAt: string | null
-  /** True while a GitHub poll is currently in flight — used to render
-   *  a "checking…" spinner next to the version badge. */
+  /** True while the client is in the middle of fetching /api/version
+   *  (plus a min-visible buffer). Synthesized client-side by
+   *  lib/version-poll.ts — the server does NOT include this field.
+   *  Drives the header spinner. */
   checking: boolean
   /** ISO timestamp of the last poll attempt (success OR failure). null
    *  before the first poll. Tooltip text on the up-to-date checkmark. */
   lastCheckedAt: string | null
-  /** ISO timestamp of the next scheduled server-side poll. Lets the
-   *  client wake up just before, so the 1.2 s "checking" flicker is
-   *  caught reliably without polling /api/version constantly. */
+  /** ISO timestamp of the next scheduled server-side poll. The client
+   *  uses it to schedule its own refetch precisely, instead of
+   *  polling at a fixed cadence — one /api/version per cycle. */
   nextCheckAt: string | null
 }
 
