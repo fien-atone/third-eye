@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import { existsSync, readFileSync, statSync } from 'fs'
+import { existsSync, statSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { db, getMeta, seedScreenLayouts } from './db.ts'
@@ -635,38 +635,21 @@ app.get('/api/insights/:projectId', (req, res) => {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, lastIngestAt: getMeta('last_ingest_at') }))
 
-// Read package.json version once at module load — it's the only place
-// that knows what version of Third Eye is actually running.
-const SERVER_VERSION: string = (() => {
-  try {
-    const pkgPath = join(__dirname, '..', 'package.json')
-    return JSON.parse(readFileSync(pkgPath, 'utf8')).version as string
-  } catch {
-    return '0.0.0'
-  }
-})()
-
-/** Compare semver triples (X.Y.Z). Returns >0 if a > b, <0 if a < b,
- *  0 if equal. Pre-release suffixes ignored. */
-function semverCompare(a: string, b: string): number {
-  const pa = a.replace(/^v/, '').split(/[-+]/, 1)[0].split('.').map(n => parseInt(n, 10) || 0)
-  const pb = b.replace(/^v/, '').split(/[-+]/, 1)[0].split('.').map(n => parseInt(n, 10) || 0)
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0)
-    if (d !== 0) return d
-  }
-  return 0
-}
-
+// /api/version reports ONLY what the server learned from GitHub. The
+// "current" version and the outdated comparison live entirely on the
+// client, which uses its build-time __APP_VERSION__ constant — that's
+// the version the user is actually looking at in the browser. Splitting
+// "current" between server (reads server/package.json) and client
+// (reads client/package.json at Vite build) used to produce mismatched
+// UI in dev when one restarted and the other didn't, and would silently
+// lie if the two package.json files ever drifted.
 app.get('/api/version', (_req, res) => {
   const latest = getLatestRelease()
   res.json({
-    current: SERVER_VERSION,
     latest: latest?.version ?? null,
     latestUrl: latest?.htmlUrl ?? null,
     latestName: latest?.name ?? null,
     latestPublishedAt: latest?.publishedAt ?? null,
-    isOutdated: latest ? semverCompare(latest.version, SERVER_VERSION) > 0 : false,
   })
 })
 

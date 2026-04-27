@@ -12,13 +12,14 @@ export type Provider = {
 }
 export type ProvidersResponse = { providers: Provider[]; lastIngestAt: string | null }
 
+/** Server reports only what it learned from GitHub. The "current"
+ *  version (and therefore the outdated check) is computed on the client
+ *  from __APP_VERSION__ — see lib/semver.ts and AppHeader. */
 export type VersionResponse = {
-  current: string
   latest: string | null
   latestUrl: string | null
   latestName: string | null
   latestPublishedAt: string | null
-  isOutdated: boolean
 }
 
 export type ProjectInfo = {

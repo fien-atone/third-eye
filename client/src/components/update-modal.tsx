@@ -54,7 +54,7 @@ export function UpdateModal({ version, onClose }: { version: VersionResponse; on
 
         <div className="update-modal-body">
           <div className="update-modal-running">
-            {t('update.youreRunning', { current: version.current })}
+            {t('update.youreRunning', { current: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '?' })}
           </div>
 
           <div className="update-modal-section-label">{t('update.pickMethod')}</div>

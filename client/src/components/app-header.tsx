@@ -8,6 +8,7 @@ import type { VersionResponse } from '../types'
 import { ThemeToggle } from './theme-toggle'
 import { LocaleSwitcher } from './locale-switcher'
 import { UpdateModal } from './update-modal'
+import { semverCompare } from '../lib/semver'
 
 /** Top app shell: brand + version + last-refresh, refresh button,
  *  locale + theme controls, and the dashboard/projects tabs. Tabs hide
@@ -32,7 +33,13 @@ export function AppHeader({
 }) {
   const t = useT()
   const [updateOpen, setUpdateOpen] = useState(false)
-  const outdated = !!version?.isOutdated
+  // Compute "outdated" client-side: compare the bundle version the user
+  // is actually looking at (__APP_VERSION__, baked in at Vite build time)
+  // against the latest GitHub release the server polled. Doing the
+  // comparison on the server used to produce mismatched UI in dev when
+  // the server restarted but Vite didn't (or vice versa).
+  const currentVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : null
+  const outdated = !!(currentVersion && version?.latest && semverCompare(version.latest, currentVersion) > 0)
   return (
     <>
       <div className="header">
@@ -56,7 +63,7 @@ export function AppHeader({
             <button
               className="version-update-pill"
               onClick={() => setUpdateOpen(true)}
-              title={t('update.pillTooltip', { current: version.current, latest: version.latest })}
+              title={t('update.pillTooltip', { current: currentVersion ?? '?', latest: version.latest })}
             >
               <span aria-hidden="true">↑</span>
               <span>{t('update.pillLabel')}</span>
