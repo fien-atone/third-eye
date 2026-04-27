@@ -37,8 +37,8 @@ The compose file:
 - Mounts `~/.claude` and `~/.codex` read-only into the container via
   `${USER_HOME:-${HOME:-${USERPROFILE}}}` — picks the right home on any shell
 - Persists SQLite to `./server/data/` on the host
-- Runs incremental ingest every 15 minutes (`CODEBURN_INGEST_INTERVAL_MIN`,
-  window `CODEBURN_INGEST_SINCE=2h`)
+- Runs incremental ingest every 15 minutes (`THIRD_EYE_INGEST_INTERVAL_MIN`,
+  window `THIRD_EYE_INGEST_SINCE=2h`)
 - Health check via `/api/health`
 - Binds the in-container server to `0.0.0.0` (only what you list under `ports:`
   gets exposed on the host)
@@ -59,8 +59,8 @@ docker run -d --name third-eye -p 4317:4317 \
   -v "$HOME/.claude:/data/claude:ro" \
   -v "$HOME/.codex:/data/codex:ro" \
   -v "$PWD/server/data:/app/server/data" \
-  -e CODEBURN_INGEST_INTERVAL_MIN=15 \
-  -e CODEBURN_HOST=0.0.0.0 \
+  -e THIRD_EYE_INGEST_INTERVAL_MIN=15 \
+  -e THIRD_EYE_HOST=0.0.0.0 \
   third-eye
 ```
 
@@ -133,7 +133,7 @@ Runs `npm run ingest:hour` every hour. Absolute npm path resolved at install
 time, so nvm / fnm / Homebrew keep working. Log: `~/.third-eye-ingest.log`.
 Idempotent — safe to re-run.
 
-Inside Docker, use `CODEBURN_INGEST_INTERVAL_MIN` instead (default 15 min).
+Inside Docker, use `THIRD_EYE_INGEST_INTERVAL_MIN` instead (default 15 min).
 
 ### Destructive rebuild
 
@@ -215,7 +215,7 @@ SQLite is a single file: `server/data/codeburn.db`.
 1. Copy it to the target machine.
 2. Run Third Eye there without mounting `~/.claude` / `~/.codex` — the data is
    in the DB already. In Docker, remove those volume lines.
-3. Disable auto-ingest (`CODEBURN_INGEST_INTERVAL_MIN=0`) so it doesn't try to
+3. Disable auto-ingest (`THIRD_EYE_INGEST_INTERVAL_MIN=0`) so it doesn't try to
    scan non-existent session folders.
 
 **Privacy note**: for Cowork ephemeral projects, labels are the first user
@@ -297,6 +297,55 @@ webapp/
     │       └── index.ts
     └── data/                SQLite DB file (gitignored)
 ```
+
+---
+
+## Release checklist (maintainers)
+
+Before tagging `vX.Y.Z` and pushing the tag, verify **both** install
+paths work end-to-end on the commit you're about to release. Each
+release where Docker breaks for new users (issue #2 was one) is a
+release where the maintainer ran only `npm run dev` and assumed
+parity. Don't assume.
+
+```bash
+# 1. Type-check both workspaces (catches silent regressions)
+cd server && npx tsc --noEmit && cd ..
+cd client && npx tsc --noEmit -p tsconfig.app.json && cd ..
+
+# 2. Production frontend build (catches Vite / dep issues)
+npm run build
+
+# 3. Ingest pipeline works against the source tree
+npm run ingest
+
+# 4. ⭐ Docker — easy to skip, easy to break, never skip again.
+docker build -t third-eye:rc .
+docker run -d --name third-eye-rc -p 4318:4317 \
+  -v "$HOME/.claude:/data/claude:ro" \
+  -e THIRD_EYE_HOST=0.0.0.0 \
+  third-eye:rc
+sleep 8
+curl -fsS http://127.0.0.1:4318/api/health || echo "❌ Docker health failed"
+docker logs third-eye-rc | tail -20    # sanity-glance for ingest errors
+docker stop third-eye-rc && docker rm third-eye-rc
+```
+
+If any step fails, fix before tagging. Docker specifically catches
+two classes of bugs the Node-native path masks:
+
+- **Stale per-package `package-lock.json`** (the project uses
+  workspaces, only the root lockfile matters; if Dockerfile pins
+  per-package locks, drift is silent until `npm ci` errors out).
+- **Native deps that need build tools** (`better-sqlite3` won't
+  compile without `python3 / make / g++`; locally those tools are
+  ambient, in the Alpine/slim base image they aren't).
+
+After the four steps pass, bump version in **all three**
+`package.json` files (root + client + server), update `CHANGELOG.md`
+under a new `## [X.Y.Z] — YYYY-MM-DD` heading, commit, tag, push tag.
+The `release.yml` workflow auto-publishes the GitHub Release using
+the matching CHANGELOG section as the body.
 
 ---
 

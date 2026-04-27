@@ -29,7 +29,13 @@
   font-weight: 700;
   color: var(--text);
   line-height: 1.2;
-  display: inline-flex;
+  /* Constrain to parent width and let the label flex-shrink so very
+     long auto-labels (raw filesystem paths) collapse to a MidEllipsis
+     instead of pushing the rename button off the right edge of the
+     page. min-width:0 on a flex item is the standard escape hatch
+     that lets text-overflow / measured-truncation work inside flex. */
+  display: flex;
+  max-width: 100%;
   align-items: baseline;
   gap: 8px;
   letter-spacing: -0.01em;
@@ -37,6 +43,8 @@
 .project-header-title-label {
   color: var(--text);
   font-weight: 700;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .project-header-rename {
   /* Borderless pencil that sits centred next to the title (.project-
@@ -60,6 +68,26 @@
   color: var(--text);
   border-color: transparent;
 }
+/* Favorite star next to the title — same borderless visual as the
+   pencil so the two button affordances feel like a pair. Filled
+   accent when on, dim when off; uses the existing .btn-star tokens
+   from the projects table for state consistency. */
+.project-header-fav {
+  align-self: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  color: var(--text-dim);
+  border-radius: 6px;
+  flex: 0 0 auto;
+  transform: translateY(-0.18em);
+}
+.project-header-fav.on { color: var(--accent); }
+.project-header-fav:hover { background: var(--hover); color: var(--text); }
+.project-header-fav.on:hover { color: var(--accent-hover); background: var(--hover); }
 .project-header-title-edit {
   display: inline-flex;
   align-items: center;

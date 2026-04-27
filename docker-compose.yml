@@ -20,13 +20,13 @@ services:
     environment:
       CLAUDE_CONFIG_DIR: /data/claude
       CODEX_HOME: /data/codex
-      CODEBURN_DB: /app/server/data/third-eye.db
+      THIRD_EYE_DB: /app/server/data/third-eye.db
       # Auto-refresh inside the container. Set to 0 to disable.
-      CODEBURN_INGEST_INTERVAL_MIN: "15"
-      CODEBURN_INGEST_SINCE: "2h"
+      THIRD_EYE_INGEST_INTERVAL_MIN: "15"
+      THIRD_EYE_INGEST_SINCE: "2h"
       # Bind to all interfaces inside the container so docker port-mapping reaches us.
       # On the host, only the ports listed under `ports:` above are exposed — stays safe.
-      CODEBURN_HOST: "0.0.0.0"
+      THIRD_EYE_HOST: "0.0.0.0"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:4317/api/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
       interval: 30s

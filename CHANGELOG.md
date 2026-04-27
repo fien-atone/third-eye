@@ -4,6 +4,70 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] — 2026-04-27
+
+### Fixed
+- **Project page header overflowed on long auto-labels** (raw
+  filesystem paths from Cowork ephemeral sessions). Title now
+  flex-shrinks and uses `MidEllipsis` so the rename button never gets
+  pushed off the right edge.
+- **Top file hotspots widget leaked a thin strip** below each row
+  from a hidden `.file-full` overlay that was clipped by the cell's
+  `overflow: hidden`. Removed the custom overlay; the native `title`
+  tooltip already handled full-path disclosure cross-browser.
+
+### Added
+- **Favorite toggle on the project page header** — a star button next
+  to the title pins/unpins the project, mirroring the toggle in the
+  projects list. Reuses the existing `PATCH /api/projects/:id { favorite }`
+  endpoint.
+
+## [2.2.1] — 2026-04-27
+
+### Fixed
+- **`docker compose up --build` failed at `npm ci`** ([#2]) due to stale
+  per-package `client/package-lock.json` and `server/package-lock.json`
+  that drifted out of sync with the authoritative root lockfile after
+  workspaces deps were added (e.g. `gridstack`). The Dockerfile now
+  installs from the root via `npm ci -w <workspace>`, the per-package
+  lockfiles are gone from the repo, and `.gitignore` blocks them so
+  they can't be reintroduced by accident. Local `npm install` and
+  `npm run dev` are unaffected — they were already using the root
+  lockfile via npm workspaces; the per-package files were dead weight.
+
+### Added
+- **Release checklist** in `DOCS.md` for maintainers — explicit Docker
+  build + run + health-check step, so future releases can't ship with
+  a broken container the way v2.2.0 did.
+
+[#2]: https://github.com/fien-atone/third-eye/issues/2
+
+## [2.2.0] — 2026-04-24
+
+### Changed
+- **Env-var namespace renamed** from `CODEBURN_*` (legacy from the
+  CodeBurn fork) to `THIRD_EYE_*`. All call-sites, `docker-compose.yml`,
+  `Dockerfile`, and `DOCS.md` now use the new prefix. Old names still
+  read silently as a fallback via `server/lib/env.ts` — existing
+  deployments continue to work with no action required. The default
+  SQLite filename is now `third-eye.db`; an existing `codeburn.db` in
+  `server/data/` is auto-discovered and kept in place.
+- **Planned for v3.0**: drop the `CODEBURN_*` legacy fallback and the
+  `codeburn.db` filename autodetect. A single CHANGELOG note will
+  announce the breaking change; users on the default docker-compose
+  or Dockerfile will have migrated naturally by then.
+
+## [2.1.1] — 2026-04-24
+
+### Fixed
+- **GitHub couldn't detect the MIT license** — an extra attribution
+  paragraph at the bottom of `LICENSE` made GitHub's `licensee`
+  classifier flag the file as `NOASSERTION` ("Other"), so the
+  repo's sidebar showed no license badge. The paragraph moved into
+  a new `## Acknowledgements` section in README.md that links to
+  the already-existing `THIRD_PARTY_NOTICES.md`. `LICENSE` now
+  matches the canonical MIT template verbatim.
+
 ## [2.1.0] — 2026-04-24
 
 ### Added

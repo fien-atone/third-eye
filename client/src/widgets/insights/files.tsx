@@ -35,7 +35,6 @@ function FilesBody({ t, files, stripProjectPrefix }: {
                   <div className="file-path-cell" tabIndex={0} title={f.name}>
                     <span className="file-dir">{dir}</span>
                     <span className="file-name">{base}</span>
-                    <span className="file-full" role="tooltip">{f.name}</span>
                   </div>
                 </td>
                 <td className="num">{fmtInt(f.count)}</td>
