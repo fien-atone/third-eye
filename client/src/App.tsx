@@ -79,44 +79,21 @@ export default function App() {
     queryFn: () => apiGet<ProjectsResponse>('/api/projects'),
   })
 
-  // Version check. The server publishes nextCheckAt (when the next
-  // GitHub poll fires), so the client can wake up just-in-time
-  // instead of polling at a fixed cadence:
-  //   - mid-poll (checking:true)         → 400 ms (catch the
-  //     checking → up-to-date transition smoothly).
-  //   - <1 s before next scheduled poll  → 400 ms (catch the
-  //     idle → checking transition).
-  //   - otherwise                        → wake ~500 ms before
-  //     nextCheckAt, capped at 60 s minimum so a 6h cadence still
-  //     pings periodically (handles server-side cache invalidations
-  //     we'd miss if we only fired once per cycle).
-  // Net effect: the spinner is reliably visible regardless of the
-  // configured interval, while the steady-state request rate is
-  // ~1 req/min instead of ~30 req/min from a flat 2 s refetch.
+  // Passive observer of the version cache — all polling lives in
+  // the singleton in lib/version-poll.ts (booted from main.tsx).
+  // The singleton owns the only /api/version timer in the app, so
+  // StrictMode double-mount, HMR, and accidental extra observers
+  // can't multiply requests. queryFn is a one-shot fallback for the
+  // unlikely race where the cache is empty when this hook first
+  // subscribes; in practice the singleton has populated it before
+  // App's first render.
   const versionQuery = useQuery<VersionResponse>({
     queryKey: ['version'],
     queryFn: () => apiGet<VersionResponse>('/api/version'),
-    refetchInterval: q => {
-      // If a request is still in flight (slow network), wait it out
-      // before scheduling the next tick — prevents the stack-of-three
-      // visible under DevTools throttling.
-      if (q.state.fetchStatus === 'fetching') return 1_000
-      const d = q.state.data
-      if (d?.checking) return 800
-      if (!d?.nextCheckAt) return 30_000
-      const msUntilNext = new Date(d.nextCheckAt).getTime() - Date.now()
-      if (msUntilNext < 1_500) return 800           // about to fire
-      // Wake ~500 ms before the next poll, but never sleep more than
-      // 60 s — keeps long cadences from staying stale across UI
-      // interactions like settings save / manual refresh.
-      return Math.min(60_000, Math.max(800, msUntilNext - 500))
-    },
-    // /api/version is a status indicator, not data the user is
-    // staring at. No need to spam an extra fetch when they tab
-    // back in — the regular refetchInterval will catch up shortly.
+    refetchInterval: false,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
-    refetchIntervalInBackground: false,
-    staleTime: 0,
+    staleTime: Infinity,
   })
 
   const providersParam = selectedProviders.length === 0 ? 'all' : selectedProviders.join(',')

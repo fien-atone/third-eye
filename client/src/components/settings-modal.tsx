@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useT } from '../i18n'
 import { apiGet, apiPatch } from '../api'
 import type { SettingsResponse } from '../types'
+import { pokeVersionPoll } from '../lib/version-poll'
 
 /** Settings modal. Opened from the gear icon in AppHeader. Currently
  *  hosts only the Updates section — but the section/grid scaffolding
@@ -31,11 +32,11 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       apiPatch<SettingsResponse>('/api/settings', { updates: next }),
     onSuccess: data => {
       qc.setQueryData(['settings'], data)
-      // Server may have just (re)started the version-check loop with
-      // a 1 s first-poll delay — refetch /api/version shortly after so
-      // the pill / spinner / checkmark react without waiting for the
-      // React Query background refetch.
-      setTimeout(() => qc.invalidateQueries({ queryKey: ['version'] }), 1_500)
+      // Server scheduled a fresh poll ~1 s out; ping the singleton
+      // poller to refetch /api/version right after so the UI catches
+      // the new state instead of waiting up to 5 s for the next
+      // tick.
+      setTimeout(pokeVersionPoll, 1_500)
       onClose()
     },
   })
