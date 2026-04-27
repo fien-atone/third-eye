@@ -342,23 +342,20 @@
 .version-badge-indicator.is-up-to-date {
   background: var(--success, #10b981);
 }
-/* Checking: same dot footprint, but spinning ring of currentColor
-   (--text-dim). Reusing the same 9 × 9 box keeps the badge layout
-   stable when state flips between checking ↔ up-to-date — no jiggle. */
+/* Checking: a plain spinning ring (no halo). Slightly larger box than
+   the static dot so the spinner reads at a glance — the user only
+   needs to see "something's happening", not measure it. The
+   .is-up-to-date / .is-checking states share the corner anchor but
+   each owns its own size + decoration; previous version layered a
+   pseudo on top of an inset ring inside a 9 × 9 box and the arc
+   visually collapsed. */
 .version-badge-indicator.is-checking {
-  background: var(--bg);
-  border-color: var(--bg);
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--text-dim) 30%, transparent);
-  position: absolute;
-  /* Layered second pseudo for the spinning arc on top of the static
-     ring, so the ring stays visible while the arc rotates. */
-}
-.version-badge-indicator.is-checking::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1.5px solid transparent;
+  width: 11px;
+  height: 11px;
+  top: -4px;
+  right: -4px;
+  background: transparent;
+  border: 1.5px solid color-mix(in srgb, var(--text-dim) 25%, transparent);
   border-top-color: var(--text-dim);
   animation: spin 0.7s linear infinite;
 }
