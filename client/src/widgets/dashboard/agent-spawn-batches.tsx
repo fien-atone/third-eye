@@ -9,10 +9,12 @@
  * (HAVING > 1 in the SQL). Header shows aggregate batch stats; the
  * body lists the largest batches with role mix and timestamp.
  *
- * Adaptive columns by tile width:
- *   w=2 → Size · When · Cost
- *   w≥3 → + Roles column (most-frequent roles in the batch)
- *   w≥4 → + Tokens column
+ * Column order — same at every width: When · Role · Size · [Tokens] · Cost.
+ * Reading flow matches how a user thinks about a batch: "I want to
+ * see WHEN something fanned out, WHAT roles, HOW MANY, COST". Tokens
+ * shown only on wide tiles (w≥4) since they're a secondary metric.
+ * Role names stay visible at every width — that's the primary signal,
+ * hiding it on narrow tiles defeats the purpose of the widget.
  */
 
 import { useRef } from 'react'
@@ -90,17 +92,17 @@ function BatchesBody({ batches, w }: {
         <>
           <table className="breakdown" style={{ width: '100%' }}>
             <colgroup>
-              <col style={{ width: 56 }} />
-              <col style={{ width: 80 }} />
-              {w >= 3 && <col />}
-              {w >= 4 && <col style={{ width: 80 }} />}
-              <col style={{ width: 80 }} />
+              <col style={{ width: 90 }} />     {/* When */}
+              <col />                            {/* Role(s) — flex */}
+              <col style={{ width: 38 }} />     {/* Size */}
+              {w >= 4 && <col style={{ width: 70 }} />}  {/* Tokens (wide only) */}
+              <col style={{ width: 64 }} />     {/* Cost */}
             </colgroup>
             <thead>
               <tr>
-                <th className="num">{t('agents.spawnBatches.colSize')}</th>
                 <th>{t('agents.spawnBatches.colWhen')}</th>
-                {w >= 3 && <th>{t('agents.spawnBatches.colRoles')}</th>}
+                <th>{t('agents.spawnBatches.colRoles')}</th>
+                <th className="num">{t('agents.spawnBatches.colSize')}</th>
                 {w >= 4 && <th className="num">{t('agents.spawnBatches.colTokens')}</th>}
                 <th className="num">{t('agents.spawnBatches.colCost')}</th>
               </tr>
@@ -108,38 +110,36 @@ function BatchesBody({ batches, w }: {
             <tbody>
               {batches.slice(0, visibleCount).map(b => (
                 <tr key={b.promptId}>
-                  <td className="num" style={{ fontWeight: 600 }}>{b.size}</td>
                   <td title={fmtTooltip(b.spawnedAt)} style={{ color: 'var(--text-dim)', fontSize: 11, whiteSpace: 'nowrap' }}>
                     {fmtCell(b.spawnedAt)}
                   </td>
-                  {w >= 3 && (
-                    <td style={{
-                      maxWidth: 0,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }} title={b.roles.map(r => `${r.role} ×${r.sessions}`).join(', ')}>
-                      <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'nowrap' }}>
-                        {b.roles.slice(0, 3).map(r => (
-                          <RoleChip
-                            key={r.role}
-                            name={r.role}
-                            sessions={r.sessions}
-                            // Hide the ×N suffix for single-role batches —
-                            // it just repeats the Size column. Show it
-                            // for mixed-role batches where the breakdown
-                            // is the actual signal.
-                            showMultiplier={b.roles.length > 1}
-                          />
-                        ))}
-                        {b.roles.length > 3 && (
-                          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                            +{b.roles.length - 3}
-                          </span>
-                        )}
-                      </span>
-                    </td>
-                  )}
+                  <td style={{
+                    maxWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }} title={b.roles.map(r => `${r.role} ×${r.sessions}`).join(', ')}>
+                    <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'nowrap' }}>
+                      {b.roles.slice(0, 3).map(r => (
+                        <RoleChip
+                          key={r.role}
+                          name={r.role}
+                          sessions={r.sessions}
+                          // Hide the ×N suffix for single-role batches —
+                          // it just repeats the Size column. Show it
+                          // for mixed-role batches where the breakdown
+                          // is the actual signal.
+                          showMultiplier={b.roles.length > 1}
+                        />
+                      ))}
+                      {b.roles.length > 3 && (
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                          +{b.roles.length - 3}
+                        </span>
+                      )}
+                    </span>
+                  </td>
+                  <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{b.size}</td>
                   {w >= 4 && <td className="num">{fmtTokens(b.tokens)}</td>}
                   <td className="num">{fmtCurrency(b.cost)}</td>
                 </tr>
