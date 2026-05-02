@@ -127,7 +127,7 @@ export function Dashboard({ data, modelNames, granularity, onSelectProject, inPr
     const effectiveInsights: InsightsResponse = insightsData ?? {
       project: { key: '' },
       range: { start: '', end: '' },
-      subagents: [], skills: [], mcp: [], bash: [],
+      skills: [], mcp: [], bash: [],
       files: [], filesUnique: 0,
       flags: { plan_mode_calls: 0, todo_write_calls: 0, total_calls: 0 },
       branches: [], versions: [],
