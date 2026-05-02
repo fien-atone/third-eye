@@ -411,6 +411,18 @@ export const de: Dict = {
   'agents.toolSpectrum.empty': 'In diesem Projekt sind noch keine Agenten konfiguriert.',
   'agents.toolSpectrum.help': 'Jede Zeile ist eine konfigurierte Rolle; jede Spalte ist eines der meistgenutzten Tools im Projekt. Zellfarbe und Zahl zeigen, welcher Anteil der Tool-Aufrufe dieser Rolle auf dieses Tool entfällt. Bewege den Mauszeiger über eine Zelle für absolute Werte. Tools außerhalb der Top-Spalten werden zu "Andere" zusammengefasst.',
 
+  'agents.spawnBatches.title': 'Parallele Spawn-Wellen',
+  'agents.spawnBatches.desc': 'Wenn Claude mehrere Subagenten in einem Orchestrierungsaufruf gestartet hat',
+  'agents.spawnBatches.subFmt': '{count} Wellen · Durchschn. {avg} · Max {max}',
+  'agents.spawnBatches.subEmpty': 'Keine parallelen Wellen im Zeitraum — jeder Agent lief allein',
+  'agents.spawnBatches.colSize': 'Größe',
+  'agents.spawnBatches.colWhen': 'Wann',
+  'agents.spawnBatches.colRoles': 'Rollen',
+  'agents.spawnBatches.colTokens': 'Tokens',
+  'agents.spawnBatches.colCost': 'Kosten',
+  'agents.spawnBatches.empty': 'Keine parallelen Agenten-Wellen in diesem Zeitraum. Jede Zeile wäre ein Orchestrierungsaufruf mit ≥2 Subagenten.',
+  'agents.spawnBatches.help': 'Jede Zeile ist ein Orchestrierungsaufruf, bei dem Claude mehrere Subagenten parallel startete — sie teilen die gleiche interne promptId. Die Größe ist die Anzahl der Agenten in der Welle. Große Fan-outs (Plan-Mode-Rollouts, parallele Recherche, Simulations-Ticks) bedeuten weniger, aber gewichtigere Aufrufe; viele kleine Wellen = feingranulare Delegierung. Solo-Task()-Aufrufe (ohne Fan-out) sind ausgeschlossen.',
+
   'agents.topSessions.title': 'Top-Agenten-Sessions nach Kosten',
   'agents.topSessions.desc': 'Die teuersten einzelnen Agenten-Aufrufe',
   'agents.topSessions.sub': 'Teuerste einzelne Aufrufe im Zeitraum',

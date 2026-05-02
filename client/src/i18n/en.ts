@@ -434,6 +434,19 @@ export const en = {
   'agents.toolSpectrum.empty': 'No agents configured in this project yet.',
   'agents.toolSpectrum.help': 'Each row is a configured role; each column is one of the most-used tools across this project. Cell color and number show how often that role uses that tool, as a percentage of the role\'s total tool calls. Hover a cell for absolute counts. Long-tail tools beyond the top columns are aggregated into "Other".',
 
+  // Spawn batches widget
+  'agents.spawnBatches.title': 'Parallel spawn batches',
+  'agents.spawnBatches.desc': 'When Claude dispatched multiple subagents in one orchestration call',
+  'agents.spawnBatches.subFmt': '{count} batches · avg {avg} · max {max}',
+  'agents.spawnBatches.subEmpty': 'No parallel batches in range — every agent ran solo',
+  'agents.spawnBatches.colSize': 'Size',
+  'agents.spawnBatches.colWhen': 'When',
+  'agents.spawnBatches.colRoles': 'Roles',
+  'agents.spawnBatches.colTokens': 'Tokens',
+  'agents.spawnBatches.colCost': 'Cost',
+  'agents.spawnBatches.empty': 'No parallel agent batches in range. Each row would be one orchestration call that fanned out to ≥2 subagents.',
+  'agents.spawnBatches.help': 'Each row is one orchestration call where Claude dispatched multiple subagents in parallel — they share the same internal promptId. The size is how many agents were in the batch. Patterns to look for: large fan-outs (Plan-mode rollouts, parallel research, simulation ticks) usually mean fewer but heavier orchestration calls; many small batches mean Claude is delegating granularly. Solo Task() calls (no fan-out) are excluded so the list isn\'t every agent ever.',
+
   // Top sessions widget
   'agents.topSessions.title': 'Top agent sessions by cost',
   'agents.topSessions.desc': 'Heaviest individual agent invocations by spend',

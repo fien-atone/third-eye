@@ -537,6 +537,66 @@ app.get('/api/overview', (req, res) => {
     tool_uses: number; api_calls: number
   }>
 
+  // Spawn batches: agents that share the same prompt_id were
+  // dispatched in one parallel orchestration call. HAVING > 1 hides
+  // singletons (every Task() with no fan-out gets a unique
+  // prompt_id, and a list of those is just every agent ever).
+  // Order by batch size descending — biggest fan-outs first.
+  // Limit to 25 to keep the response trim.
+  const agentBatchRows = d.prepare(`
+    SELECT s.prompt_id                    AS prompt_id,
+           COUNT(*)                       AS batch_size,
+           MIN(s.ts_start)                AS spawned_at,
+           MIN(s.ts_start_epoch)          AS spawned_at_epoch,
+           COALESCE(SUM(s.cost_usd), 0)   AS cost,
+           COALESCE(SUM(s.total_tokens), 0) AS tokens
+    ${agentFromClause}
+    WHERE s.ts_start_epoch BETWEEN ? AND ? ${agentProjectFilter}
+      AND s.prompt_id IS NOT NULL
+    GROUP BY s.prompt_id
+    HAVING batch_size > 1
+    ORDER BY batch_size DESC, cost DESC
+    LIMIT 25
+  `).all(...agentParams) as Array<{
+    prompt_id: string; batch_size: number; spawned_at: string;
+    spawned_at_epoch: number; cost: number; tokens: number
+  }>
+
+  // Roles per batch — second query so the GROUP_CONCAT doesn't blow
+  // out the main row size. Returns the role list for batches that
+  // actually appeared above.
+  const batchPromptIds = agentBatchRows.map(r => r.prompt_id)
+  const agentBatchRoles = batchPromptIds.length === 0 ? [] : d.prepare(`
+    SELECT s.prompt_id              AS prompt_id,
+           ${effectiveRoleExpr}     AS effective_role,
+           COUNT(*)                 AS sessions
+    ${agentFromClause}
+    WHERE s.prompt_id IN (${batchPromptIds.map(() => '?').join(',')})
+      ${projectKey ? 'AND s.project = ?' : ''}
+    GROUP BY s.prompt_id, effective_role
+  `).all(
+    ...batchPromptIds,
+    ...(projectKey ? [projectKey] : []),
+  ) as Array<{ prompt_id: string; effective_role: string; sessions: number }>
+
+  // Aggregate batch stats for the KPI tile: average size, max size,
+  // total agents that ran inside batches (vs solo).
+  const agentBatchAvgRow = d.prepare(`
+    SELECT AVG(batch_size) AS avg_size, MAX(batch_size) AS max_size,
+           SUM(batch_size) AS batched_agents, COUNT(*) AS batch_count
+    FROM (
+      SELECT COUNT(*) AS batch_size
+      ${agentFromClause}
+      WHERE s.ts_start_epoch BETWEEN ? AND ? ${agentProjectFilter}
+        AND s.prompt_id IS NOT NULL
+      GROUP BY s.prompt_id
+      HAVING batch_size > 1
+    )
+  `).get(...agentParams) as {
+    avg_size: number | null; max_size: number | null;
+    batched_agents: number | null; batch_count: number | null
+  }
+
   // Per-role tool-usage spectrum. One DB row per agent session
   // matching the registry filter; we sum tools_json per role in JS
   // (sessions are bounded — hundreds, not millions — so JSON.parse
@@ -750,6 +810,26 @@ app.get('/api/overview', (req, res) => {
       toolSpectrum: {
         topTools: agentTopTools,
         roles: agentToolSpectrum,
+      },
+      spawnBatches: {
+        // Aggregate stats — 0s when no batches at all (all agents
+        // were dispatched solo or none in range).
+        avgSize: agentBatchAvgRow.avg_size ? Number(agentBatchAvgRow.avg_size.toFixed(1)) : 0,
+        maxSize: agentBatchAvgRow.max_size ?? 0,
+        batchedAgents: agentBatchAvgRow.batched_agents ?? 0,
+        batchCount: agentBatchAvgRow.batch_count ?? 0,
+        batches: agentBatchRows.map(r => ({
+          promptId: r.prompt_id,
+          size: r.batch_size,
+          spawnedAt: r.spawned_at,
+          cost: roundUsd(r.cost),
+          tokens: r.tokens,
+          // Roles aggregated from the second query — order by sessions desc
+          roles: agentBatchRoles
+            .filter(b => b.prompt_id === r.prompt_id)
+            .sort((a, b) => b.sessions - a.sessions)
+            .map(b => ({ role: b.effective_role, sessions: b.sessions })),
+        })),
       },
     },
     lastIngestAt: getMeta('last_ingest_at'),

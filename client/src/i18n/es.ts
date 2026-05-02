@@ -411,6 +411,18 @@ export const es: Dict = {
   'agents.toolSpectrum.empty': 'Aún no hay agentes configurados en este proyecto.',
   'agents.toolSpectrum.help': 'Cada fila es un rol configurado; cada columna, una de las herramientas más usadas en este proyecto. El color y el número de la celda muestran qué proporción de las llamadas de herramienta de ese rol corresponden a esa herramienta. Pasa el cursor para ver valores absolutos. Las herramientas fuera del top se agregan en "Otros".',
 
+  'agents.spawnBatches.title': 'Lotes de despliegue paralelo',
+  'agents.spawnBatches.desc': 'Cuando Claude envió varios subagentes en una sola orquestación',
+  'agents.spawnBatches.subFmt': '{count} lotes · medio {avg} · máx {max}',
+  'agents.spawnBatches.subEmpty': 'No hay lotes paralelos en el rango — cada agente corrió solo',
+  'agents.spawnBatches.colSize': 'Tamaño',
+  'agents.spawnBatches.colWhen': 'Cuándo',
+  'agents.spawnBatches.colRoles': 'Roles',
+  'agents.spawnBatches.colTokens': 'Tokens',
+  'agents.spawnBatches.colCost': 'Coste',
+  'agents.spawnBatches.empty': 'No hay lotes paralelos en este rango. Cada fila sería una llamada de orquestación con ≥2 subagentes desplegados.',
+  'agents.spawnBatches.help': 'Cada fila es una llamada de orquestación donde Claude desplegó varios subagentes en paralelo — comparten el mismo promptId interno. El tamaño es cuántos agentes hubo en el lote. Lotes grandes (Plan-mode, investigación paralela, ticks de simulación) implican menos llamadas pero más pesadas; muchos lotes pequeños indican delegación granular. Las invocaciones Task() solitarias (sin fan-out) se excluyen para que la lista no sea solo cada agente.',
+
   'agents.topSessions.title': 'Top sesiones de agentes por coste',
   'agents.topSessions.desc': 'Las ejecuciones de agente más costosas',
   'agents.topSessions.sub': 'Ejecuciones más costosas del período',

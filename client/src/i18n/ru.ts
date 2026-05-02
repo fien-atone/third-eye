@@ -412,6 +412,18 @@ export const ru: Dict = {
   'agents.toolSpectrum.empty': 'В этом проекте ещё не настроены агенты.',
   'agents.toolSpectrum.help': 'Каждая строка — настроенная роль агентов; каждая колонка — один из самых частых тулов в этом проекте. Цвет ячейки и число показывают, какую долю тул-вызовов этой роли занимает данный тул. Наведи курсор для абсолютных значений. Тулы за пределами top-колонок собираются в «Прочее».',
 
+  'agents.spawnBatches.title': 'Параллельные волны агентов',
+  'agents.spawnBatches.desc': 'Когда Claude запустил несколько subagent-ов одной orchestration-командой',
+  'agents.spawnBatches.subFmt': '{count} волн · средне {avg} · макс {max}',
+  'agents.spawnBatches.subEmpty': 'В диапазоне нет параллельных волн — все агенты запускались поодиночке',
+  'agents.spawnBatches.colSize': 'Размер',
+  'agents.spawnBatches.colWhen': 'Когда',
+  'agents.spawnBatches.colRoles': 'Роли',
+  'agents.spawnBatches.colTokens': 'Токены',
+  'agents.spawnBatches.colCost': 'Стоимость',
+  'agents.spawnBatches.empty': 'В этом диапазоне нет параллельных волн. Каждая строка — это один orchestration-вызов, запустивший ≥2 subagent-ов.',
+  'agents.spawnBatches.help': 'Каждая строка — один orchestration-вызов, в котором Claude запустил параллельно несколько subagent-ов (у них общий внутренний promptId). «Размер» — сколько агентов в волне. Большие волны характерны для Plan-mode разворотов, параллельных исследований, тиков симуляций; много мелких волн = Claude делегирует мелко. Одиночные Task()-вызовы (без fan-out) скрыты, чтобы список не был просто перечислением всех агентов.',
+
   'agents.topSessions.title': 'Топ сессий агентов по стоимости',
   'agents.topSessions.desc': 'Самые тяжёлые отдельные вызовы агентов по расходу',
   'agents.topSessions.sub': 'Самые затратные вызовы за период',

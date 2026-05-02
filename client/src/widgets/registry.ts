@@ -26,6 +26,7 @@ import { agentDistributionWidget } from './dashboard/agent-distribution'
 import { agentTopSessionsWidget } from './dashboard/agent-top-sessions'
 import { agentTimelineWidget } from './dashboard/agent-timeline'
 import { agentToolSpectrumWidget } from './dashboard/agent-tool-spectrum'
+import { agentSpawnBatchesWidget } from './dashboard/agent-spawn-batches'
 
 import { subagentsWidget } from './insights/subagents'
 import { skillsWidget } from './insights/skills'
@@ -79,6 +80,7 @@ export function buildDashboardCatalog(ctx: DashboardCtx): WidgetDef[] {
       agentTopSessionsWidget(t, data),
       agentTimelineWidget(t, data, series, granularity),
       agentToolSpectrumWidget(t, data),
+      agentSpawnBatchesWidget(t, data),
     ]
   }
   // Dashboard-only widgets: "cost by project" and "top projects" aggregate

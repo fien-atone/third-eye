@@ -411,6 +411,18 @@ export const zh: Dict = {
   'agents.toolSpectrum.empty': '该项目暂未配置 Agent。',
   'agents.toolSpectrum.help': '每行是一个已配置的角色；每列是该项目中最常用的工具之一。单元格颜色和数字显示该角色的工具调用中此工具所占的比例。悬停查看绝对计数。超出顶部列的长尾工具会被聚合到「其他」。',
 
+  'agents.spawnBatches.title': '并行调度批次',
+  'agents.spawnBatches.desc': 'Claude 在单次编排调用中并行调度多个子代理的情况',
+  'agents.spawnBatches.subFmt': '{count} 批次 · 平均 {avg} · 最大 {max}',
+  'agents.spawnBatches.subEmpty': '范围内无并行批次 — 每个代理都是单独运行',
+  'agents.spawnBatches.colSize': '规模',
+  'agents.spawnBatches.colWhen': '时间',
+  'agents.spawnBatches.colRoles': '角色',
+  'agents.spawnBatches.colTokens': '令牌',
+  'agents.spawnBatches.colCost': '成本',
+  'agents.spawnBatches.empty': '此范围内无并行代理批次。每行将代表一次编排调用，调度 ≥2 个子代理。',
+  'agents.spawnBatches.help': '每行是 Claude 一次编排调用中并行调度多个子代理的事件 — 它们共享同一个内部 promptId。规模是该批次中代理的数量。大规模 fan-out（Plan 模式展开、并行研究、模拟 tick）通常意味着更少但更重的调用；许多小批次意味着 Claude 进行细粒度委托。单独的 Task() 调用（无 fan-out）已被排除，避免列表只是所有代理的罗列。',
+
   'agents.topSessions.title': '按成本排序的 Agent 会话',
   'agents.topSessions.desc': '最耗费的单次 Agent 调用',
   'agents.topSessions.sub': '范围内最耗费的单次调用',

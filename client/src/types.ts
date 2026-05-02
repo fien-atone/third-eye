@@ -176,6 +176,22 @@ export type AgentTelemetry = {
       tools: Record<string, number>  // tool -> count for this role
     }>
   }
+  /** Spawn batches — agents sharing one promptId were dispatched
+   *  in a single parallel orchestration call by Claude. */
+  spawnBatches: {
+    avgSize: number       // mean across all batches (singletons excluded)
+    maxSize: number       // largest fan-out seen
+    batchedAgents: number // total sessions that ran inside a batch
+    batchCount: number    // distinct batch count
+    batches: Array<{
+      promptId: string
+      size: number
+      spawnedAt: string   // ISO of earliest agent in this batch
+      cost: number
+      tokens: number
+      roles: Array<{ role: string; sessions: number }>  // role mix in this batch
+    }>
+  }
 }
 
 /** Recharts tooltip props (re-typed loosely — Recharts types are
