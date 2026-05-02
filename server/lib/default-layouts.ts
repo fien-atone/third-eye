@@ -66,13 +66,18 @@ export const PROJECT_DEFAULT: ScreenLayout = {
     { i: 'bash',      x: 0, y: 15, w: 2, h: 2 },
     { i: 'branches',  x: 2, y: 15, w: 2, h: 2 },
     { i: 'files',     x: 0, y: 17, w: 4, h: 2 },
-    // Agents block: KPI pins → tables side-by-side → timeline
+    // Agents block: KPI pins → tables side-by-side → timeline →
+    // tools-by-role + spawn-batches side-by-side. Layout matches
+    // the post-v2.4 project view that the maintainer iterated on
+    // with real data.
     { i: 'kpi-agent-delegation',         x: 0, y: 19, w: 1, h: 1 },
     { i: 'kpi-agent-sessions',           x: 1, y: 19, w: 1, h: 1 },
     { i: 'kpi-agent-tokens-per-session', x: 2, y: 19, w: 1, h: 1 },
-    { i: 'agent-distribution', x: 0, y: 20, w: 2, h: 3 },
-    { i: 'agent-top-sessions', x: 2, y: 20, w: 2, h: 3 },
-    { i: 'agent-timeline',     x: 0, y: 23, w: 4, h: 3 },
+    { i: 'agent-distribution',  x: 0, y: 20, w: 2, h: 3 },
+    { i: 'agent-top-sessions',  x: 2, y: 20, w: 2, h: 3 },
+    { i: 'agent-timeline',      x: 0, y: 23, w: 4, h: 3 },
+    { i: 'agent-tool-spectrum', x: 0, y: 26, w: 2, h: 3 },
+    { i: 'agent-spawn-batches', x: 2, y: 26, w: 2, h: 3 },
   ],
   hidden: ['flags'],
 }
