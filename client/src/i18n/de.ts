@@ -425,10 +425,6 @@ export const de: Dict = {
   'agents.spawnBatches.empty': 'Keine parallelen Agenten-Wellen in diesem Zeitraum. Jede Zeile wäre ein Orchestrierungsaufruf mit ≥2 Subagenten.',
   'agents.spawnBatches.help': 'Jede Zeile ist ein Orchestrierungsaufruf, bei dem Claude mehrere Subagenten parallel startete — sie teilen die gleiche interne promptId. Die Größe ist die Anzahl der Agenten in der Welle. Große Fan-outs (Plan-Mode-Rollouts, parallele Recherche, Simulations-Ticks) bedeuten weniger, aber gewichtigere Aufrufe; viele kleine Wellen = feingranulare Delegierung. Solo-Task()-Aufrufe (ohne Fan-out) sind ausgeschlossen.',
 
-  'agents.kpi.sidechain.title': 'Subagenten-Anteil',
-  'agents.kpi.sidechain.desc': 'Wie viel der Gesamtkosten in Subagenten lief (unabhängig von Rollen-Klassifizierung)',
-  'agents.kpi.sidechain.costShare': 'Kosten in Subagenten',
-  'agents.kpi.sidechain.sessions': 'Sessions',
 
   'agents.topSessions.title': 'Top-Agenten-Sessions nach Kosten',
   'agents.topSessions.desc': 'Die teuersten einzelnen Agenten-Aufrufe',

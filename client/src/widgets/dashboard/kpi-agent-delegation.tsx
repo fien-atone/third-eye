@@ -1,10 +1,15 @@
 /**
  * KPI: Agent efficiency — two complementary shares that together
  * tell a small story:
- *   - "Cost share": what % of the project's spend went through
- *     confirmed agents.
- *   - "Tokens share": what % of the project's token volume went
- *     through agents.
+ *   - "Cost share": what % of the project's spend ran inside
+ *     subagents.
+ *   - "Tokens share": what % of the project's token volume ran
+ *     inside subagents.
+ *
+ * Now uses agentTelemetry.totals which is registry-UNFILTERED —
+ * the percentages reflect ALL subagent activity, not only roles
+ * the user has classified. A user with an empty registry still
+ * sees the truth here.
  *
  * When the two % differ materially, you learn something: if cost
  * share > tokens share, your agents skew toward premium models (or

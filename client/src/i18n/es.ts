@@ -425,10 +425,6 @@ export const es: Dict = {
   'agents.spawnBatches.empty': 'No hay lotes paralelos en este rango. Cada fila sería una llamada de orquestación con ≥2 subagentes desplegados.',
   'agents.spawnBatches.help': 'Cada fila es una llamada de orquestación donde Claude desplegó varios subagentes en paralelo — comparten el mismo promptId interno. El tamaño es cuántos agentes hubo en el lote. Lotes grandes (Plan-mode, investigación paralela, ticks de simulación) implican menos llamadas pero más pesadas; muchos lotes pequeños indican delegación granular. Las invocaciones Task() solitarias (sin fan-out) se excluyen para que la lista no sea solo cada agente.',
 
-  'agents.kpi.sidechain.title': 'Cuota de subagentes',
-  'agents.kpi.sidechain.desc': 'Qué parte del gasto total ocurrió dentro de subagentes (sin filtrar por clasificación)',
-  'agents.kpi.sidechain.costShare': 'Gasto en subagentes',
-  'agents.kpi.sidechain.sessions': 'Sesiones',
 
   'agents.topSessions.title': 'Top sesiones de agentes por coste',
   'agents.topSessions.desc': 'Las ejecuciones de agente más costosas',

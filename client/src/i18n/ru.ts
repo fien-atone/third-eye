@@ -426,10 +426,6 @@ export const ru: Dict = {
   'agents.spawnBatches.empty': 'В этом диапазоне нет параллельных волн. Каждая строка — это один orchestration-вызов, запустивший ≥2 subagent-ов.',
   'agents.spawnBatches.help': 'Каждая строка — один orchestration-вызов, в котором Claude запустил параллельно несколько subagent-ов (у них общий внутренний promptId). «Размер» — сколько агентов в волне. Большие волны характерны для Plan-mode разворотов, параллельных исследований, тиков симуляций; много мелких волн = Claude делегирует мелко. Одиночные Task()-вызовы (без fan-out) скрыты, чтобы список не был просто перечислением всех агентов.',
 
-  'agents.kpi.sidechain.title': 'Доля subagent-ов',
-  'agents.kpi.sidechain.desc': 'Какая часть общих расходов прошла через subagent-ов (без учёта классификации ролей)',
-  'agents.kpi.sidechain.costShare': 'Расходы в subagent-ах',
-  'agents.kpi.sidechain.sessions': 'Сессий',
 
   'agents.topSessions.title': 'Топ сессий агентов по стоимости',
   'agents.topSessions.desc': 'Самые тяжёлые отдельные вызовы агентов по расходу',

@@ -475,19 +475,26 @@ app.get('/api/overview', (req, res) => {
       ON r.project = s.project AND r.raw_role = s.role AND r.enabled = 1
   `
 
+  // Agent aggregate totals — registry-UNFILTERED. The aggregate KPIs
+  // ("how big is my agent footprint?", "how does it compare to total
+  // spend?") should always tell the truth, even when the user has
+  // a stale or empty registry. The registry is for naming/grouping
+  // in per-role breakdowns (byRole, topSessions, timeline,
+  // toolSpectrum, spawnBatches), not for hiding aggregate truth.
   const agentTotals = d.prepare(`
     SELECT COUNT(*) AS sessions,
-           COALESCE(SUM(s.input_tokens), 0)        AS input_tokens,
-           COALESCE(SUM(s.cache_create_tokens), 0) AS cache_create,
-           COALESCE(SUM(s.cache_read_tokens), 0)   AS cache_read,
-           COALESCE(SUM(s.output_tokens), 0)       AS output_tokens,
-           COALESCE(SUM(s.total_tokens), 0)        AS total_tokens,
-           COALESCE(SUM(s.cost_usd), 0)            AS cost,
-           COALESCE(SUM(s.tool_uses), 0)           AS tool_uses,
-           COALESCE(SUM(s.duration_s), 0)          AS duration_s
-    ${agentFromClause}
-    WHERE s.ts_start_epoch BETWEEN ? AND ? ${agentProjectFilter}
-  `).get(...agentParams) as {
+           COALESCE(SUM(input_tokens), 0)        AS input_tokens,
+           COALESCE(SUM(cache_create_tokens), 0) AS cache_create,
+           COALESCE(SUM(cache_read_tokens), 0)   AS cache_read,
+           COALESCE(SUM(output_tokens), 0)       AS output_tokens,
+           COALESCE(SUM(total_tokens), 0)        AS total_tokens,
+           COALESCE(SUM(cost_usd), 0)            AS cost,
+           COALESCE(SUM(tool_uses), 0)           AS tool_uses,
+           COALESCE(SUM(duration_s), 0)          AS duration_s
+    FROM agent_sessions
+    WHERE ts_start_epoch BETWEEN ? AND ?
+      ${projectKey ? 'AND project = ?' : ''}
+  `).get(...(projectKey ? [startEpoch, endEpoch, projectKey] : [startEpoch, endEpoch])) as {
     sessions: number; input_tokens: number; cache_create: number; cache_read: number;
     output_tokens: number; total_tokens: number; cost: number; tool_uses: number; duration_s: number
   }
@@ -537,22 +544,6 @@ app.get('/api/overview', (req, res) => {
     tool_uses: number; api_calls: number
   }>
 
-  // Total subagent cost — NO registry filter. Used to compute the
-  // "delegation share" KPI ("how much of my AI spend ran inside
-  // subagents") which should reflect ALL subagents, not only the
-  // ones the user has acknowledged in the registry. The registry
-  // filter elsewhere is for "what the user wants to see broken
-  // down by role"; the ratio question is broader.
-  const agentDelegationRow = d.prepare(`
-    SELECT COALESCE(SUM(cost_usd), 0) AS cost,
-           COUNT(*)                   AS sessions
-    FROM agent_sessions
-    WHERE ts_start_epoch BETWEEN ? AND ?
-      ${projectKey ? 'AND project = ?' : ''}
-  `).get(...(projectKey ? [startEpoch, endEpoch, projectKey] : [startEpoch, endEpoch])) as {
-    cost: number; sessions: number
-  }
-
   // Spawn batches: agents that share the same prompt_id were
   // dispatched in one parallel orchestration call. HAVING > 1 hides
   // singletons (every Task() with no fan-out gets a unique
@@ -571,7 +562,10 @@ app.get('/api/overview', (req, res) => {
       AND s.prompt_id IS NOT NULL
     GROUP BY s.prompt_id
     HAVING batch_size > 1
-    ORDER BY batch_size DESC, cost DESC
+    -- Sort newest first — the widget reads as a log of recent
+    -- orchestration calls. Earlier ordering by batch_size buried
+    -- the most actionable rows below ancient mega-fan-outs.
+    ORDER BY spawned_at_epoch DESC
     LIMIT 25
   `).all(...agentParams) as Array<{
     prompt_id: string; batch_size: number; spawned_at: string;
@@ -797,15 +791,6 @@ app.get('/api/overview', (req, res) => {
         cost: roundUsd(agentTotals.cost),
         toolUses: agentTotals.tool_uses ?? 0,
         durationS: agentTotals.duration_s ?? 0,
-      },
-      // Cost across ALL agent sessions in range, ignoring registry —
-      // used for the delegation-share KPI. The registry-filtered
-      // totals.cost above answers "of MY classified agents, how much
-      // did they cost?"; this answers "of ALL my AI spend, how much
-      // happened inside subagents?".
-      delegation: {
-        cost: roundUsd(agentDelegationRow.cost),
-        sessions: agentDelegationRow.sessions ?? 0,
       },
       byRole: agentByRole.map(r => ({
         role: r.effective_role,
