@@ -52,12 +52,23 @@ const FALLBACK_PRICING: Record<string, ModelCosts> = {
 
 let pricingCache: Map<string, ModelCosts> | null = null
 
+/** LiteLLM pricing cache lives under ~/.cache/third-eye/ on all
+ *  platforms. Originally under ~/.cache/codeburn/ from the upstream
+ *  fork; the legacy path is read as a fallback so existing
+ *  installs don't trigger an extra HTTP fetch on the first run
+ *  after upgrade. Writes always go to the new path. Legacy path
+ *  scheduled for removal in v3.0 along with the rest of the
+ *  CodeBurn-era namespace. */
 function getCacheDir(): string {
-  return join(homedir(), '.cache', 'codeburn')
+  return join(homedir(), '.cache', 'third-eye')
 }
 
 function getCachePath(): string {
   return join(getCacheDir(), 'litellm-pricing.json')
+}
+
+function getLegacyCachePath(): string {
+  return join(homedir(), '.cache', 'codeburn', 'litellm-pricing.json')
 }
 
 function parseLiteLLMEntry(entry: LiteLLMEntry): ModelCosts | null {
@@ -94,14 +105,17 @@ async function fetchAndCachePricing(): Promise<Map<string, ModelCosts>> {
 }
 
 async function loadCachedPricing(): Promise<Map<string, ModelCosts> | null> {
-  try {
-    const raw = await readFile(getCachePath(), 'utf-8')
-    const cached = JSON.parse(raw) as { timestamp: number; data: Record<string, ModelCosts> }
-    if (Date.now() - cached.timestamp > CACHE_TTL_MS) return null
-    return new Map(Object.entries(cached.data))
-  } catch {
-    return null
+  // Try the canonical path first, then the legacy one for upgrade
+  // continuity. Either succeeding skips the HTTP refetch.
+  for (const p of [getCachePath(), getLegacyCachePath()]) {
+    try {
+      const raw = await readFile(p, 'utf-8')
+      const cached = JSON.parse(raw) as { timestamp: number; data: Record<string, ModelCosts> }
+      if (Date.now() - cached.timestamp > CACHE_TTL_MS) continue
+      return new Map(Object.entries(cached.data))
+    } catch { /* try next */ }
   }
+  return null
 }
 
 export async function loadPricing(): Promise<void> {
