@@ -874,7 +874,10 @@ app.get('/api/insights/:projectId', (req, res) => {
       LIMIT ?
     `).all(projectKey, kind, startEpoch, endEpoch, ...providers, limit) as Array<{ name: string; count: number; cost: number }>
 
-  const subagents = topByKind('subagent', 20)
+  // 'subagent' kind in tool_events is still ingested for completeness
+  // (a Task() tool call writes one), but the widget that consumed it
+  // was retired in v2.4 — agent_sessions is the richer source for
+  // anything subagent-related (per-agent costs, tokens, tools, etc.).
   const skills = topByKind('skill', 20)
   const mcp = topByKind('mcp', 20)
   const bash = topByKind('bash', 20)
@@ -921,7 +924,6 @@ app.get('/api/insights/:projectId', (req, res) => {
   res.json({
     project: { key: projectKey },
     range: { start: new Date(startEpoch).toISOString(), end: new Date(endEpoch).toISOString(), tzOffsetMin: tzMin },
-    subagents: subagents.map(r => ({ ...r, cost: roundUsd(r.cost) })),
     skills: skills.map(r => ({ ...r, cost: roundUsd(r.cost) })),
     mcp: mcp.map(r => ({ ...r, cost: roundUsd(r.cost) })),
     bash: bash.map(r => ({ ...r, cost: roundUsd(r.cost) })),

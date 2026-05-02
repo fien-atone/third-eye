@@ -126,7 +126,6 @@ export const de: Dict = {
   'widgets.activity.description': 'Ausgaben nach automatisch klassifizierter Aktivitätskategorie.',
   'widgets.models.description': 'Modell-Tabelle mit Anteil, Aufrufen, Tokens und Kosten.',
   'widgets.top-projects.description': 'Projekte nach Ausgaben — Zeile klicken zum Öffnen.',
-  'widgets.subagents.description': 'Agent-Tool-Aufrufe gruppiert nach subagent_type.',
   'widgets.skills.description': 'Slash-Befehle über das Skill-Tool.',
   'widgets.mcp.description': 'Externe MCP-Tool-Aufrufe gruppiert nach Server.',
   'widgets.bash.description': 'Top-Befehle aus Bash-Tool-Eingaben.',
@@ -253,9 +252,6 @@ export const de: Dict = {
 
   'insights.title': 'Projekt-Insights',
 
-  'insights.subagents.title': 'Subagenten',
-  'insights.subagents.sub': 'Agent-Tool — nach subagent_type',
-  'insights.subagents.help': 'Zählungen von Agent-Tool-Aufrufen gruppiert nach subagent_type (z.B. Explore, Plan, eigene Agenten). Die Kosten des Eltern-Aufrufs werden auf die aufgerufenen Tools verteilt.',
 
   'insights.skills.title': 'Skills',
   'insights.skills.sub': 'Slash-Commands via Skill',

@@ -126,7 +126,6 @@ export const es: Dict = {
   'widgets.activity.description': 'Gasto desglosado por categoría de actividad auto-clasificada.',
   'widgets.models.description': 'Tabla por modelo con cuota, llamadas, tokens y coste.',
   'widgets.top-projects.description': 'Ranking de proyectos por gasto — clic abre el proyecto.',
-  'widgets.subagents.description': 'Llamadas a Agent agrupadas por subagent_type.',
   'widgets.skills.description': 'Comandos slash invocados vía Skill.',
   'widgets.mcp.description': 'Llamadas a herramientas MCP agrupadas por servidor.',
   'widgets.bash.description': 'Comandos principales extraídos de entradas Bash.',
@@ -253,9 +252,6 @@ export const es: Dict = {
 
   'insights.title': 'Detalles del proyecto',
 
-  'insights.subagents.title': 'Subagentes',
-  'insights.subagents.sub': 'Herramienta Agent — por subagent_type',
-  'insights.subagents.help': 'Conteo de llamadas a la herramienta Agent agrupadas por subagent_type (ej. Explore, Plan, tus agentes personalizados). El costo es el gasto API del turno padre dividido entre las herramientas que invocó.',
 
   'insights.skills.title': 'Skills',
   'insights.skills.sub': 'Comandos slash invocados vía Skill',

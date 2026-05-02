@@ -128,7 +128,6 @@ export const en = {
   'widgets.activity.description': 'Spend broken down by auto-classified activity category.',
   'widgets.models.description': 'Per-model table with share, calls, tokens and cost.',
   'widgets.top-projects.description': 'Leaderboard of projects by spend — click a row to drill in.',
-  'widgets.subagents.description': 'Counts of Agent tool calls grouped by subagent_type.',
   'widgets.skills.description': 'Slash commands invoked via the Skill tool.',
   'widgets.mcp.description': 'External MCP tool calls grouped by server.',
   'widgets.bash.description': 'Top commands extracted from Bash tool inputs.',
@@ -265,9 +264,6 @@ export const en = {
   // Insights — section
   'insights.title': 'Project insights',
 
-  'insights.subagents.title': 'Subagents',
-  'insights.subagents.sub': 'Agent tool — by subagent_type',
-  'insights.subagents.help': 'Counts of Agent tool calls grouped by their subagent_type (e.g. Explore, Plan, your custom agents). Cost is the parent call\'s API spend split across the tools it invoked.',
 
   'insights.skills.title': 'Skills',
   'insights.skills.sub': 'Slash commands invoked via Skill',

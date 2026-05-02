@@ -74,7 +74,7 @@ export const PROJECT_DEFAULT: ScreenLayout = {
     { i: 'agent-top-sessions', x: 2, y: 20, w: 2, h: 3 },
     { i: 'agent-timeline',     x: 0, y: 23, w: 4, h: 3 },
   ],
-  hidden: ['subagents', 'flags'],
+  hidden: ['flags'],
 }
 
 /** Day-view screen — single calendar day, hour-by-hour breakdown.

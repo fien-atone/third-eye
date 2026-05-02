@@ -126,7 +126,6 @@ export const ru: Dict = {
   'widgets.activity.description': 'Расход по автоматически классифицированным категориям активности.',
   'widgets.models.description': 'Таблица по моделям: доля, вызовы, токены и стоимость.',
   'widgets.top-projects.description': 'Топ проектов по расходу — клик открывает проект.',
-  'widgets.subagents.description': 'Вызовы Agent, сгруппированные по subagent_type.',
   'widgets.skills.description': 'Слэш-команды, запущенные через инструмент Skill.',
   'widgets.mcp.description': 'Внешние вызовы MCP, сгруппированные по серверу.',
   'widgets.bash.description': 'Топ команд, извлечённых из входов Bash.',
@@ -253,9 +252,6 @@ export const ru: Dict = {
 
   'insights.title': 'Детальная статистика проекта',
 
-  'insights.subagents.title': 'Субагенты',
-  'insights.subagents.sub': 'Инструмент Agent — по subagent_type',
-  'insights.subagents.help': 'Подсчёт вызовов Agent по их subagent_type (например Explore, Plan, твои кастомные). Стоимость — API-расход родительского вызова, делится на инструменты, которые он запускает.',
 
   'insights.skills.title': 'Скиллы',
   'insights.skills.sub': 'Слэш-команды через Skill',

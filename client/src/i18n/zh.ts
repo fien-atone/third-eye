@@ -126,7 +126,6 @@ export const zh: Dict = {
   'widgets.activity.description': '按自动分类的活动类别拆分的支出。',
   'widgets.models.description': '按模型的表格：份额、调用、token 与成本。',
   'widgets.top-projects.description': '按支出排序的项目榜 — 点击行打开项目。',
-  'widgets.subagents.description': '按 subagent_type 分组的 Agent 工具调用。',
   'widgets.skills.description': '通过 Skill 工具调用的斜杠命令。',
   'widgets.mcp.description': '按服务器分组的外部 MCP 工具调用。',
   'widgets.bash.description': '从 Bash 工具输入中提取的热门命令。',
@@ -253,9 +252,6 @@ export const zh: Dict = {
 
   'insights.title': '项目洞察',
 
-  'insights.subagents.title': '子代理',
-  'insights.subagents.sub': 'Agent 工具 — 按 subagent_type',
-  'insights.subagents.help': 'Agent 工具调用按 subagent_type 分组计数(例如 Explore、Plan、自定义代理)。成本按父调用的 API 支出在子工具间平均分摊。',
 
   'insights.skills.title': '技能',
   'insights.skills.sub': '通过 Skill 调用的斜杠命令',

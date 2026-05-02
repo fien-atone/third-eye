@@ -73,7 +73,6 @@ export type VersionRow = {
 export type InsightsResponse = {
   project: { key: string }
   range: { start: string; end: string }
-  subagents: InsightsItem[]
   skills: InsightsItem[]
   mcp: InsightsItem[]
   bash: InsightsItem[]

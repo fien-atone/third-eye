@@ -28,7 +28,6 @@ import { agentTimelineWidget } from './dashboard/agent-timeline'
 import { agentToolSpectrumWidget } from './dashboard/agent-tool-spectrum'
 import { agentSpawnBatchesWidget } from './dashboard/agent-spawn-batches'
 
-import { subagentsWidget } from './insights/subagents'
 import { skillsWidget } from './insights/skills'
 import { mcpWidget } from './insights/mcp'
 import { bashWidget } from './insights/bash'
@@ -112,7 +111,6 @@ export type InsightsCtx = {
 export function buildInsightsCatalog(ctx: InsightsCtx): WidgetDef[] {
   const { t, data, projectKey } = ctx
   return [
-    subagentsWidget(t, data),
     skillsWidget(t, data),
     mcpWidget(t, data),
     bashWidget(t, data),
