@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync, statSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { envRead } from './lib/env.ts'
@@ -15,11 +15,15 @@ function resolveDefaultDbPath(): string {
   const dataDir = join(__dirname, '..', 'data')
   const newPath = join(dataDir, 'third-eye.db')
   const legacyPath = join(dataDir, 'codeburn.db')
-  // If the legacy file is present AND the new file is not, keep reading
-  // the legacy file. Rename would require WAL/SHM sidecars to move atomically
-  // AND be safe across process restarts — simpler to just point at the
-  // existing file until the user deletes it or we drop legacy in v3.0.
-  if (!existsSync(newPath) && existsSync(legacyPath)) return legacyPath
+  // Prefer the legacy file whenever it has actual data — the new
+  // path may exist as an empty placeholder (Docker test runs create
+  // one on a fresh data volume; our own dev runs can too if the user
+  // wipes the new DB without removing the legacy one). Without this
+  // size check the auto-detect would silently switch to a 0-byte
+  // file and the UI would look empty.
+  const legacyHasData = existsSync(legacyPath) && statSync(legacyPath).size > 0
+  const newHasData = existsSync(newPath) && statSync(newPath).size > 0
+  if (legacyHasData && !newHasData) return legacyPath
   return newPath
 }
 
