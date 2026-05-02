@@ -34,6 +34,11 @@ function AgentBadge({ name }: { name: string }) {
       fontWeight: 500,
       background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
       color: 'var(--accent)',
+      // Role names with hyphens (e.g. general-purpose, frontend-dev) were
+      // breaking after the hyphen and stacking on two lines inside the
+      // pill. Lock to a single line — if the column is too narrow the
+      // pill itself sets its own max width via the cell's width.
+      whiteSpace: 'nowrap',
     }}>
       {name}
     </span>

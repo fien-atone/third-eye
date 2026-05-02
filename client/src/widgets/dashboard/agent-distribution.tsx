@@ -29,6 +29,10 @@ function AgentBadge({ name }: { name: string }) {
       fontWeight: 500,
       background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
       color: 'var(--accent)',
+      // Hyphenated role names ("general-purpose") used to break after
+      // the hyphen and wrap to a second line inside the pill — keep
+      // them on one line.
+      whiteSpace: 'nowrap',
     }}>
       {name}
     </span>
