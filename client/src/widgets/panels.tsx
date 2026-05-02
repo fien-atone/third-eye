@@ -106,7 +106,7 @@ export function CostByProjectPanel({
             </div>
           )}
           <div className="widget-chart-area">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={series} margin={TIMESERIES_MARGIN} barCategoryGap="15%">
                 <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
@@ -198,7 +198,7 @@ export function TokensPanel({ series, granularity: _g, hasData, showLegend = tru
       <div className="widget-panel-body widget-chart-body">
         {hasData ? (
           <div className="widget-chart-area">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={series} margin={TIMESERIES_MARGIN} barCategoryGap="15%">
                 <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" />
@@ -459,7 +459,7 @@ export function VersionsPanel({ rows }: { rows: VersionRow[] }) {
           <div className="versions-layout">
             {showDonut && (
               <div className="versions-chart">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     {/* Percent radii so the donut scales to whatever
                         the .versions-chart cell ends up being — at h=2

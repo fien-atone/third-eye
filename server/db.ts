@@ -174,6 +174,14 @@ function migrate(d: Database.Database) {
   );
   CREATE INDEX IF NOT EXISTS idx_agent_registry_project ON agent_registry(project);
   `)
+
+  // User-controlled settings (versioned via key/value JSON so adding a
+  // new field doesn't need a migration). One key per top-level section
+  // — `lib/settings.ts` reads/writes typed objects.
+  d.exec(`CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )`)
 }
 
 /** Seed default layouts on first startup. Idempotent: INSERT OR IGNORE

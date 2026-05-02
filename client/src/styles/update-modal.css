@@ -1,0 +1,374 @@
+/* "New version available" pill next to the version badge in the
+   header. Version numbers are intentionally absent here — they live
+   in the modal. Keep the pill visual-minimal: single accent color,
+   no border, just enough background to read as an action target. */
+.version-update-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  margin-left: 4px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: none;
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.version-update-pill:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* Modal — shares the confirm-dialog backdrop treatment but has its
+   own tighter layout so copy-paste-able commands dominate the space. */
+.update-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.48);
+  z-index: 900;
+  backdrop-filter: blur(2px);
+}
+.update-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 32px));
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  z-index: 901;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+}
+.update-modal-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.update-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.update-modal-subtitle {
+  font-size: 13px;
+  color: var(--accent);
+  margin-top: 2px;
+  font-weight: 600;
+}
+.update-modal-ago { color: var(--text-dim); font-weight: 400; }
+.update-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-top: -4px;
+}
+.update-modal-close:hover { color: var(--text); }
+
+.update-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.update-modal-running {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.update-modal-section-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.update-modal-tabs { margin-bottom: 2px; }
+
+.update-modal-cmd {
+  position: relative;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 40px 10px 12px;
+  font-family: ui-monospace, monospace;
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.5;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+.update-modal-cmd code {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+.update-modal-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.update-modal-copy:hover {
+  background: var(--hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.update-modal-note {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.update-modal-release-link {
+  font-size: 12.5px;
+  color: var(--accent);
+  text-decoration: none;
+  align-self: flex-start;
+}
+.update-modal-release-link:hover { text-decoration: underline; }
+
+.update-modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Header gear icon — opens the SettingsModal. Same ghost-button feel
+   as ThemeToggle next door so the right-cluster of header controls
+   reads as a single group. */
+.header-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.header-icon-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+/* Settings modal — reuses .update-modal* skeleton for backdrop /
+   head / footer; only the body's section/row layout is bespoke. */
+.settings-modal .update-modal-body {
+  gap: 0;
+}
+.settings-section + .settings-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.settings-section-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.settings-section-help {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+.settings-row-stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.settings-row.is-disabled { opacity: 0.55; }
+.settings-row-label {
+  font-size: 13px;
+  color: var(--text);
+}
+/* Layout for the boolean toggle row: label on the left, switch on
+   the right. The whole <label> is clickable. */
+.settings-row-toggle {
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Custom toggle switch. Native <input type="checkbox"> is kept for
+   keyboard + a11y semantics but visually hidden; track + thumb are
+   styled siblings that react to the .is-on class on the wrapper.
+   (We could also drive it via :has(:checked) instead of the class,
+   but Safari support there is too recent for a self-host audience.) */
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+.toggle-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border-strong, var(--border));
+  border-radius: 999px;
+  transition: background 0.16s ease;
+}
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--panel);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.16s ease;
+}
+.toggle.is-on .toggle-track { background: var(--accent); }
+.toggle.is-on .toggle-thumb { transform: translateX(16px); }
+.toggle-input:focus-visible + .toggle-track {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Custom select. appearance:none drops the native chevron; we render
+   our own SVG positioned absolutely on the right, with pointer-events
+   off so clicks pass through to the select. Width/min-width is on
+   the wrapper so the chevron stays glued to the right edge. */
+.select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 220px;
+}
+.select-styled {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 32px 7px 10px;
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.select-styled:hover { border-color: var(--border-strong, var(--accent)); }
+.select-styled:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.select-styled:disabled {
+  cursor: not-allowed;
+  background: var(--hover);
+}
+.select-chevron {
+  position: absolute;
+  right: 10px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+/* Version-badge needs to host an indicator dot in its top-right
+   corner, so it's now position:relative. The badge itself stays
+   visually unchanged; the indicator is a 8px circle that only shows
+   in the "informational" update states (up-to-date, checking). The
+   "actionable" outdated state is rendered as a separate labeled
+   pill (.version-update-pill) right after the badge — that one is
+   loud on purpose. */
+.version-badge { position: relative; }
+
+.version-badge-indicator {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--bg);
+  /* The 2px border-cut against the page background makes the dot
+     read as a notification badge stuck to the corner of the version
+     pill, not as part of its outline. */
+}
+.version-badge-indicator.is-up-to-date {
+  background: var(--success, #10b981);
+}
+/* Checking: a plain spinning ring (no halo). Slightly larger box than
+   the static dot so the spinner reads at a glance — the user only
+   needs to see "something's happening", not measure it. The
+   .is-up-to-date / .is-checking states share the corner anchor but
+   each owns its own size + decoration; previous version layered a
+   pseudo on top of an inset ring inside a 9 × 9 box and the arc
+   visually collapsed. */
+.version-badge-indicator.is-checking {
+  width: 11px;
+  height: 11px;
+  top: -4px;
+  right: -4px;
+  background: transparent;
+  border: 1.5px solid color-mix(in srgb, var(--text-dim) 25%, transparent);
+  border-top-color: var(--text-dim);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Dev-only hint under the frequency dropdown. Reminds the user the
+   short presets ship only because NODE_ENV != production. */
+.settings-dev-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-top: 4px;
+}
