@@ -4,6 +4,124 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] — 2026-05-02
+
+The agent telemetry release. Surfacing what your AI subagents
+actually do — across any project, regardless of how you use Claude
+Code (frontend dev, NPC simulation, parallel research, anything).
+Driven by a real-world test on a 32-NPC D&D-village simulation
+that exposed roughly a year of hidden bugs in the parser and a
+handful of UX papercuts.
+
+### Added
+
+- **`agentType` is now the canonical role source.** Claude Code
+  2.x writes a sibling `agent-<id>.meta.json` next to every
+  subagent transcript with an explicit `agentType` field. We
+  used to ignore it and rely on a heuristic "<role>:" prefix
+  in description, which only ~10% of files happen to follow.
+  Result before: hundreds of agents stuck in "unknown". Result
+  after: full classification end-to-end with no user action.
+- **Parser captures `prompt_id` and `stop_reason`** per agent
+  session. Drives spawn-batch grouping and (future) failure
+  detection.
+- **Tools-by-role widget** — heatmap matrix where rows are
+  configured roles, columns are top tools, cells show what each
+  role spends its tool calls on. Answers "when my <role>
+  agents run, what work do they actually do?".
+- **Parallel spawn-batches widget** — log of orchestration calls
+  where Claude dispatched multiple subagents at once
+  (Plan-mode rollouts, parallel research, simulation ticks).
+  Sorted newest-first; size column shows the fan-out width.
+- **Setup banner re-triggers when new roles appear.** Used to
+  retire permanently after first configuration; now reappears
+  whenever a fresh agent role lands without a registry row,
+  with copy that distinguishes "set things up the first time"
+  from "new roles since last setup".
+- **Refresh in the header now invalidates agent + project +
+  insights caches**, not just providers/overview. New agents
+  spawned between two refreshes used to remain invisible in
+  Manage Agents until a full page reload.
+- **`THIRD_EYE_CLAUDE_DIR` env var** for non-default Claude
+  Code install locations (multi-user servers, Docker mounts,
+  symlinks, NAS-backed storage). Priority over Claude Code's
+  own `CLAUDE_CONFIG_DIR`. Documented in DOCS.md "Custom
+  Claude Code location".
+- **Vitest test suite + GitHub Actions CI.** First test
+  infrastructure for the project — 30 tests across parser,
+  path resolution, semver. Synthetic JSONL fixtures cover the
+  branches we care about (with/without meta.json, corrupt
+  meta, validity gate, etc.). Suite runs in ~250 ms; CI blocks
+  merge on failure.
+
+### Changed
+
+- **Aggregate agent KPIs use unfiltered totals.** The
+  registry-filtered totals previously used by Agent Efficiency,
+  Agent Sessions, and Agent Session Avg were silently lying
+  when the user hadn't classified some roles. Aggregates now
+  show the truth across ALL subagent activity; the registry
+  continues to drive per-role breakdowns (byRole, topSessions,
+  timeline, toolSpectrum, spawnBatches) where naming and
+  grouping is the actual point.
+- **Default project layout includes the new agent widgets**
+  (tool-spectrum, spawn-batches) at y=26. Existing layouts
+  unchanged; new users see the full v2.4 view out of the box.
+
+### Removed
+
+- **Legacy `subagents` insights widget.** It was a thin counter
+  on `tool_events.kind='subagent'` (Task tool dispatch events)
+  with cost-of-the-call-not-the-agent. Superseded by
+  `agent-distribution`, which reads from the proper
+  `agent_sessions` table with full per-agent decomposition.
+  Kept the `tool_events.kind='subagent'` rows in the DB for
+  anyone querying directly; just dropped the widget.
+
+### Fixed
+
+- **Database auto-detect no longer prefers an empty
+  `third-eye.db`** over a populated `codeburn.db`. A 0-byte
+  placeholder file (created accidentally during a Docker
+  smoke run on a fresh data volume) used to win against a
+  25 MB legacy file sitting next to it, hiding all the user's
+  data.
+- **Cross-platform path centralization.** Two duplicated
+  `getClaudeDir()` helpers collapsed into one
+  `server/lib/claude-paths.ts`. The macOS-hardcoded path in
+  ingest's Cowork resolver now uses the per-OS dispatcher.
+  Audit pass confirmed all path concatenations use
+  `path.join` and all home-directory references go through
+  `os.homedir()` (no shell-style `~` strings).
+- **Per-file try/catch** around `parseAgentFile` in the agent
+  scanner. A single corrupt JSONL or unreadable file used to
+  abort the whole agent ingest; now it logs and continues.
+- **MidEllipsis no longer collapses short labels to a lone "…"**
+  on first paint. Web fonts load async; the first measurement
+  often used wrong fallback metrics and over-truncated. Added
+  re-measure after `document.fonts.ready` plus a `MIN_VISIBLE`
+  floor that bails to full text if truncation would clip below
+  three characters.
+- **MidEllipsis oscillation loop on the project header**
+  fixed. Renaming a project to its auto-derived label could
+  cause the title to "breathe" — collapsing and expanding
+  forever, freezing the JS thread. Two fixes: `align-self:
+  stretch` on the title so its width no longer depends on its
+  own children, and an in-component oscillation guard that
+  freezes after detecting a repeating truncation candidate.
+- **Migration order guard.** `addCol()` now silently skips
+  ALTER on missing tables instead of aborting the entire
+  migration on a fresh DB (caught during a v2.4 Docker smoke
+  run when a `prompt_id` ALTER landed above its `CREATE
+  TABLE`).
+
+### Internal
+
+- ROADMAP captures the v2.4.1 (robustness) and v2.5.0 (scale)
+  next steps so they survive across sessions: incremental
+  agent ingest by mtime, failure-detection widget on top of
+  the new `stop_reason`.
+
 ## [2.3.0] — 2026-04-27
 
 ### Added

@@ -101,10 +101,19 @@ function migrate(d: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_tool_events_dedup   ON tool_events(dedup_key);
   `)
 
-  // Idempotent column additions (SQLite has no IF NOT EXISTS for columns)
+  // Idempotent column additions (SQLite has no IF NOT EXISTS for columns).
+  // Two errors are swallowed silently:
+  //   - "duplicate column" — column already exists, expected on every
+  //     run after the first.
+  //   - "no such table"    — migration ordering accident: a future
+  //     change might place an addCol() above its CREATE TABLE; we'd
+  //     rather skip the alter and surface the missing column at use
+  //     time than abort the entire migration on a fresh DB.
   const addCol = (sql: string) => {
     try { d.exec(sql) } catch (e) {
-      if (!String((e as Error).message).includes('duplicate column')) throw e
+      const msg = String((e as Error).message)
+      if (msg.includes('duplicate column') || msg.includes('no such table')) return
+      throw e
     }
   }
   addCol("ALTER TABLE api_calls ADD COLUMN git_branch TEXT")
@@ -116,18 +125,6 @@ function migrate(d: Database.Database) {
   // User-editable project metadata
   addCol("ALTER TABLE projects ADD COLUMN custom_label TEXT")
   addCol("ALTER TABLE projects ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
-
-  // Agent-session enrichment fields (added v2.4 work).
-  // `prompt_id` — Claude's parent prompt UUID that spawned this agent.
-  //   Multiple agents sharing the same prompt_id were dispatched as a
-  //   single parallel batch, which lets us answer "how wide is a typical
-  //   spawn fan-out?".
-  // `stop_reason` — final assistant turn's stop_reason from the JSONL.
-  //   end_turn = clean exit, tool_use (last) = agent didn't finish its
-  //   final tool call, max_tokens = hit context limit. Surface "agent
-  //   health" without parsing the transcript at view time.
-  addCol("ALTER TABLE agent_sessions ADD COLUMN prompt_id TEXT")
-  addCol("ALTER TABLE agent_sessions ADD COLUMN stop_reason TEXT")
 
   // Per-screen widget layouts. layout_json shape matches the ScreenLayout
   // type in server/lib/default-layouts.ts. Defaults are seeded by
@@ -169,6 +166,18 @@ function migrate(d: Database.Database) {
   CREATE INDEX IF NOT EXISTS idx_agent_sessions_ts      ON agent_sessions(ts_start_epoch);
   CREATE INDEX IF NOT EXISTS idx_agent_sessions_role    ON agent_sessions(role);
   `)
+
+  // Agent-session enrichment fields (added in v2.4). MUST run AFTER
+  // the CREATE TABLE above — addCol on a missing table aborts the
+  // whole migration on a fresh DB (caught during a Docker smoke run).
+  // `prompt_id`  — Claude's parent prompt UUID that spawned this
+  //                agent. Multiple agents sharing it = one parallel
+  //                batch dispatch.
+  // `stop_reason` — final assistant turn's stop_reason. end_turn =
+  //                clean exit; tool_use last = aborted mid-tool;
+  //                max_tokens = context limit. "Agent health" signal.
+  addCol("ALTER TABLE agent_sessions ADD COLUMN prompt_id TEXT")
+  addCol("ALTER TABLE agent_sessions ADD COLUMN stop_reason TEXT")
 
   // Per-project agent-role registry. Rows are created by the user via
   // the Agents Setup modal — one row per detected raw-role value the
