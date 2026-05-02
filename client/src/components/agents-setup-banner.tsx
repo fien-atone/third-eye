@@ -1,14 +1,19 @@
 /**
  * Setup banner — appears above the dashboard grid when there are
- * ACTIONABLE detected roles the user hasn't classified yet. Banner
- * and modal lifecycles are intentionally separate: the modal lives
- * one level up in Dashboard screen so triggering components (this
- * banner, the widget's Manage button, future Settings entry) can all
- * open the same instance. Banner only fires the open callback.
+ * ACTIONABLE roles the user hasn't classified in this project's
+ * agent_registry yet. Banner and modal lifecycles are intentionally
+ * separate: the modal lives one level up in Dashboard screen so
+ * triggering components (this banner, the widget's Manage button,
+ * future Settings entry) can all open the same instance.
  *
- * Banner retires permanently for a project once the user has at
- * least one registry row — first-time setup is a one-shot CTA. Later
- * affordances (project-header Manage button) cover ongoing management.
+ * Re-triggers when fresh roles appear. Originally banner retired
+ * permanently after first setup, but that hid the case where
+ * Claude Code rolls out new agentTypes (e.g. "general-purpose"
+ * arrived after the initial classification round) — those new
+ * roles would sit forever in the unclassified bucket without the
+ * user noticing. Now: banner shows whenever there's at least one
+ * unregistered, actionable role; copy adapts based on whether the
+ * project has been configured before (first-run vs follow-up).
  */
 
 import { useT } from '../i18n'
@@ -28,23 +33,33 @@ export function AgentsSetupBanner({
 function ProjectBanner({ projectId, onOpen }: { projectId: string; onOpen?: () => void }) {
   const t = useT()
   const detected = useDetectedRoles(projectId)
-  const actionableCount = (detected.data?.detected ?? [])
-    .filter(r => r.rawRole !== 'unknown').length
+  // Count roles that are (a) actionable (not "unknown" — those are
+  // task-source agents we can't classify by definition) AND (b) NOT
+  // already in the user's registry. This is what's actually
+  // unsettled — a registered role isn't a CTA target.
+  const newUnclassified = (detected.data?.detected ?? [])
+    .filter(r => r.rawRole !== 'unknown' && !r.registered).length
   const configured = detected.data?.configured ?? false
 
-  if (actionableCount === 0) return null
-  if (configured) return null
+  if (newUnclassified === 0) return null
+
+  // First-run vs follow-up copy. Returning users (configured=true)
+  // get phrasing that emphasizes "NEW since last time" so they
+  // don't read it as a duplicate of the same banner they already
+  // dismissed.
+  const titleKey = configured ? 'agents.banner.titleNew' : 'agents.banner.title'
+  const bodyKey = configured ? 'agents.banner.projectBodyNew' : 'agents.banner.projectBody'
 
   return (
     <div style={bannerStyle}>
       <div style={{ flex: 1 }}>
         <div style={headerRow}>
-          <strong>{t('agents.banner.title')}</strong>
+          <strong>{t(titleKey)}</strong>
         </div>
         <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
-          {t('agents.banner.projectBody', {
-            n: actionableCount,
-            roles: actionableCount === 1 ? t('agents.banner.roleOne') : t('agents.banner.roleMany'),
+          {t(bodyKey, {
+            n: newUnclassified,
+            roles: newUnclassified === 1 ? t('agents.banner.roleOne') : t('agents.banner.roleMany'),
           })}
         </div>
       </div>

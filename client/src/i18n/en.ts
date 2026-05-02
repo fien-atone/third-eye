@@ -360,7 +360,9 @@ export const en = {
   // ─── Agents ───────────────────────────────────────────────────────
   // Setup banner
   'agents.banner.title': 'Set up your Agentic AI insights',
+  'agents.banner.titleNew': 'New agent roles detected',
   'agents.banner.projectBody': 'We found {n} agent {roles} in this project. Tell us which are real agents to unlock per-agent breakdowns.',
+  'agents.banner.projectBodyNew': '{n} new {roles} appeared since you last set things up. Classify them so they show up in widgets.',
   'agents.banner.globalBody': 'We detected {n} agent {roles} across your projects. Open any project to classify them and unlock role-level analytics.',
   'agents.banner.cta': 'Set up agents →',
   'agents.banner.roleOne': 'role',

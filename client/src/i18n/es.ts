@@ -343,7 +343,9 @@ export const es: Dict = {
   'time.dayAgo': 'hace {n} d',
   // ─── Agentes ──────────────────────────────────────────────────
   'agents.banner.title': 'Configura tus métricas de Agentic AI',
+  'agents.banner.titleNew': 'Aparecieron nuevos roles de agente',
   'agents.banner.projectBody': 'Encontramos {n} {roles} de agente en este proyecto. Indica cuáles son agentes reales para desbloquear el desglose por agente.',
+  'agents.banner.projectBodyNew': 'Aparecieron {n} {roles} nuevos desde tu última configuración. Clasifícalos para que se muestren en los widgets.',
   'agents.banner.globalBody': 'Detectamos {n} {roles} de agente en tus proyectos. Abre cualquier proyecto para clasificarlos y obtener analíticas por rol.',
   'agents.banner.cta': 'Configurar agentes →',
   'agents.banner.roleOne': 'rol',

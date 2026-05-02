@@ -343,7 +343,9 @@ export const zh: Dict = {
   'time.dayAgo': '{n} 天前',
   // ─── Agents ───────────────────────────────────────────────────
   'agents.banner.title': '设置你的 Agentic AI 分析',
+  'agents.banner.titleNew': '检测到新的 Agent 角色',
   'agents.banner.projectBody': '在该项目中发现了 {n} 个 Agent {roles}。告诉我们哪些是真正的 Agent，以解锁按 Agent 分类的明细。',
+  'agents.banner.projectBodyNew': '自上次设置以来出现了 {n} 个新的 {roles}。请进行分类，使它们显示在小部件中。',
   'agents.banner.globalBody': '在你的项目中检测到 {n} 个 Agent {roles}。打开任一项目进行分类即可获得角色级分析。',
   'agents.banner.cta': '设置 Agent →',
   'agents.banner.roleOne': '角色',
