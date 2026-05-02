@@ -16,11 +16,12 @@
  */
 
 import { useRef } from 'react'
+import { format, parseISO } from 'date-fns'
 import type { WidgetDef } from '../grid'
 import type { T } from '../../i18n'
 import type { OverviewResponse, AgentTelemetry } from '../../types'
 import { ChartEmpty, PanelHeader, WidgetListMore } from '../../components/widgets-misc'
-import { fmtCurrency, fmtInt, fmtTokens } from '../../lib/format'
+import { fmtCurrency, fmtInt, fmtTokens, useDateLocale } from '../../lib/format'
 import { useFitCount } from '../../lib/use-fit-count'
 import { useT } from '../../i18n'
 
@@ -50,20 +51,22 @@ function RoleChip({ name, sessions, showMultiplier }: {
   )
 }
 
-/** Compact relative date — "12d ago" / "3h ago". The full ISO is
- *  in the title attribute on the parent cell for hover-disclosure. */
-function relTime(iso: string): string {
-  const t = new Date(iso).getTime()
-  const diff = Date.now() - t
-  if (diff < 60_000) return 'just now'
-  const min = Math.floor(diff / 60_000)
-  if (min < 60) return `${min}m ago`
-  const hr = Math.floor(min / 60)
-  if (hr < 24) return `${hr}h ago`
-  const dy = Math.floor(hr / 24)
-  if (dy < 30) return `${dy}d ago`
-  const mo = Math.floor(dy / 30)
-  return `${mo}mo ago`
+/** Concrete date + time for batch dispatch. Showed "12d ago" before,
+ *  but for orchestration analysis the actual moment matters more
+ *  than fuzzy distance — comparing two batches that both say "5d
+ *  ago" doesn't help; "2 May 14:34" vs "27 Apr 09:12" does. The
+ *  parent cell carries the full ISO in title= for the day-of-week
+ *  / seconds disclosure. */
+function useFmtBatchTime() {
+  const dl = useDateLocale()
+  // Visible cell: "10 Apr, 13:09" — concrete enough to compare
+  // batches at a glance, narrow enough not to push the table.
+  const cell = (iso: string) => format(parseISO(iso), 'd MMM, HH:mm', { locale: dl })
+  // title= attribute on hover: full date + day-of-week + seconds.
+  // Keeping the seconds since we have promptIds to disambiguate
+  // batches dispatched in the same minute (rare, but possible).
+  const tooltip = (iso: string) => format(parseISO(iso), 'EEEE, d MMM yyyy · HH:mm:ss', { locale: dl })
+  return { cell, tooltip }
 }
 
 function BatchesBody({ batches, w }: {
@@ -71,6 +74,7 @@ function BatchesBody({ batches, w }: {
   w: number
 }) {
   const t = useT()
+  const { cell: fmtCell, tooltip: fmtTooltip } = useFmtBatchTime()
   const bodyRef = useRef<HTMLDivElement>(null)
   const footerRef = useRef<HTMLDivElement>(null)
   const visibleCount = useFitCount(bodyRef, batches.length, {
@@ -105,8 +109,8 @@ function BatchesBody({ batches, w }: {
               {batches.slice(0, visibleCount).map(b => (
                 <tr key={b.promptId}>
                   <td className="num" style={{ fontWeight: 600 }}>{b.size}</td>
-                  <td title={b.spawnedAt} style={{ color: 'var(--text-dim)', fontSize: 11 }}>
-                    {relTime(b.spawnedAt)}
+                  <td title={fmtTooltip(b.spawnedAt)} style={{ color: 'var(--text-dim)', fontSize: 11, whiteSpace: 'nowrap' }}>
+                    {fmtCell(b.spawnedAt)}
                   </td>
                   {w >= 3 && (
                     <td style={{
