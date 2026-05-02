@@ -403,6 +403,13 @@ export const es: Dict = {
   'agents.distribution.colCost': 'Coste',
   'agents.distribution.empty': 'Aún no hay agentes configurados en este proyecto.',
 
+  'agents.toolSpectrum.title': 'Herramientas por rol',
+  'agents.toolSpectrum.desc': 'En qué emplea cada rol sus llamadas de herramienta — Read vs Bash vs Edit vs …',
+  'agents.toolSpectrum.sub': '% de las llamadas de herramienta de cada rol por herramienta',
+  'agents.toolSpectrum.colRole': 'Rol',
+  'agents.toolSpectrum.colOther': 'Otros',
+  'agents.toolSpectrum.empty': 'Aún no hay agentes configurados en este proyecto.',
+
   'agents.topSessions.title': 'Top sesiones de agentes por coste',
   'agents.topSessions.desc': 'Las ejecuciones de agente más costosas',
   'agents.topSessions.sub': 'Ejecuciones más costosas del período',

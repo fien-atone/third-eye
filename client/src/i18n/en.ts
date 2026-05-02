@@ -425,6 +425,14 @@ export const en = {
   'agents.distribution.colCost': 'Cost',
   'agents.distribution.empty': 'No agents configured in this project yet.',
 
+  // Tool spectrum widget
+  'agents.toolSpectrum.title': 'Tools by role',
+  'agents.toolSpectrum.desc': 'What each role spends its tool calls on — Read vs Bash vs Edit vs …',
+  'agents.toolSpectrum.sub': '% of each role\'s tool calls per tool',
+  'agents.toolSpectrum.colRole': 'Role',
+  'agents.toolSpectrum.colOther': 'Other',
+  'agents.toolSpectrum.empty': 'No agents configured in this project yet.',
+
   // Top sessions widget
   'agents.topSessions.title': 'Top agent sessions by cost',
   'agents.topSessions.desc': 'Heaviest individual agent invocations by spend',

@@ -164,6 +164,18 @@ export type AgentTelemetry = {
     roles: string[]              // all effective roles seen in range, sorted
     series: Array<Record<string, number | string>>  // per-bucket row, keys: bucket, `agent:<role>`
   }
+  /** Tool-usage breakdown per role. UI renders as a matrix: rows are
+   *  roles, columns are top-N most-used tools globally, cells are
+   *  counts (with % computed client-side as cell / role.toolUses). */
+  toolSpectrum: {
+    topTools: string[]   // global top-N tool names, ordered by total usage
+    roles: Array<{
+      role: string       // effective label
+      sessions: number
+      toolUses: number   // total tool calls across this role's sessions
+      tools: Record<string, number>  // tool -> count for this role
+    }>
+  }
 }
 
 /** Recharts tooltip props (re-typed loosely — Recharts types are

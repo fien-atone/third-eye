@@ -403,6 +403,13 @@ export const zh: Dict = {
   'agents.distribution.colCost': '成本',
   'agents.distribution.empty': '该项目暂未配置 Agent。',
 
+  'agents.toolSpectrum.title': '按角色的工具',
+  'agents.toolSpectrum.desc': '每种角色的工具调用都花在哪里 — Read / Bash / Edit / ……',
+  'agents.toolSpectrum.sub': '每个角色的工具调用占比',
+  'agents.toolSpectrum.colRole': '角色',
+  'agents.toolSpectrum.colOther': '其他',
+  'agents.toolSpectrum.empty': '该项目暂未配置 Agent。',
+
   'agents.topSessions.title': '按成本排序的 Agent 会话',
   'agents.topSessions.desc': '最耗费的单次 Agent 调用',
   'agents.topSessions.sub': '范围内最耗费的单次调用',

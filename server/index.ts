@@ -537,6 +537,20 @@ app.get('/api/overview', (req, res) => {
     tool_uses: number; api_calls: number
   }>
 
+  // Per-role tool-usage spectrum. One DB row per agent session
+  // matching the registry filter; we sum tools_json per role in JS
+  // (sessions are bounded — hundreds, not millions — so JSON.parse
+  // overhead is fine, and SQL's json_each() varies by SQLite build).
+  const agentToolsRows = d.prepare(`
+    SELECT ${effectiveRoleExpr}  AS effective_role,
+           s.tools_json,
+           s.tool_uses
+    ${agentFromClause}
+    WHERE s.ts_start_epoch BETWEEN ? AND ? ${agentProjectFilter}
+  `).all(...agentParams) as Array<{
+    effective_role: string; tools_json: string; tool_uses: number
+  }>
+
   // Per-bucket × per-agent cost for the timeline widget. Uses the same
   // bucketing (day/week/month/hour) as the rest of the dashboard so
   // users see agent activity aligned with other time-series widgets.
@@ -590,6 +604,45 @@ app.get('/api/overview', (req, res) => {
     for (const name of agentRoleNames) row[`agent:${name}`] = roundUsd(ab?.get(name))
     return row
   })
+
+  // Tool spectrum aggregation. Build:
+  //   - per-role tool counters
+  //   - global tool counter (drives column ordering and "top N" trim)
+  //   - per-role session count + total tool calls (denominator for %)
+  const toolsByRole = new Map<string, Map<string, number>>()
+  const sessionsByRole = new Map<string, number>()
+  const totalToolUsesByRole = new Map<string, number>()
+  const globalToolCounts = new Map<string, number>()
+  for (const r of agentToolsRows) {
+    sessionsByRole.set(r.effective_role, (sessionsByRole.get(r.effective_role) ?? 0) + 1)
+    totalToolUsesByRole.set(r.effective_role, (totalToolUsesByRole.get(r.effective_role) ?? 0) + r.tool_uses)
+    let bucket = toolsByRole.get(r.effective_role)
+    if (!bucket) { bucket = new Map(); toolsByRole.set(r.effective_role, bucket) }
+    try {
+      const parsed = JSON.parse(r.tools_json) as Record<string, number>
+      for (const [tool, n] of Object.entries(parsed)) {
+        if (typeof n !== 'number' || n <= 0) continue
+        bucket.set(tool, (bucket.get(tool) ?? 0) + n)
+        globalToolCounts.set(tool, (globalToolCounts.get(tool) ?? 0) + n)
+      }
+    } catch { /* ignore corrupt tools_json */ }
+  }
+  // Top tools globally — UI uses this for column order. Cap at 8 so
+  // a wide tile renders without horizontal-scroll on standard layouts;
+  // long-tail tools are aggregated into "Other" client-side.
+  const TOP_TOOLS_N = 8
+  const agentTopTools = [...globalToolCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, TOP_TOOLS_N)
+    .map(([tool]) => tool)
+  const agentToolSpectrum = [...toolsByRole.entries()]
+    .map(([role, tools]) => ({
+      role,
+      sessions: sessionsByRole.get(role) ?? 0,
+      toolUses: totalToolUsesByRole.get(role) ?? 0,
+      tools: Object.fromEntries(tools),
+    }))
+    .sort((a, b) => b.toolUses - a.toolUses)
 
   const series = bucketKeys.map(k => {
     const s = seriesMap.get(k)
@@ -693,6 +746,10 @@ app.get('/api/overview', (req, res) => {
       timeline: {
         roles: agentRoleNames,
         series: agentTimelineSeries,
+      },
+      toolSpectrum: {
+        topTools: agentTopTools,
+        roles: agentToolSpectrum,
       },
     },
     lastIngestAt: getMeta('last_ingest_at'),

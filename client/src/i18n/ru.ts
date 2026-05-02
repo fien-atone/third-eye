@@ -404,6 +404,13 @@ export const ru: Dict = {
   'agents.distribution.colCost': 'Стоимость',
   'agents.distribution.empty': 'В этом проекте ещё не настроены агенты.',
 
+  'agents.toolSpectrum.title': 'Тулы по ролям',
+  'agents.toolSpectrum.desc': 'Чем именно занят каждый тип агентов — Read, Bash, Edit и т.д.',
+  'agents.toolSpectrum.sub': 'Доля каждого тула в работе роли',
+  'agents.toolSpectrum.colRole': 'Роль',
+  'agents.toolSpectrum.colOther': 'Прочее',
+  'agents.toolSpectrum.empty': 'В этом проекте ещё не настроены агенты.',
+
   'agents.topSessions.title': 'Топ сессий агентов по стоимости',
   'agents.topSessions.desc': 'Самые тяжёлые отдельные вызовы агентов по расходу',
   'agents.topSessions.sub': 'Самые затратные вызовы за период',
