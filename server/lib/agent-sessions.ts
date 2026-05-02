@@ -38,7 +38,6 @@
 
 import { readdir, readFile, stat } from 'fs/promises'
 import { basename, dirname, join } from 'path'
-import { homedir, platform } from 'os'
 import { calculateCost } from './models.js'
 
 // ──────────────────────────────────────────────────────────────────────
@@ -77,26 +76,11 @@ type Usage = {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// File discovery
+// File discovery — paths come from the centralized claude-paths
+// module which honors THIRD_EYE_CLAUDE_DIR and is cross-platform.
 // ──────────────────────────────────────────────────────────────────────
 
-function getClaudeProjectsDir(): string {
-  return process.env['CLAUDE_CONFIG_DIR']
-    ? join(process.env['CLAUDE_CONFIG_DIR'] as string, 'projects')
-    : join(homedir(), '.claude', 'projects')
-}
-
-/** Base dir for task output streams. macOS/Linux use /private/tmp/claude-<uid>/
- *  (the UID varies — we probe for the current user's prefix). */
-function getTaskBaseDirs(): string[] {
-  if (platform() === 'win32') return []
-  // Best effort: /private/tmp/claude-<uid>/ on macOS, /tmp/claude-<uid>/ on Linux
-  const uid = (process.getuid?.() ?? 501).toString()
-  return [
-    `/private/tmp/claude-${uid}`,
-    `/tmp/claude-${uid}`,
-  ]
-}
+import { claudeProjectsDir, claudeTaskBaseDirs } from './claude-paths.ts'
 
 async function listDir(p: string): Promise<string[]> {
   try { return await readdir(p) } catch { return [] }
@@ -110,7 +94,7 @@ async function isDir(p: string): Promise<boolean> {
 /** Yields `{ project, sessionDir }` tuples discovered by scanning the
  *  Claude Code projects folder (one level deep). */
 async function* discoverProjectSessions(): AsyncGenerator<{ project: string; sessionDir: string }> {
-  const projectsDir = getClaudeProjectsDir()
+  const projectsDir = claudeProjectsDir()
   for (const proj of await listDir(projectsDir)) {
     const projDir = join(projectsDir, proj)
     if (!(await isDir(projDir))) continue
@@ -123,7 +107,7 @@ async function* discoverProjectSessions(): AsyncGenerator<{ project: string; ses
 
 /** Yields `{ project, sessionDir }` tuples from task-output dirs. */
 async function* discoverTaskSessions(): AsyncGenerator<{ project: string; sessionDir: string }> {
-  for (const base of getTaskBaseDirs()) {
+  for (const base of claudeTaskBaseDirs()) {
     if (!(await isDir(base))) continue
     for (const proj of await listDir(base)) {
       const projDir = join(base, proj)

@@ -5,9 +5,9 @@ import type { ClassifiedTurn, ParsedApiCall, DateRange } from './lib/types.ts'
 import { randomUUID } from 'crypto'
 import { createInterface } from 'readline'
 import { readdir, readFile, stat } from 'fs/promises'
-import { homedir } from 'os'
 import { join } from 'path'
 import { db, setMeta, truncateAll, type CallRow } from './db.ts'
+import { claudeDesktopSessionsDir } from './lib/claude-paths.ts'
 import { scanAgentSessions } from './lib/agent-sessions.ts'
 
 function shortenProjectLabel(key: string): string {
@@ -29,7 +29,7 @@ function labelFromText(text: string, max = 90): string {
 /** For ephemeral Cowork projects, look up the first user message in audit.jsonl. */
 async function resolveCoworkLabel(projectKey: string): Promise<string | null> {
   if (!isEphemeralCoworkKey(projectKey)) return null
-  const base = join(homedir(), 'Library', 'Application Support', 'Claude', 'local-agent-mode-sessions')
+  const base = claudeDesktopSessionsDir()
   let outerDirs: string[] = []
   try { outerDirs = await readdir(base) } catch { return null }
 
