@@ -24,7 +24,13 @@ import { fmtCurrency, fmtInt, fmtTokens } from '../../lib/format'
 import { useFitCount } from '../../lib/use-fit-count'
 import { useT } from '../../i18n'
 
-function RoleChip({ name, sessions }: { name: string; sessions: number }) {
+/** Role chip. The "×N" multiplier shows per-role count within the
+ *  batch — but it's redundant when the batch is single-role (the
+ *  Size column already carries that number). Caller passes
+ *  `showMultiplier=false` in that case to drop the noise. */
+function RoleChip({ name, sessions, showMultiplier }: {
+  name: string; sessions: number; showMultiplier: boolean
+}) {
   return (
     <span style={{
       display: 'inline-flex',
@@ -39,7 +45,7 @@ function RoleChip({ name, sessions }: { name: string; sessions: number }) {
       gap: 3,
     }}>
       <span>{name}</span>
-      <span style={{ fontWeight: 400, opacity: 0.7 }}>×{sessions}</span>
+      {showMultiplier && <span style={{ fontWeight: 400, opacity: 0.7 }}>×{sessions}</span>}
     </span>
   )
 }
@@ -111,7 +117,16 @@ function BatchesBody({ batches, w }: {
                     }} title={b.roles.map(r => `${r.role} ×${r.sessions}`).join(', ')}>
                       <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'nowrap' }}>
                         {b.roles.slice(0, 3).map(r => (
-                          <RoleChip key={r.role} name={r.role} sessions={r.sessions} />
+                          <RoleChip
+                            key={r.role}
+                            name={r.role}
+                            sessions={r.sessions}
+                            // Hide the ×N suffix for single-role batches —
+                            // it just repeats the Size column. Show it
+                            // for mixed-role batches where the breakdown
+                            // is the actual signal.
+                            showMultiplier={b.roles.length > 1}
+                          />
                         ))}
                         {b.roles.length > 3 && (
                           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
