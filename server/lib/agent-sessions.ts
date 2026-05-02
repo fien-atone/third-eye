@@ -65,6 +65,8 @@ export type AgentSessionRow = {
   api_calls: number
   tool_uses: number
   tools_json: string      // JSON: {"Edit": 12, "Read": 34}
+  prompt_id: string | null    // first promptId seen — groups parallel-spawned agents
+  stop_reason: string | null  // last assistant turn's stop_reason — agent's final state
 }
 
 type Usage = {
@@ -193,6 +195,13 @@ export async function parseAgentFile(
   let firstUserText: string | null = null
   let firstTs: string | null = null
   let lastTs: string | null = null
+  // First promptId seen — Claude's parent-prompt UUID. Multiple agents
+  // sharing this value were dispatched in one parallel batch.
+  let firstPromptId: string | null = null
+  // Last assistant message's stop_reason — agent's terminal state.
+  // Updated on every assistant event so the final value is what
+  // ends up in the row.
+  let lastStopReason: string | null = null
 
   for (const line of content.split('\n')) {
     if (!line.trim()) continue
@@ -205,6 +214,10 @@ export async function parseAgentFile(
     if (ts) {
       if (!firstTs) firstTs = ts
       lastTs = ts
+    }
+
+    if (firstPromptId === null && typeof ev.promptId === 'string' && ev.promptId.length > 0) {
+      firstPromptId = ev.promptId
     }
 
     // First user message — used for role detection + description fallback
@@ -225,11 +238,17 @@ export async function parseAgentFile(
     }
 
     if (ev.type === 'assistant') {
-      const msg = ev.message as { usage?: Usage; content?: unknown; model?: string } | undefined
+      const msg = ev.message as { usage?: Usage; content?: unknown; model?: string; stop_reason?: string } | undefined
       const rid = typeof ev.requestId === 'string' ? ev.requestId : null
       if (msg && rid) {
         if (msg.usage) requestUsage.set(rid, msg.usage)
         if (typeof msg.model === 'string') requestModel.set(rid, msg.model)
+      }
+      // Track final stop_reason — last assistant turn wins. Empty
+      // string is treated as no value so we never overwrite a real
+      // earlier value with garbage.
+      if (msg && typeof msg.stop_reason === 'string' && msg.stop_reason.length > 0) {
+        lastStopReason = msg.stop_reason
       }
       // Tool usage — count across ALL assistant events (tool_use blocks
       // appear in the final message, not partials, so double-counting
@@ -321,6 +340,8 @@ export async function parseAgentFile(
     api_calls: requestUsage.size,
     tool_uses: toolUses,
     tools_json: JSON.stringify(toolsObj),
+    prompt_id: firstPromptId,
+    stop_reason: lastStopReason,
   }
 }
 

@@ -250,12 +250,14 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
         agent_id, source, project, ts_start, ts_start_epoch, duration_s,
         role, role_confidence, description, model,
         input_tokens, cache_create_tokens, cache_read_tokens, output_tokens,
-        total_tokens, cost_usd, api_calls, tool_uses, tools_json
+        total_tokens, cost_usd, api_calls, tool_uses, tools_json,
+        prompt_id, stop_reason
       ) VALUES (
         @agent_id, @source, @project, @ts_start, @ts_start_epoch, @duration_s,
         @role, @role_confidence, @description, @model,
         @input_tokens, @cache_create_tokens, @cache_read_tokens, @output_tokens,
-        @total_tokens, @cost_usd, @api_calls, @tool_uses, @tools_json
+        @total_tokens, @cost_usd, @api_calls, @tool_uses, @tools_json,
+        @prompt_id, @stop_reason
       )
       ON CONFLICT(source, project, agent_id) DO UPDATE SET
         ts_start=excluded.ts_start, ts_start_epoch=excluded.ts_start_epoch,
@@ -270,7 +272,9 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
         cost_usd=excluded.cost_usd,
         api_calls=excluded.api_calls,
         tool_uses=excluded.tool_uses,
-        tools_json=excluded.tools_json
+        tools_json=excluded.tools_json,
+        prompt_id=excluded.prompt_id,
+        stop_reason=excluded.stop_reason
     `)
     const batch: Parameters<typeof agentInsert.run>[0][] = []
     for await (const ar of scanAgentSessions()) batch.push(ar as unknown as Parameters<typeof agentInsert.run>[0])

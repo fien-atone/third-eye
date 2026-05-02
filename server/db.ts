@@ -117,6 +117,18 @@ function migrate(d: Database.Database) {
   addCol("ALTER TABLE projects ADD COLUMN custom_label TEXT")
   addCol("ALTER TABLE projects ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
 
+  // Agent-session enrichment fields (added v2.4 work).
+  // `prompt_id` — Claude's parent prompt UUID that spawned this agent.
+  //   Multiple agents sharing the same prompt_id were dispatched as a
+  //   single parallel batch, which lets us answer "how wide is a typical
+  //   spawn fan-out?".
+  // `stop_reason` — final assistant turn's stop_reason from the JSONL.
+  //   end_turn = clean exit, tool_use (last) = agent didn't finish its
+  //   final tool call, max_tokens = hit context limit. Surface "agent
+  //   health" without parsing the transcript at view time.
+  addCol("ALTER TABLE agent_sessions ADD COLUMN prompt_id TEXT")
+  addCol("ALTER TABLE agent_sessions ADD COLUMN stop_reason TEXT")
+
   // Per-screen widget layouts. layout_json shape matches the ScreenLayout
   // type in server/lib/default-layouts.ts. Defaults are seeded by
   // seedScreenLayouts() below — only on first start, never overwriting
