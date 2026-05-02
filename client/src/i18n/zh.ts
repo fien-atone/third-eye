@@ -409,6 +409,7 @@ export const zh: Dict = {
   'agents.toolSpectrum.colRole': '角色',
   'agents.toolSpectrum.colOther': '其他',
   'agents.toolSpectrum.empty': '该项目暂未配置 Agent。',
+  'agents.toolSpectrum.help': '每行是一个已配置的角色；每列是该项目中最常用的工具之一。单元格颜色和数字显示该角色的工具调用中此工具所占的比例。悬停查看绝对计数。超出顶部列的长尾工具会被聚合到「其他」。',
 
   'agents.topSessions.title': '按成本排序的 Agent 会话',
   'agents.topSessions.desc': '最耗费的单次 Agent 调用',

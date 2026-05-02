@@ -409,6 +409,7 @@ export const es: Dict = {
   'agents.toolSpectrum.colRole': 'Rol',
   'agents.toolSpectrum.colOther': 'Otros',
   'agents.toolSpectrum.empty': 'Aún no hay agentes configurados en este proyecto.',
+  'agents.toolSpectrum.help': 'Cada fila es un rol configurado; cada columna, una de las herramientas más usadas en este proyecto. El color y el número de la celda muestran qué proporción de las llamadas de herramienta de ese rol corresponden a esa herramienta. Pasa el cursor para ver valores absolutos. Las herramientas fuera del top se agregan en "Otros".',
 
   'agents.topSessions.title': 'Top sesiones de agentes por coste',
   'agents.topSessions.desc': 'Las ejecuciones de agente más costosas',

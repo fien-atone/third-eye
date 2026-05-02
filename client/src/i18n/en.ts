@@ -432,6 +432,7 @@ export const en = {
   'agents.toolSpectrum.colRole': 'Role',
   'agents.toolSpectrum.colOther': 'Other',
   'agents.toolSpectrum.empty': 'No agents configured in this project yet.',
+  'agents.toolSpectrum.help': 'Each row is a configured role; each column is one of the most-used tools across this project. Cell color and number show how often that role uses that tool, as a percentage of the role\'s total tool calls. Hover a cell for absolute counts. Long-tail tools beyond the top columns are aggregated into "Other".',
 
   // Top sessions widget
   'agents.topSessions.title': 'Top agent sessions by cost',

@@ -46,45 +46,56 @@ function AgentBadge({ name }: { name: string }) {
   )
 }
 
-/** One cell in the matrix. The bar fill scales linearly to the
- *  percentage; the inline number is the percentage text. */
+/** One cell in the matrix. Cell background scales in opacity with
+ *  the percentage — heatmap style — so a wide cell with a tiny %
+ *  doesn't have a "stretched bar" mismatch. The cap on opacity
+ *  keeps text readable even for 100% cells. Numeric value is shown
+ *  flat in the centre; full breakdown lives in the title attr. */
 function ToolCell({ count, total }: { count: number; total: number }) {
   if (count <= 0 || total <= 0) {
     return <td className="num" style={{ color: 'var(--text-dim)', opacity: 0.4 }}>—</td>
   }
   const pct = (count / total) * 100
+  // Opacity at 100% should top out at ~55% so the cell tints
+  // strongly but text still passes contrast. Linear scaling.
+  const tint = Math.min(55, pct * 0.55)
   return (
-    <td className="num" title={`${fmtInt(count)} / ${fmtInt(total)} = ${pct.toFixed(1)}%`}
-        style={{ position: 'relative', verticalAlign: 'middle' }}>
-      <div style={{
-        position: 'absolute', left: 4, right: 4, top: '50%', height: 4,
-        transform: 'translateY(-50%)',
-        background: 'color-mix(in srgb, var(--accent) 18%, transparent)',
-        borderRadius: 2,
-      }}>
-        <div style={{
-          height: '100%',
-          width: `${Math.max(2, pct)}%`,
-          background: 'var(--accent)',
-          opacity: 0.85,
-          borderRadius: 2,
-        }} />
-      </div>
-      <span style={{ position: 'relative', fontSize: 11, fontWeight: 500 }}>
-        {pct.toFixed(0)}%
-      </span>
+    <td className="num"
+        title={`${fmtInt(count)} / ${fmtInt(total)} = ${pct.toFixed(1)}%`}
+        style={{
+          background: `color-mix(in srgb, var(--accent) ${tint}%, transparent)`,
+          fontSize: 11,
+          fontWeight: 500,
+        }}>
+      {pct.toFixed(0)}%
     </td>
   )
 }
 
-/** Truncate a long tool name (MCP names like
- *  "mcp__ccd_session__mark_chapter") to keep column headers tight.
- *  Full name is preserved in the column's title attribute. */
+/** Truncate a long tool name to keep column headers tight; the
+ *  full name remains in the column's title attribute.
+ *
+ *  MCP tools follow the convention `mcp__<server>__<tool>` where
+ *  both <server> and <tool> may themselves contain single
+ *  underscores ("ccd_session", "mark_chapter"). Splitting on the
+ *  double-underscore separator extracts the leaf tool name
+ *  reliably; a regex that treats _ as a delimiter would break on
+ *  these. Examples:
+ *    mcp__ccd_session__mark_chapter   → mcp:mark_chapter
+ *    mcp__pandoc__convert             → mcp:convert
+ *    mcp__a__b__c__d                  → mcp:d   (last segment) */
 function shortToolName(name: string, maxLen = 14): string {
+  if (name.startsWith('mcp__')) {
+    const parts = name.split('__')
+    if (parts.length >= 3) {
+      const leaf = parts[parts.length - 1]
+      // Still might be too long after mcp:-prefix removal —
+      // truncate the leaf if so.
+      const candidate = `mcp:${leaf}`
+      return candidate.length <= maxLen ? candidate : candidate.slice(0, maxLen - 1) + '…'
+    }
+  }
   if (name.length <= maxLen) return name
-  // mcp__server__tool → mcp:tool (strip the server segment)
-  const mcp = name.match(/^mcp__[^_]+(?:__[^_]+)*__([^_]+)$/)
-  if (mcp) return `mcp:${mcp[1]}`
   return name.slice(0, maxLen - 1) + '…'
 }
 
@@ -174,6 +185,7 @@ export function agentToolSpectrumWidget(t: T, data: OverviewResponse): WidgetDef
         <PanelHeader
           title={t('agents.toolSpectrum.title')}
           sub={t('agents.toolSpectrum.sub')}
+          help={t('agents.toolSpectrum.help')}
         />
         <SpectrumBody topTools={topTools} roles={roles} w={w} />
       </div>
