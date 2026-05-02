@@ -94,7 +94,18 @@ export function MidEllipsis({ text, query, className }: { text: string; query?: 
       || ((MidEllipsis as unknown as { _c?: HTMLCanvasElement })._c = document.createElement('canvas'))
     const ctx = sharedCanvas.getContext('2d')!
 
+    // Oscillation guard: if a parent's flex sizing depends on this
+    // element's content (a layout we caught on the project page),
+    // setDisplay → DOM size change → ResizeObserver fires → compute
+    // → setDisplay → … in an infinite loop visible as the label
+    // "breathing" in and out. Track recent results; if a candidate
+    // matches one we've already produced, freeze. The deps array
+    // [text, isHighlighting] resets this on legit change.
+    const recentDisplays: string[] = []
+    let frozen = false
+
     const compute = () => {
+      if (frozen) return
       const containerW = parent.clientWidth
       if (containerW <= 0) return
       const cs = getComputedStyle(el)
@@ -105,6 +116,12 @@ export function MidEllipsis({ text, query, className }: { text: string; query?: 
         return
       }
       const ELLIPSIS = '…'
+      // Floor on truncation: we never collapse below MIN_VISIBLE
+      // characters of the original text (plus the ellipsis). A single
+      // "…" tells the user nothing — full overflow with CSS would be
+      // more useful at that point. This also dodges the worst case of
+      // a stale-font measurement falsely deciding nothing fits.
+      const MIN_VISIBLE = 3
       let lo = 0, hi = text.length - 1
       while (lo < hi) {
         const mid = Math.ceil((lo + hi) / 2)
@@ -114,15 +131,41 @@ export function MidEllipsis({ text, query, className }: { text: string; query?: 
         if (ctx.measureText(candidate).width <= containerW) lo = mid
         else hi = mid - 1
       }
+      if (lo < MIN_VISIBLE) {
+        // Fall back to full text — the parent's overflow:hidden will
+        // clip whatever doesn't fit; better than rendering "…" alone.
+        setDisplay(text)
+        return
+      }
       const startN = Math.ceil(lo / 2)
       const endN = lo - startN
-      setDisplay(text.slice(0, startN) + ELLIPSIS + (endN > 0 ? text.slice(text.length - endN) : ''))
+      const next = text.slice(0, startN) + ELLIPSIS + (endN > 0 ? text.slice(text.length - endN) : '')
+      // Detect oscillation — if we've already produced this exact
+      // candidate before (in this effect's lifetime), the layout is
+      // bouncing between two results. Freeze on whatever's currently
+      // showing instead of looping forever.
+      if (recentDisplays.includes(next)) {
+        frozen = true
+        return
+      }
+      recentDisplays.push(next)
+      if (recentDisplays.length > 4) recentDisplays.shift()
+      setDisplay(next)
     }
 
     compute()
     const ro = new ResizeObserver(compute)
     ro.observe(parent)
-    return () => ro.disconnect()
+    // Web fonts load async — first compute() may fire BEFORE the
+    // real font is ready, in which case ctx.measureText uses fallback
+    // metrics and frequently overestimates width, falsely truncating
+    // a short label like "dnd village" down to "…". Re-measure once
+    // fonts settle. Idempotent if no font swap was needed.
+    let cancelled = false
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      void document.fonts.ready.then(() => { if (!cancelled) compute() })
+    }
+    return () => { cancelled = true; ro.disconnect() }
   }, [text, isHighlighting])
 
   if (isHighlighting) return <span className={className}><HighlightedText text={text} query={query!} /></span>
@@ -164,6 +207,7 @@ export function PanelHeader({ title, sub, help }: { title: string; sub?: string;
 const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches
 
 export function HelpTip({ children }: { children: React.ReactNode }) {
+  const t = useT()
   const triggerRef = useRef<HTMLSpanElement>(null)
   const bubbleRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
@@ -221,7 +265,7 @@ export function HelpTip({ children }: { children: React.ReactNode }) {
         ref={triggerRef}
         className="help-tip"
         tabIndex={0}
-        aria-label="Help"
+        aria-label={t('common.help')}
         aria-expanded={open}
         {...hoverProps}
       >?</span>

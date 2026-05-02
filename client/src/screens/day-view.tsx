@@ -20,6 +20,7 @@ import { apiGet, dashboardParams } from '../api'
 import { useDateLocale, toInputDate, parseLocalDate } from '../lib/format'
 import type { OverviewResponse, ProjectsResponse } from '../types'
 import { DateField } from '../components/date-field'
+import { SlidersIcon } from '../components/icons'
 import { hoursHeatstripWidget } from '../widgets/day/heatstrip-hour'
 import { daysHoursHeatmapWidget } from '../widgets/day/heatmap-days-hours'
 import { weekdayHourHeatmapWidget } from '../widgets/day/heatmap-weekday-hour'
@@ -171,7 +172,7 @@ export function DayView({
               title={t('controls.customize')}
               aria-pressed={false}
             >
-              <span className="customize-icon" aria-hidden="true">⚙</span>
+              <span className="customize-icon" aria-hidden="true"><SlidersIcon size={14} /></span>
               <span className="customize-label">{t('controls.customize')}</span>
             </button>
           ))}

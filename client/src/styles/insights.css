@@ -151,10 +151,10 @@ table.breakdown-projects td input { pointer-events: auto; }
 .file-hotspots-table td:first-child { overflow: hidden; }
 /* Custom .file-full overlay was removed: it was absolutely positioned
    inside the cell, which lives inside the widget body's
-   `overflow: hidden`. The overlay leaked a thin visible strip below
-   each row before the user even hovered. Native `title=` on the cell
-   now handles the full-path disclosure — browser-native tooltip
-   escapes every clipping ancestor and handles wrapping automatically. */
+   `overflow: hidden`. Symptoms: clipped on long paths AND leaked a
+   thin visible strip below each row even at rest. Native `title=`
+   on the cell now handles the full-path disclosure — browser-native
+   tooltip escapes every clipping ancestor and handles wrapping. */
 
 /* Branch name cell — clamp to its column width and use mid-ellipsis
    ("feature/…ies") so long branch names on a narrow widget don't push

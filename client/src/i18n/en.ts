@@ -128,7 +128,6 @@ export const en = {
   'widgets.activity.description': 'Spend broken down by auto-classified activity category.',
   'widgets.models.description': 'Per-model table with share, calls, tokens and cost.',
   'widgets.top-projects.description': 'Leaderboard of projects by spend — click a row to drill in.',
-  'widgets.subagents.description': 'Counts of Agent tool calls grouped by subagent_type.',
   'widgets.skills.description': 'Slash commands invoked via the Skill tool.',
   'widgets.mcp.description': 'External MCP tool calls grouped by server.',
   'widgets.bash.description': 'Top commands extracted from Bash tool inputs.',
@@ -265,9 +264,6 @@ export const en = {
   // Insights — section
   'insights.title': 'Project insights',
 
-  'insights.subagents.title': 'Subagents',
-  'insights.subagents.sub': 'Agent tool — by subagent_type',
-  'insights.subagents.help': 'Counts of Agent tool calls grouped by their subagent_type (e.g. Explore, Plan, your custom agents). Cost is the parent call\'s API spend split across the tools it invoked.',
 
   'insights.skills.title': 'Skills',
   'insights.skills.sub': 'Slash commands invoked via Skill',
@@ -356,6 +352,145 @@ export const en = {
   'time.minAgo': '{n}m ago',
   'time.hourAgo': '{n}h ago',
   'time.dayAgo': '{n}d ago',
+
+  // ─── Agents ───────────────────────────────────────────────────────
+  // Setup banner
+  'agents.banner.title': 'Set up your Agentic AI insights',
+  'agents.banner.titleNew': 'New agent roles detected',
+  'agents.banner.projectBody': 'We found {n} agent {roles} in this project. Tell us which are real agents to unlock per-agent breakdowns.',
+  'agents.banner.projectBodyNew': '{n} new {roles} appeared since you last set things up. Classify them so they show up in widgets.',
+  'agents.banner.globalBody': 'We detected {n} agent {roles} across your projects. Open any project to classify them and unlock role-level analytics.',
+  'agents.banner.cta': 'Set up agents →',
+  'agents.banner.roleOne': 'role',
+  'agents.banner.roleMany': 'roles',
+
+  // Registry modal
+  'agents.modal.title': 'Set up your agents',
+  'agents.modal.close': 'Close',
+  'agents.modal.intro': 'Mark the role names that are real agents. Nothing is saved until you click {apply} at the bottom — feel free to explore.',
+  'agents.modal.disclaimer': 'Detected from session logs. Some spawns may be missing or misclassified — treat this list as a starting point, not a complete ledger.',
+  'agents.modal.searchPlaceholder': 'Search {n} {roles}…',
+  'agents.modal.noMatch': 'No roles match “{q}”.',
+  'agents.modal.clearFilter': 'Clear filter',
+  'agents.modal.loading': 'Loading…',
+  'agents.modal.loadError': 'Failed to load: {err}',
+  'agents.modal.unknownRow': '{n} {sessions} (${cost}) had no role tag — nothing to classify here.',
+  'agents.modal.emptyRoles': 'No classifiable agent roles found in this project yet.',
+  'agents.modal.markToggleOn': '✓ Agent',
+  'agents.modal.markToggleOff': 'Mark as agent',
+  'agents.modal.displayNameLabel': 'Display name:',
+  'agents.modal.footerTrust': 'Trust the detector? Mark every role as an agent in one click.',
+  'agents.modal.footerPending': '{n} pending {changes} — click Apply to save.',
+  'agents.modal.markAll': 'Mark all as agents',
+  'agents.modal.apply': 'Apply',
+  'agents.modal.applyWithCount': 'Apply ({n})',
+  'agents.modal.applying': 'Saving…',
+  'agents.modal.saveError': 'Failed to save',
+  'agents.modal.discardConfirm': 'You have {n} unsaved {changes}. Discard?',
+  'agents.modal.discardTitle': 'Discard unsaved changes?',
+  'agents.modal.discardOk': 'Discard',
+  'agents.modal.discardCancel': 'Keep editing',
+  'agents.modal.sessionOne': 'session',
+  'agents.modal.sessionMany': 'sessions',
+  'agents.modal.changeOne': 'change',
+  'agents.modal.changeMany': 'changes',
+  'agents.modal.roleSessionStats': '{n} {sessions} · ${cost}',
+
+  // KPI pins
+  'agents.kpi.sessions.title': 'Agent sessions',
+  'agents.kpi.sessions.desc': 'Count of agent spawns + total tokens moved',
+  'agents.kpi.sessions.total': 'Total',
+  'agents.kpi.sessions.tokens': 'Tokens',
+
+  'agents.kpi.sessionAvg.title': 'Agent session avg',
+  'agents.kpi.sessionAvg.desc': 'Average cost and tokens for a typical agent spawn',
+  'agents.kpi.sessionAvg.cost': 'Cost',
+  'agents.kpi.sessionAvg.tokens': 'Tokens',
+
+  'agents.kpi.efficiency.title': 'Agent efficiency',
+  'agents.kpi.efficiency.desc': 'What share of the project runs through your agents',
+  'agents.kpi.efficiency.costShare': 'Cost share',
+  'agents.kpi.efficiency.tokensShare': 'Tokens share',
+
+  // Distribution widget
+  'agents.distribution.title': 'Agents by cost',
+  'agents.distribution.desc': 'Per-agent totals: sessions, tokens, cost',
+  'agents.distribution.sub': 'Per-agent totals across the selected range',
+  'agents.distribution.colAgent': 'Agent',
+  'agents.distribution.colSessions': 'Sessions',
+  'agents.distribution.colTokens': 'Tokens',
+  'agents.distribution.colTools': 'Tools',
+  'agents.distribution.colCost': 'Cost',
+  'agents.distribution.empty': 'No agents configured in this project yet.',
+
+  // Tool spectrum widget
+  'agents.toolSpectrum.title': 'Tools by role',
+  'agents.toolSpectrum.desc': 'What each role spends its tool calls on — Read vs Bash vs Edit vs …',
+  'agents.toolSpectrum.sub': '% of each role\'s tool calls per tool',
+  'agents.toolSpectrum.colRole': 'Role',
+  'agents.toolSpectrum.colOther': 'Other',
+  'agents.toolSpectrum.empty': 'No agents configured in this project yet.',
+  'agents.toolSpectrum.help': 'Each row is a configured role; each column is one of the most-used tools across this project. Cell color and number show how often that role uses that tool, as a percentage of the role\'s total tool calls. Hover a cell for absolute counts. Long-tail tools beyond the top columns are aggregated into "Other".',
+
+  // Spawn batches widget
+  'agents.spawnBatches.title': 'Parallel spawn batches',
+  'agents.spawnBatches.desc': 'When Claude dispatched multiple subagents in one orchestration call',
+  'agents.spawnBatches.subFmt': '{count} batches · avg {avg} · max {max}',
+  'agents.spawnBatches.subEmpty': 'No parallel batches in range — every agent ran solo',
+  'agents.spawnBatches.colSize': 'Size',
+  'agents.spawnBatches.colWhen': 'When',
+  'agents.spawnBatches.colRoles': 'Roles',
+  'agents.spawnBatches.colTokens': 'Tokens',
+  'agents.spawnBatches.colCost': 'Cost',
+  'agents.spawnBatches.empty': 'No parallel agent batches in range. Each row would be one orchestration call that fanned out to ≥2 subagents.',
+  'agents.spawnBatches.help': 'Each row is one orchestration call where Claude dispatched multiple subagents in parallel — they share the same internal promptId. The size is how many agents were in the batch. Patterns to look for: large fan-outs (Plan-mode rollouts, parallel research, simulation ticks) usually mean fewer but heavier orchestration calls; many small batches mean Claude is delegating granularly. Solo Task() calls (no fan-out) are excluded so the list isn\'t every agent ever.',
+
+
+  // Top sessions widget
+  'agents.topSessions.title': 'Top agent sessions by cost',
+  'agents.topSessions.desc': 'Heaviest individual agent invocations by spend',
+  'agents.topSessions.sub': 'Heaviest individual invocations in range',
+  'agents.topSessions.colAgent': 'Agent',
+  'agents.topSessions.colDescription': 'Description',
+  'agents.topSessions.colTokens': 'Tokens',
+  'agents.topSessions.colTools': 'Tools',
+  'agents.topSessions.colDuration': 'Dur',
+  'agents.topSessions.colCost': 'Cost',
+  'agents.topSessions.empty': 'No agent sessions in this range.',
+
+  // Timeline widget
+  'agents.timeline.title': 'Agents over time',
+  'agents.timeline.desc': 'Per-day cost by agent — see which roles work when',
+  'agents.timeline.subHour': 'Cost per agent per hour',
+  'agents.timeline.subDay': 'Cost per agent per day',
+  'agents.timeline.subWeek': 'Cost per agent per week',
+  'agents.timeline.subMonth': 'Cost per agent per month',
+  'agents.timeline.help': 'Cost per bucket stacked by agent. Bars show when each of your configured agents was active and how costly their work was. Only shows agents you\'ve classified — everything else is excluded.',
+  'agents.timeline.empty': 'No configured agents active in this range.',
+
+  // Placeholder used inside widget empty state (just informational — no CTA)
+  'agents.widget.emptyWithManage': 'No agents configured in this project yet. Use ‘Manage agents’ in the project header above to set them up.',
+
+  // Project header — Manage agents
+  'agents.projectHeader.manage': 'Manage agents',
+  'agents.projectHeader.manageTitle': 'Manage configured agents for this project',
+
+  // Widget picker sections + search
+  'customize.sectionGeneral': 'General',
+  'customize.sectionInsights': 'Insights by area',
+  'customize.sectionAgents': 'Agents',
+  'customize.searchPlaceholder': 'Search {n} {widgets}…',
+  'customize.searchDisabled': 'No widgets to add',
+  'customize.widgetOne': 'widget',
+  'customize.widgetMany': 'widgets',
+  'customize.noMatch': 'No widgets match “{q}”.',
+  'customize.clearSearch': 'Clear',
+
+  // Misc — aria-labels, tooltips that weren't covered in dedicated blocks
+  'common.home': 'Home',
+  'common.help': 'Help',
+  'footer.releasesTitle': 'Compare to the latest release on GitHub',
+  'agents.modal.unsavedDot': 'Unsaved change',
 } as const
 
 export type Dict = Record<keyof typeof en, string>

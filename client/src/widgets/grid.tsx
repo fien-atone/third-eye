@@ -21,6 +21,11 @@ import 'gridstack/dist/gridstack.css'
 export type WidgetSize = { w: number; h: number; label?: string }
 export type WidgetCategory = 'kpi' | 'chart' | 'table' | 'insights'
 
+/** Top-level picker grouping. Purely cosmetic — "category" drives
+ *  default-sizes, "section" drives picker headers. Keep in sync with
+ *  SECTION_LABELS and SECTION_ORDER below. */
+export type WidgetSection = 'general' | 'insights' | 'agents'
+
 /** Context passed to a widget's render function — includes current tile
  *  dimensions in grid units, so widgets can adapt their content (drop
  *  legends at small heights, show fewer rows in tables, etc.). Updates
@@ -30,6 +35,8 @@ export type WidgetDef = {
   title: string
   description?: string
   category?: WidgetCategory
+  /** Picker grouping — shown as a section header. Defaults to 'general'. */
+  section?: WidgetSection
   /** Supported sizes in the picker. First entry is the default. If omitted,
    *  the picker falls back to a sensible default based on `category`. */
   sizes?: WidgetSize[]
@@ -603,6 +610,10 @@ export function AddWidgetPicker({ screen, catalog, open, onClose, slot, onAdded 
 
   // Per-card selected size (map by widget id → index into sizesFor()).
   const [selected, setSelected] = useState<Record<string, number>>({})
+  // Search filter for the picker — case-insensitive substring match on
+  // widget title + description. Kicks in only when the catalog grows
+  // past a handful of widgets (threshold in the render below).
+  const [search, setSearch] = useState('')
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -618,6 +629,16 @@ export function AddWidgetPicker({ screen, catalog, open, onClose, slot, onAdded 
   const available = layout.hidden
     .map(id => catalog.find(w => w.id === id))
     .filter((w): w is WidgetDef => !!w)
+
+  // Filter by search query against title + description (case-insensitive).
+  const q = search.trim().toLowerCase()
+  const availableFiltered = q
+    ? available.filter(w =>
+        w.title.toLowerCase().includes(q) ||
+        (w.description ?? '').toLowerCase().includes(q) ||
+        w.id.toLowerCase().includes(q)
+      )
+    : available
 
   // Filter by slot constraints. For regular 'gap' slots: the size must
   // fit inside maxW × maxH. For 'row-break' slots: the size must span
@@ -639,11 +660,37 @@ export function AddWidgetPicker({ screen, catalog, open, onClose, slot, onAdded 
   }
 
   // Show non-fitting widgets (disabled) for discoverability. Fitting
-  // widgets sort first.
-  type WithFit = { def: WidgetDef; fitsSlot: boolean }
-  const visibleWidgets: WithFit[] = available
-    .map(def => ({ def, fitsSlot: fittingSizesFor(def).length > 0 }))
+  // widgets sort first. Also attach `section` (default 'general') so
+  // the picker can render group headers.
+  type WithFit = { def: WidgetDef; fitsSlot: boolean; section: WidgetSection }
+  const visibleWidgets: WithFit[] = availableFiltered
+    .map(def => ({
+      def,
+      fitsSlot: fittingSizesFor(def).length > 0,
+      section: (def.section ?? 'general') as WidgetSection,
+    }))
     .sort((a, b) => Number(b.fitsSlot) - Number(a.fitsSlot))
+
+  // Group into sections, preserving the fitting-first order within
+  // each group. SECTION_ORDER controls the display sequence; unknown
+  // sections (shouldn't happen) fall to the end under 'general'.
+  const SECTION_ORDER: WidgetSection[] = ['general', 'insights', 'agents']
+  const SECTION_LABELS: Record<WidgetSection, string> = {
+    general: t('customize.sectionGeneral'),
+    insights: t('customize.sectionInsights'),
+    agents: t('customize.sectionAgents'),
+  }
+  const groupedWidgets: Array<{ section: WidgetSection; items: WithFit[] }> =
+    SECTION_ORDER
+      .map(s => ({ section: s, items: visibleWidgets.filter(w => w.section === s) }))
+      .filter(g => g.items.length > 0)
+  // Section headers render when the OVERALL catalog has more than one
+  // section — not just the current filter result. Otherwise the
+  // grouping disappears on narrow searches and users lose context.
+  const overallSectionsCount = new Set(
+    available.map(d => (d.section ?? 'general') as WidgetSection)
+  ).size
+  const showSectionHeaders = overallSectionsCount > 1
 
   const getSelectedSize = (def: WidgetDef): WidgetSize => {
     const sizes = fittingSizesFor(def)
@@ -719,10 +766,55 @@ export function AddWidgetPicker({ screen, catalog, open, onClose, slot, onAdded 
             </div>
           )}
         </div>
+        <div className="widget-picker-search">
+          <input
+            type="search"
+            placeholder={
+              available.length > 0
+                ? t('customize.searchPlaceholder', {
+                    n: available.length,
+                    widgets: available.length === 1
+                      ? t('customize.widgetOne')
+                      : t('customize.widgetMany'),
+                  })
+                : t('customize.searchDisabled')
+            }
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            aria-label={t('customize.searchPlaceholder', {
+              n: available.length,
+              widgets: available.length === 1
+                ? t('customize.widgetOne')
+                : t('customize.widgetMany'),
+            })}
+            disabled={available.length === 0}
+          />
+        </div>
         <div className="widget-picker-list">
           {visibleWidgets.length === 0 ? (
-            <div className="widget-picker-empty">{t('customize.addEmpty')}</div>
-          ) : visibleWidgets.map(({ def, fitsSlot: doesFit }) => {
+            <div className="widget-picker-empty">
+              {q
+                ? <>
+                    {t('customize.noMatch', { q })}{' '}
+                    <button className="ghost" onClick={() => setSearch('')} style={{ textDecoration: 'underline', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--accent)' }}>
+                      {t('customize.clearSearch')}
+                    </button>
+                  </>
+                : t('customize.addEmpty')}
+            </div>
+          ) : groupedWidgets.flatMap(group => [
+            // Only show the section header when there is more than one
+            // section — avoids a pointless "General" header on screens
+            // that have no other sections available.
+            showSectionHeaders ? (
+              <div
+                key={`__section_${group.section}`}
+                className="widget-picker-section-header"
+              >
+                {SECTION_LABELS[group.section]}
+              </div>
+            ) : null,
+            ...group.items.map(({ def, fitsSlot: doesFit }) => {
             // For disabled cards, preview the widget's default size so the
             // user can see WHY it doesn't fit (too tall/wide). For fitting
             // cards, preview whichever fitting size is currently selected.
@@ -810,7 +902,8 @@ export function AddWidgetPicker({ screen, catalog, open, onClose, slot, onAdded 
                 </div>
               </div>
             )
-          })}
+            }),
+          ].filter(Boolean))}
         </div>
       </div>
     </>

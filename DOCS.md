@@ -224,10 +224,50 @@ sensitive, share the code and let them build their own DB.
 
 ---
 
+## Custom Claude Code location
+
+By default Third Eye looks for Claude Code data under the standard
+location for your OS:
+
+- macOS / Linux: `~/.claude/projects/`
+- Windows: `%USERPROFILE%\.claude\projects\`
+
+If your install lives elsewhere — multi-user server, NAS-backed
+storage, dev/staging side by side, Docker mount, symlinks, anything
+non-default — point Third Eye at it via env var:
+
+```
+THIRD_EYE_CLAUDE_DIR=/path/to/.claude
+```
+
+(`CLAUDE_CONFIG_DIR`, the env Claude Code itself respects, is also
+read as a fallback. `THIRD_EYE_CLAUDE_DIR` wins when both are set.)
+
+Common scenarios:
+
+- **Docker:** mount your host's `~/.claude` into the container, e.g.
+  `-v ~/.claude:/data/claude`, then set
+  `THIRD_EYE_CLAUDE_DIR=/data/claude`. The default
+  `docker-compose.yml` does this automatically using
+  `${USER_HOME}/.claude`.
+- **Multi-user / shared install:** point at the team account's
+  `.claude` directly.
+- **WSL viewing Windows-side data:** `THIRD_EYE_CLAUDE_DIR=/mnt/c/Users/<name>/.claude`.
+
+Subagent task outputs (`/private/tmp/claude-<uid>/` on macOS,
+`/tmp/claude-<uid>/` on Linux) are auto-discovered separately and
+don't honor this override — they're an OS-level artifact, not a
+configurable user data location.
+
 ## Windows specifics
 
 Session paths auto-detect — Claude Code / Desktop / Codex are all found under
-`%USERPROFILE%` / `%APPDATA%` without config.
+`%USERPROFILE%` / `%APPDATA%` without config. If your install isn't
+in the default place, see "Custom Claude Code location" above.
+
+Native Windows runs are untested as of v2.4 — Linux containers
+(Docker) and WSL are the recommended paths. File an issue with
+`environment: Windows native` if you hit anything.
 
 If `npm install` fails on `better-sqlite3` with a node-gyp error, install
 **Visual Studio Build Tools** with the "Desktop development with C++"

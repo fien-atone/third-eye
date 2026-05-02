@@ -9,6 +9,7 @@ export function skillsWidget(t: T, data: InsightsResponse): WidgetDef {
     title: t('insights.skills.title'),
     description: t('widgets.skills.description'),
     category: 'insights',
+    section: 'insights',
     sizes: [{ w: 2, h: 3 }, { w: 4, h: 3 }, { w: 2, h: 2 }],
     minW: 2,
     minH: 2,

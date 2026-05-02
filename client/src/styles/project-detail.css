@@ -29,14 +29,23 @@
   font-weight: 700;
   color: var(--text);
   line-height: 1.2;
-  /* Constrain to parent width and let the label flex-shrink so very
+  /* display:flex + max-width:100% lets the label flex-shrink so very
      long auto-labels (raw filesystem paths) collapse to a MidEllipsis
-     instead of pushing the rename button off the right edge of the
-     page. min-width:0 on a flex item is the standard escape hatch
-     that lets text-overflow / measured-truncation work inside flex. */
+     instead of pushing buttons off the right edge. align-items:center
+     unifies vertical position of label, star, pencil, and Manage —
+     no per-child transform hacks needed below.
+     align-self:stretch — the parent .project-header is column-flex
+     with align-items:flex-start, which prevents this h1 from
+     stretching to full row width by default. Without stretching,
+     h1's width = its content width, so when MidEllipsis truncates
+     the label, h1 shrinks, label's flex space shrinks, MidEllipsis
+     truncates more, etc. — an infinite oscillation visible as the
+     title "breathing" in/out. Forcing stretch makes h1 width depend
+     on the outer page, not its own children. */
+  align-self: stretch;
   display: flex;
   max-width: 100%;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   letter-spacing: -0.01em;
 }
@@ -47,11 +56,9 @@
   min-width: 0;
 }
 .project-header-rename {
-  /* Borderless pencil that sits centred next to the title (.project-
-     header-title uses align-items: baseline for its label, so we lift
-     the pencil with translateY to optically centre on the cap height
-     rather than the baseline). */
-  align-self: center;
+  /* Borderless icon button next to the title. Parent uses
+     align-items: center so we don't need the translateY hack that
+     used to compensate for baseline alignment. */
   border: none;
   background: transparent;
   padding: 0;
@@ -60,20 +67,39 @@
   font-size: 18px;
   color: var(--text-dim);
   border-radius: 6px;
-  margin-left: 6px;
-  transform: translateY(-0.18em);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .project-header-rename:hover {
   background: var(--hover);
   color: var(--text);
   border-color: transparent;
 }
+/* Secondary action buttons in the project header (e.g. "Manage agents").
+   Base look is set inline on the element; this rule just adds hover/
+   focus states that inline styles can't express. Keeps the experimental
+   purple tone on hover rather than flipping to accent orange. */
+.project-header-action {
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.project-header-action:hover,
+.project-header-action:focus-visible {
+  background: var(--experimental-soft, var(--hover)) !important;
+  border-style: solid !important;
+  border-color: var(--experimental, var(--border-strong)) !important;
+  color: var(--experimental-hover, var(--experimental, var(--text))) !important;
+  outline: none;
+}
+.project-header-action:active {
+  background: var(--experimental-strong, var(--hover)) !important;
+}
+
 /* Favorite star next to the title — same borderless visual as the
    pencil so the two button affordances feel like a pair. Filled
-   accent when on, dim when off; uses the existing .btn-star tokens
-   from the projects table for state consistency. */
+   accent when on, dim when off. Parent uses align-items:center so no
+   translateY compensation needed (unlike older baseline-aligned variant). */
 .project-header-fav {
-  align-self: center;
   border: none;
   background: transparent;
   padding: 0;
@@ -83,7 +109,9 @@
   color: var(--text-dim);
   border-radius: 6px;
   flex: 0 0 auto;
-  transform: translateY(-0.18em);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .project-header-fav.on { color: var(--accent); }
 .project-header-fav:hover { background: var(--hover); color: var(--text); }

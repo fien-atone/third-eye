@@ -9,6 +9,7 @@ export function flagsWidget(t: T, data: InsightsResponse): WidgetDef {
     title: t('insights.flags.title'),
     description: t('widgets.flags.description'),
     category: 'insights',
+    section: 'insights',
     sizes: [{ w: 2, h: 2 }, { w: 4, h: 2 }, { w: 2, h: 3 }],
     minW: 2,
     minH: 2,

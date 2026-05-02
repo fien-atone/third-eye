@@ -1,0 +1,2 @@
+{"type":"user","timestamp":"2026-04-30T11:00:00.000Z","promptId":"b2222222-2222-2222-2222-222222222222","isSidechain":true,"agentId":"a000000000000002","message":{"role":"user","content":"Investigate the slow query."}}
+{"type":"assistant","timestamp":"2026-04-30T11:00:03.000Z","requestId":"req-003","message":{"role":"assistant","model":"claude-sonnet-4-5","stop_reason":"end_turn","usage":{"input_tokens":200,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":100},"content":[{"type":"text","text":"Looked into it."}]}}

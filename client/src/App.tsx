@@ -104,8 +104,16 @@ export default function App() {
   const refreshMutation = useMutation({
     mutationFn: () => apiPost<{ ok: boolean; durationMs: number; total: number }>('/api/refresh'),
     onSuccess: () => {
+      // Invalidate everything that ingest can change. Without this the
+      // "Manage agents" modal and the setup banner would keep their
+      // cached role list until the next page reload — even though new
+      // agents land in the DB on every refresh. Same for projects /
+      // insights: a fresh ingest can surface a brand-new project.
       qc.invalidateQueries({ queryKey: ['providers'] })
       qc.invalidateQueries({ queryKey: ['overview'] })
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      qc.invalidateQueries({ queryKey: ['insights'] })
+      qc.invalidateQueries({ queryKey: ['agents'] })
     },
   })
 

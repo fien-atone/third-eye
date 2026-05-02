@@ -5,9 +5,75 @@ based on user feedback. Past releases are in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Now (active work)
 
-Nothing actively in flight — v1.4.0 just shipped. We're listening for
-feedback from the first wave of users on widget layouts before picking
-the next focus area.
+**`feat/agent-telemetry` branch.** Surfacing agent-session data
+(Claude Code subagents and Task-tool spawned agents) across the
+dashboard and per-project views. Currently testing on real-world
+projects, including a D&D-village simulation that runs ~32 NPCs as
+parallel subagents. Several iterations of parser fixes ahead before
+this is ready for v2.4 release.
+
+## Agent telemetry — what's coming after the current iteration
+
+Captured from a real-world test session on 2026-05-02. These items
+are validated against systems we've never seen — universality is
+the bar.
+
+### v2.4.0 (universal features that benefit any agent setup)
+
+- **Tool spectrum per role.** We already store `tools_json` per
+  agent session. Surface as either a column in the Top Sessions
+  widget or a new "Tools by role" widget. Answers "when my
+  frontend-dev agents run, what do they actually do?".
+- **`promptId` → spawn batches.** Claude orchestrates parallel
+  Task() calls under one promptId. Group them, expose "average
+  batch size" as a metric, "agents per orchestration request" in
+  the timeline.
+- **`isSidechain` ratio.** Sidechain = parallel/auxiliary agent.
+  Universal "what fraction of my agent spend goes to parallel
+  research vs the main chain" answer.
+- **In-app onboarding.** Welcome modal on first run + a permanent
+  "Take a tour" entry point. Critical when the user base is people
+  who didn't write the code — they need to know what "Manage
+  agents" or "registry" means.
+
+### v2.4.1 (robustness for systems we haven't seen)
+
+- **Cross-platform path audit.** All agent-session paths assume
+  macOS/Linux. Verify Windows (`%USERPROFILE%\.claude\projects\`)
+  works end-to-end, fix anything that doesn't.
+- **Per-file try/catch in meta.json reads.** Today one corrupted
+  JSON file would crash the whole agent ingest. Wrap every parse,
+  log + continue.
+- **`THIRD_EYE_CLAUDE_DIR` env var.** Custom Claude Code install
+  locations (sandboxed setups, symlinks, non-default homes).
+- **Parser unit tests.** Fixtures for: agent JSONL with meta.json,
+  without meta.json, old format, current format, agentType
+  present/missing. Today a Claude Code schema change would
+  silently break parsing for many users at once.
+
+### v2.5.0 (scale)
+
+- **Incremental agent ingest.** Currently re-parses every JSONL
+  file on every Refresh. The `runIngest` comment says "the set is
+  small (hundreds, not tens of thousands)" — but a simulation user
+  with 10k agents/day breaks that assumption. Switch to mtime-
+  based incremental scan for the agent pipeline (api_calls
+  pipeline already does this).
+- **Stop_reason / failure detection.** Track when agents end with
+  tool errors, hit max tokens, or otherwise terminate abnormally.
+  Operationally important even for the user — and a great
+  visualisation for "agent health".
+
+### Niche / opt-in (not for everyone)
+
+- **Per-persona drill-down via `description`.** Group sessions by
+  the first token of description (e.g. "outsider_branimir t19" →
+  "outsider_branimir"). Useful for simulations where agents have
+  stable names; useless for typical software-dev usage where
+  description is "fix login bug" / "refactor billing". Keep as
+  opt-in flag in the agent registry.
+
+
 
 ## Next (likely v1.5.x)
 

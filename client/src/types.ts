@@ -73,7 +73,6 @@ export type VersionRow = {
 export type InsightsResponse = {
   project: { key: string }
   range: { start: string; end: string }
-  subagents: InsightsItem[]
   skills: InsightsItem[]
   mcp: InsightsItem[]
   bash: InsightsItem[]
@@ -82,7 +81,6 @@ export type InsightsResponse = {
   flags: { plan_mode_calls: number; todo_write_calls: number; total_calls: number }
   branches: Array<{ name: string; calls: number; cost: number }>
   versions: VersionRow[]
-  heatmap: Array<{ dow: number; hour: number; calls: number; cost: number }>
 }
 
 export type OverviewResponse = {
@@ -124,7 +122,75 @@ export type OverviewResponse = {
   }>
   topProjects: Array<{ key: string; id: string | null; label: string; cost: number; calls: number }>
   otherProjects: { count: number; cost: number }
+  agentTelemetry: AgentTelemetry
   lastIngestAt: string | null
+}
+
+export type AgentTelemetry = {
+  totals: {
+    sessions: number
+    inputTokens: number
+    cacheCreate: number
+    cacheRead: number
+    outputTokens: number
+    totalTokens: number
+    cost: number
+    toolUses: number
+    durationS: number
+  }
+  byRole: Array<{
+    role: string                 // effective label: display_name OR raw role
+    sessions: number
+    tokens: number
+    cost: number
+    toolUses: number
+  }>
+  topSessions: Array<{
+    agentId: string
+    source: string               // 'subagent' | 'task'
+    role: string                 // effective label (see byRole.role)
+    rawRole: string              // original detected role, for reference
+    confidence: string
+    description: string
+    tsStart: string
+    durationS: number
+    totalTokens: number
+    cost: number
+    toolUses: number
+    apiCalls: number
+  }>
+  timeline: {
+    roles: string[]              // all effective roles seen in range, sorted
+    series: Array<Record<string, number | string>>  // per-bucket row, keys: bucket, `agent:<role>`
+  }
+  /** Tool-usage breakdown per role. UI renders as a matrix: rows are
+   *  roles, columns are top-N most-used tools globally, cells are
+   *  counts (with % computed client-side as cell / role.toolUses). */
+  toolSpectrum: {
+    topTools: string[]   // global top-N tool names, ordered by total usage
+    roles: Array<{
+      role: string       // effective label
+      sessions: number
+      toolUses: number   // total tool calls across this role's sessions
+      tools: Record<string, number>  // tool -> count for this role
+    }>
+  }
+  /** Spawn batches — agents sharing one promptId were dispatched
+   *  in a single parallel orchestration call by Claude. */
+  spawnBatches: {
+    avgSize: number       // mean across all batches (singletons excluded)
+    maxSize: number       // largest fan-out seen
+    batchedAgents: number // total sessions that ran inside a batch
+    batchCount: number    // distinct batch count
+    batches: Array<{
+      promptId: string
+      size: number
+      spawnedAt: string   // ISO of earliest agent in this batch
+      cost: number
+      tokens: number
+      roles: Array<{ role: string; sessions: number }>  // role mix in this batch
+    }>
+  }
 }
 
 /** Recharts tooltip props (re-typed loosely — Recharts types are

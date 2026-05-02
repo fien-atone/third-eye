@@ -61,6 +61,7 @@ export function filesWidget(t: T, data: InsightsResponse, projectKey: string | n
     title: t('insights.files.title'),
     description: t('widgets.files.description'),
     category: 'insights',
+    section: 'insights',
     sizes: [{ w: 2, h: 3 }, { w: 4, h: 3 }, { w: 2, h: 2 }],
     minW: 2,
     minH: 2,

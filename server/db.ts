@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync, statSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { envRead } from './lib/env.ts'
@@ -15,11 +15,15 @@ function resolveDefaultDbPath(): string {
   const dataDir = join(__dirname, '..', 'data')
   const newPath = join(dataDir, 'third-eye.db')
   const legacyPath = join(dataDir, 'codeburn.db')
-  // If the legacy file is present AND the new file is not, keep reading
-  // the legacy file. Rename would require WAL/SHM sidecars to move atomically
-  // AND be safe across process restarts — simpler to just point at the
-  // existing file until the user deletes it or we drop legacy in v3.0.
-  if (!existsSync(newPath) && existsSync(legacyPath)) return legacyPath
+  // Prefer the legacy file whenever it has actual data — the new
+  // path may exist as an empty placeholder (Docker test runs create
+  // one on a fresh data volume; our own dev runs can too if the user
+  // wipes the new DB without removing the legacy one). Without this
+  // size check the auto-detect would silently switch to a 0-byte
+  // file and the UI would look empty.
+  const legacyHasData = existsSync(legacyPath) && statSync(legacyPath).size > 0
+  const newHasData = existsSync(newPath) && statSync(newPath).size > 0
+  if (legacyHasData && !newHasData) return legacyPath
   return newPath
 }
 
@@ -97,10 +101,19 @@ function migrate(d: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_tool_events_dedup   ON tool_events(dedup_key);
   `)
 
-  // Idempotent column additions (SQLite has no IF NOT EXISTS for columns)
+  // Idempotent column additions (SQLite has no IF NOT EXISTS for columns).
+  // Two errors are swallowed silently:
+  //   - "duplicate column" — column already exists, expected on every
+  //     run after the first.
+  //   - "no such table"    — migration ordering accident: a future
+  //     change might place an addCol() above its CREATE TABLE; we'd
+  //     rather skip the alter and surface the missing column at use
+  //     time than abort the entire migration on a fresh DB.
   const addCol = (sql: string) => {
     try { d.exec(sql) } catch (e) {
-      if (!String((e as Error).message).includes('duplicate column')) throw e
+      const msg = String((e as Error).message)
+      if (msg.includes('duplicate column') || msg.includes('no such table')) return
+      throw e
     }
   }
   addCol("ALTER TABLE api_calls ADD COLUMN git_branch TEXT")
@@ -122,6 +135,70 @@ function migrate(d: Database.Database) {
     layout_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`)
+
+  // Per-agent-invocation telemetry. One row = one spawned agent session
+  // (subagent or Task tool output). Populated by server/lib/agent-sessions.ts
+  // during ingest. Primary key is (source, project, agent_id) so re-ingest
+  // is idempotent — the same JSONL file always maps to the same row.
+  d.exec(`CREATE TABLE IF NOT EXISTS agent_sessions (
+    agent_id            TEXT NOT NULL,
+    source              TEXT NOT NULL,  -- 'subagent' | 'task'
+    project             TEXT NOT NULL,
+    ts_start            TEXT NOT NULL,
+    ts_start_epoch      INTEGER NOT NULL,
+    duration_s          INTEGER NOT NULL,
+    role                TEXT NOT NULL,
+    role_confidence     TEXT NOT NULL,  -- 'meta' | 'prompt' | 'unknown'
+    description         TEXT NOT NULL,
+    model               TEXT NOT NULL,
+    input_tokens        INTEGER NOT NULL,
+    cache_create_tokens INTEGER NOT NULL,
+    cache_read_tokens   INTEGER NOT NULL,
+    output_tokens       INTEGER NOT NULL,
+    total_tokens        INTEGER NOT NULL,
+    cost_usd            REAL NOT NULL,
+    api_calls           INTEGER NOT NULL,
+    tool_uses           INTEGER NOT NULL,
+    tools_json          TEXT NOT NULL,
+    PRIMARY KEY (source, project, agent_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_agent_sessions_project ON agent_sessions(project);
+  CREATE INDEX IF NOT EXISTS idx_agent_sessions_ts      ON agent_sessions(ts_start_epoch);
+  CREATE INDEX IF NOT EXISTS idx_agent_sessions_role    ON agent_sessions(role);
+  `)
+
+  // Agent-session enrichment fields (added in v2.4). MUST run AFTER
+  // the CREATE TABLE above — addCol on a missing table aborts the
+  // whole migration on a fresh DB (caught during a Docker smoke run).
+  // `prompt_id`  — Claude's parent prompt UUID that spawned this
+  //                agent. Multiple agents sharing it = one parallel
+  //                batch dispatch.
+  // `stop_reason` — final assistant turn's stop_reason. end_turn =
+  //                clean exit; tool_use last = aborted mid-tool;
+  //                max_tokens = context limit. "Agent health" signal.
+  addCol("ALTER TABLE agent_sessions ADD COLUMN prompt_id TEXT")
+  addCol("ALTER TABLE agent_sessions ADD COLUMN stop_reason TEXT")
+
+  // Per-project agent-role registry. Rows are created by the user via
+  // the Agents Setup modal — one row per detected raw-role value the
+  // user has explicitly acknowledged. raw_role is the key extracted by
+  // the parser (meta-prefix or "You are the X" match). display_name
+  // lets the user rename for UI; when merged_into is set the role is
+  // treated as an alias of another (rollup target). enabled=0 means
+  // the role is acknowledged but should be collapsed into the
+  // "Unclassified" bucket in views. Any raw role NOT in this table
+  // counts as "undetected-but-present" and drives the setup banner.
+  d.exec(`CREATE TABLE IF NOT EXISTS agent_registry (
+    project       TEXT NOT NULL,
+    raw_role      TEXT NOT NULL,
+    display_name  TEXT,
+    enabled       INTEGER NOT NULL DEFAULT 1,
+    merged_into   TEXT,
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (project, raw_role)
+  );
+  CREATE INDEX IF NOT EXISTS idx_agent_registry_project ON agent_registry(project);
+  `)
 
   // User-controlled settings (versioned via key/value JSON so adding a
   // new field doesn't need a migration). One key per top-level section
@@ -147,7 +224,7 @@ export function truncateAll(): { calls: number; projects: number } {
   const d = db()
   const calls = (d.prepare('SELECT COUNT(*) AS n FROM api_calls').get() as { n: number }).n
   const projects = (d.prepare('SELECT COUNT(*) AS n FROM projects').get() as { n: number }).n
-  d.exec('DELETE FROM api_calls; DELETE FROM tool_events; DELETE FROM projects; DELETE FROM meta WHERE key LIKE \'last_ingest%\';')
+  d.exec('DELETE FROM api_calls; DELETE FROM tool_events; DELETE FROM projects; DELETE FROM agent_sessions; DELETE FROM agent_registry; DELETE FROM meta WHERE key LIKE \'last_ingest%\';')
   d.exec('VACUUM')
   return { calls, projects }
 }

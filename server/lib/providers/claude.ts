@@ -6,24 +6,10 @@
 
 import { readdir, stat } from 'fs/promises'
 import { basename, join } from 'path'
-import { homedir } from 'os'
 
 import type { Provider, SessionSource, SessionParser } from './types.js'
 import { getShortModelName } from '../models.js'
-
-function getClaudeDir(): string {
-  return process.env['CLAUDE_CONFIG_DIR'] || join(homedir(), '.claude')
-}
-
-function getProjectsDir(): string {
-  return join(getClaudeDir(), 'projects')
-}
-
-function getDesktopSessionsDir(): string {
-  if (process.platform === 'darwin') return join(homedir(), 'Library', 'Application Support', 'Claude', 'local-agent-mode-sessions')
-  if (process.platform === 'win32') return join(homedir(), 'AppData', 'Roaming', 'Claude', 'local-agent-mode-sessions')
-  return join(homedir(), '.config', 'Claude', 'local-agent-mode-sessions')
-}
+import { claudeProjectsDir, claudeDesktopSessionsDir } from '../claude-paths.ts'
 
 async function findDesktopProjectDirs(base: string): Promise<string[]> {
   const results: string[] = []
@@ -66,7 +52,7 @@ export const claude: Provider = {
   async discoverSessions(): Promise<SessionSource[]> {
     const sources: SessionSource[] = []
 
-    const projectsDir = getProjectsDir()
+    const projectsDir = claudeProjectsDir()
     try {
       const entries = await readdir(projectsDir)
       for (const dirName of entries) {
@@ -78,7 +64,7 @@ export const claude: Provider = {
       }
     } catch {}
 
-    const desktopDirs = await findDesktopProjectDirs(getDesktopSessionsDir())
+    const desktopDirs = await findDesktopProjectDirs(claudeDesktopSessionsDir())
     for (const dirPath of desktopDirs) {
       sources.push({ path: dirPath, project: basename(dirPath), provider: 'claude' })
     }

@@ -9,6 +9,7 @@ export function versionsWidget(t: T, data: InsightsResponse): WidgetDef {
     title: t('insights.versions.title'),
     description: t('widgets.versions.description'),
     category: 'insights',
+    section: 'insights',
     sizes: [{ w: 4, h: 2 }, { w: 2, h: 2 }, { w: 4, h: 3 }],
     minW: 2,
     minH: 2,

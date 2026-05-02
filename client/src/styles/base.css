@@ -3,6 +3,15 @@
   --accent-hover: #c2410c;
   --good: #16a34a;
   --bad: #dc2626;
+  /* Experimental / labs accent — violet, triadic against the orange
+   * primary and distinct from --good (green) / --bad (red). Reserved
+   * exclusively for "this is an opt-in preview" surfaces so the hue
+   * stays a signal, not decoration. */
+  --experimental: #7c3aed;
+  --experimental-hover: #6d28d9;
+  --experimental-soft: rgba(124, 58, 237, 0.08);
+  --experimental-strong: rgba(124, 58, 237, 0.2);
+  --experimental-border: rgba(124, 58, 237, 0.3);
   /* Bright console palette — matches codeburn CLI "burn" gradient */
   --chart-1: #FF8C42;  /* orange (primary - burn) */
   --chart-2: #5B9EF5;  /* sky blue */
@@ -51,6 +60,11 @@
   --grid: #242428;
   --shadow: 0 1px 2px rgba(0,0,0,0.4);
   --accent: #f97316;
+  --experimental: #a78bfa;
+  --experimental-hover: #c4b5fd;
+  --experimental-soft: rgba(167, 139, 250, 0.12);
+  --experimental-strong: rgba(167, 139, 250, 0.25);
+  --experimental-border: rgba(167, 139, 250, 0.4);
   color-scheme: dark;
 }
 

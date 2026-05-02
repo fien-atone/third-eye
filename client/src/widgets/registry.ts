@@ -19,8 +19,15 @@ import { modelsWidget } from './dashboard/models'
 import { activityWidget } from './dashboard/activity'
 import { topProjectsWidget } from './dashboard/top-projects'
 import { hourTimelineWidget } from './dashboard/hour-timeline'
+import { kpiAgentSessionsWidget } from './dashboard/kpi-agent-sessions'
+import { kpiAgentTokensPerSessionWidget } from './dashboard/kpi-agent-tokens-per-session'
+import { kpiAgentDelegationWidget } from './dashboard/kpi-agent-delegation'
+import { agentDistributionWidget } from './dashboard/agent-distribution'
+import { agentTopSessionsWidget } from './dashboard/agent-top-sessions'
+import { agentTimelineWidget } from './dashboard/agent-timeline'
+import { agentToolSpectrumWidget } from './dashboard/agent-tool-spectrum'
+import { agentSpawnBatchesWidget } from './dashboard/agent-spawn-batches'
 
-import { subagentsWidget } from './insights/subagents'
 import { skillsWidget } from './insights/skills'
 import { mcpWidget } from './insights/mcp'
 import { bashWidget } from './insights/bash'
@@ -28,7 +35,6 @@ import { filesWidget } from './insights/files'
 import { flagsWidget } from './insights/flags'
 import { versionsWidget } from './insights/versions'
 import { branchesWidget } from './insights/branches'
-import { heatmapWidget } from './insights/heatmap'
 
 export type DashboardCtx = {
   t: T
@@ -59,13 +65,29 @@ export function buildDashboardCatalog(ctx: DashboardCtx): WidgetDef[] {
     modelsWidget(t, data),
     activityWidget(t, data),
   ]
+  // Project-only widgets — Agent insights are scoped to a single
+  // project (registry is per-project). Surfacing them on the main
+  // dashboard would show cross-project aggregates that can't be
+  // configured there, so gate on inProjectView.
+  if (inProjectView) {
+    return [
+      ...shared,
+      kpiAgentSessionsWidget(t, data),
+      kpiAgentTokensPerSessionWidget(t, data),
+      kpiAgentDelegationWidget(t, data),
+      agentDistributionWidget(t, data),
+      agentTopSessionsWidget(t, data),
+      agentTimelineWidget(t, data, series, granularity),
+      agentToolSpectrumWidget(t, data),
+      agentSpawnBatchesWidget(t, data),
+    ]
+  }
   // Dashboard-only widgets: "cost by project" and "top projects" aggregate
   // ACROSS projects — showing them inside a single project's view makes no
   // semantic sense (cost-by-project would collapse to a single bar;
   // top-projects to a single row). Gate on !inProjectView so they're
   // unavailable in the project picker, and reconcile() scrubs them if a
   // stale saved layout still references them.
-  if (inProjectView) return shared
   // Hour-timeline only meaningful when the series IS hourly — adding it
   // unconditionally would put a 24-bar chart on the daily dashboard
   // where the data is one bar per day. Gate on granularity.
@@ -87,9 +109,8 @@ export type InsightsCtx = {
 }
 
 export function buildInsightsCatalog(ctx: InsightsCtx): WidgetDef[] {
-  const { t, data, projectKey, dl } = ctx
+  const { t, data, projectKey } = ctx
   return [
-    subagentsWidget(t, data),
     skillsWidget(t, data),
     mcpWidget(t, data),
     bashWidget(t, data),
@@ -97,6 +118,5 @@ export function buildInsightsCatalog(ctx: InsightsCtx): WidgetDef[] {
     flagsWidget(t, data),
     versionsWidget(t, data),
     branchesWidget(t, data),
-    heatmapWidget(t, data, dl),
   ]
 }

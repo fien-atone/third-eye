@@ -3,6 +3,7 @@ import type { Locale } from 'date-fns'
 import { useT } from '../i18n'
 import { useDateLocale, fmtCurrency, fmtInt } from '../lib/format'
 import type { Granularity, OverviewResponse, ProvidersResponse } from '../types'
+import { SlidersIcon } from './icons'
 import { DateField } from './date-field'
 
 type PresetKey = 'preset.7d' | 'preset.30d' | 'preset.12w' | 'preset.mtd' | 'preset.12m'
@@ -148,7 +149,7 @@ export function DashboardControls({
             aria-label={t('controls.customize')}
             aria-pressed={false}
           >
-            <span className="customize-icon" aria-hidden="true">⚙</span>
+            <span className="customize-icon" aria-hidden="true"><SlidersIcon size={14} /></span>
             <span className="customize-label">{t('controls.customize')}</span>
           </button>
         )}

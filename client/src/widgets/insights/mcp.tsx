@@ -9,6 +9,7 @@ export function mcpWidget(t: T, data: InsightsResponse): WidgetDef {
     title: t('insights.mcp.title'),
     description: t('widgets.mcp.description'),
     category: 'insights',
+    section: 'insights',
     sizes: [{ w: 2, h: 3 }, { w: 4, h: 3 }, { w: 2, h: 2 }],
     minW: 2,
     minH: 2,
