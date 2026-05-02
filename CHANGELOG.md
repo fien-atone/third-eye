@@ -80,12 +80,13 @@ handful of UX papercuts.
 
 ### Fixed
 
-- **Database auto-detect no longer prefers an empty
-  `third-eye.db`** over a populated `codeburn.db`. A 0-byte
-  placeholder file (created accidentally during a Docker
-  smoke run on a fresh data volume) used to win against a
-  25 MB legacy file sitting next to it, hiding all the user's
-  data.
+- **Database auto-detect prefers data over filename.** Affects
+  the upgrade path from the CodeBurn fork only: if both
+  `third-eye.db` and `codeburn.db` exist in `server/data/`,
+  the one with actual data wins. Previously a 0-byte
+  `third-eye.db` placeholder (which can be created by certain
+  install paths on a fresh data volume) silently shadowed a
+  populated legacy file. New installs untouched.
 - **Cross-platform path centralization.** Two duplicated
   `getClaudeDir()` helpers collapsed into one
   `server/lib/claude-paths.ts`. The macOS-hardcoded path in
