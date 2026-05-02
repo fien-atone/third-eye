@@ -33,7 +33,16 @@
      long auto-labels (raw filesystem paths) collapse to a MidEllipsis
      instead of pushing buttons off the right edge. align-items:center
      unifies vertical position of label, star, pencil, and Manage —
-     no per-child transform hacks needed below. */
+     no per-child transform hacks needed below.
+     align-self:stretch — the parent .project-header is column-flex
+     with align-items:flex-start, which prevents this h1 from
+     stretching to full row width by default. Without stretching,
+     h1's width = its content width, so when MidEllipsis truncates
+     the label, h1 shrinks, label's flex space shrinks, MidEllipsis
+     truncates more, etc. — an infinite oscillation visible as the
+     title "breathing" in/out. Forcing stretch makes h1 width depend
+     on the outer page, not its own children. */
+  align-self: stretch;
   display: flex;
   max-width: 100%;
   align-items: center;

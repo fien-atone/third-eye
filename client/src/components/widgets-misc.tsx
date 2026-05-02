@@ -94,7 +94,18 @@ export function MidEllipsis({ text, query, className }: { text: string; query?: 
       || ((MidEllipsis as unknown as { _c?: HTMLCanvasElement })._c = document.createElement('canvas'))
     const ctx = sharedCanvas.getContext('2d')!
 
+    // Oscillation guard: if a parent's flex sizing depends on this
+    // element's content (a layout we caught on the project page),
+    // setDisplay → DOM size change → ResizeObserver fires → compute
+    // → setDisplay → … in an infinite loop visible as the label
+    // "breathing" in and out. Track recent results; if a candidate
+    // matches one we've already produced, freeze. The deps array
+    // [text, isHighlighting] resets this on legit change.
+    const recentDisplays: string[] = []
+    let frozen = false
+
     const compute = () => {
+      if (frozen) return
       const containerW = parent.clientWidth
       if (containerW <= 0) return
       const cs = getComputedStyle(el)
@@ -128,7 +139,18 @@ export function MidEllipsis({ text, query, className }: { text: string; query?: 
       }
       const startN = Math.ceil(lo / 2)
       const endN = lo - startN
-      setDisplay(text.slice(0, startN) + ELLIPSIS + (endN > 0 ? text.slice(text.length - endN) : ''))
+      const next = text.slice(0, startN) + ELLIPSIS + (endN > 0 ? text.slice(text.length - endN) : '')
+      // Detect oscillation — if we've already produced this exact
+      // candidate before (in this effect's lifetime), the layout is
+      // bouncing between two results. Freeze on whatever's currently
+      // showing instead of looping forever.
+      if (recentDisplays.includes(next)) {
+        frozen = true
+        return
+      }
+      recentDisplays.push(next)
+      if (recentDisplays.length > 4) recentDisplays.shift()
+      setDisplay(next)
     }
 
     compute()
