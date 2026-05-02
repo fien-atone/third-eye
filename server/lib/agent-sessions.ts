@@ -143,7 +143,24 @@ const PROMPT_ROLE_RE = /You are the\s+([A-Za-z][A-Za-z0-9_-]{1,30})/
 
 export type DetectedRole = { role: string; confidence: 'meta' | 'prompt' | 'unknown' }
 
-export function detectRole(metaDesc: string | null, firstUserText: string | null): DetectedRole {
+/** Recognize the role of a spawned agent using all signals available
+ *  in the new (Claude Code 2.x) layout, in order:
+ *    1. meta.json `agentType` — the canonical role name (e.g.
+ *       "frontend-dev", "Explore", "villager"). Present in essentially
+ *       every modern subagent invocation. Used to be ignored entirely,
+ *       which made the parser miss ~90% of detectable roles.
+ *    2. meta.json `description` "<role>:" prefix — legacy convention
+ *       that some users still follow manually.
+ *    3. First user/system message containing "You are the X" — last-
+ *       resort regex against the prompt body. */
+export function detectRole(
+  metaAgentType: string | null,
+  metaDesc: string | null,
+  firstUserText: string | null,
+): DetectedRole {
+  if (metaAgentType && metaAgentType.trim()) {
+    return { role: metaAgentType.trim().toLowerCase(), confidence: 'meta' }
+  }
   if (metaDesc) {
     const m = metaDesc.match(META_ROLE_PREFIX)
     if (m) return { role: m[1].toLowerCase(), confidence: 'meta' }
@@ -163,7 +180,7 @@ export function detectRole(metaDesc: string | null, firstUserText: string | null
  *  no billable tokens (empty / corrupt / synthetic). */
 export async function parseAgentFile(
   filePath: string,
-  opts: { source: 'subagent' | 'task'; project: string; metaDesc?: string | null }
+  opts: { source: 'subagent' | 'task'; project: string; metaDesc?: string | null; metaAgentType?: string | null }
 ): Promise<AgentSessionRow | null> {
   let content: string
   try { content = await readFile(filePath, 'utf-8') } catch { return null }
@@ -264,7 +281,8 @@ export async function parseAgentFile(
     .replace(/^agent-/, '')
 
   const metaDesc = opts.metaDesc ?? null
-  const { role, confidence } = detectRole(metaDesc, firstUserText)
+  const metaAgentType = opts.metaAgentType ?? null
+  const { role, confidence } = detectRole(metaAgentType, metaDesc, firstUserText)
 
   // Description: meta.json takes priority; fall back to a cleaned first-user slice
   let description = metaDesc ?? ''
@@ -326,15 +344,20 @@ export async function* scanAgentSessions(): AsyncGenerator<AgentSessionRow> {
       if (seen.has(key)) continue
       seen.add(key)
       const fp = join(subDir, f)
-      // Sibling meta.json (if present) carries the Task tool description
+      // Sibling meta.json (if present) carries the canonical agentType
+      // (used as the role) and a human description (used as the row's
+      // display description). Both are optional but agentType is
+      // present in essentially every Claude Code 2.x subagent file.
       const metaFp = fp.replace(/\.jsonl$/, '.meta.json')
       let metaDesc: string | null = null
+      let metaAgentType: string | null = null
       try {
         const raw = await readFile(metaFp, 'utf-8')
-        const parsed = JSON.parse(raw) as { description?: string }
+        const parsed = JSON.parse(raw) as { description?: string; agentType?: string }
         if (typeof parsed.description === 'string') metaDesc = parsed.description
-      } catch { /* no meta file — leave null */ }
-      const row = await parseAgentFile(fp, { source: 'subagent', project, metaDesc })
+        if (typeof parsed.agentType === 'string') metaAgentType = parsed.agentType
+      } catch { /* no meta file — leave both null */ }
+      const row = await parseAgentFile(fp, { source: 'subagent', project, metaDesc, metaAgentType })
       if (row) yield row
     }
   }
