@@ -423,6 +423,11 @@ export const zh: Dict = {
   'agents.spawnBatches.empty': '此范围内无并行代理批次。每行将代表一次编排调用，调度 ≥2 个子代理。',
   'agents.spawnBatches.help': '每行是 Claude 一次编排调用中并行调度多个子代理的事件 — 它们共享同一个内部 promptId。规模是该批次中代理的数量。大规模 fan-out（Plan 模式展开、并行研究、模拟 tick）通常意味着更少但更重的调用；许多小批次意味着 Claude 进行细粒度委托。单独的 Task() 调用（无 fan-out）已被排除，避免列表只是所有代理的罗列。',
 
+  'agents.kpi.sidechain.title': '子代理占比',
+  'agents.kpi.sidechain.desc': '总支出中有多少在子代理内部运行（不考虑角色分类）',
+  'agents.kpi.sidechain.costShare': '子代理支出',
+  'agents.kpi.sidechain.sessions': '会话数',
+
   'agents.topSessions.title': '按成本排序的 Agent 会话',
   'agents.topSessions.desc': '最耗费的单次 Agent 调用',
   'agents.topSessions.sub': '范围内最耗费的单次调用',

@@ -447,6 +447,12 @@ export const en = {
   'agents.spawnBatches.empty': 'No parallel agent batches in range. Each row would be one orchestration call that fanned out to ≥2 subagents.',
   'agents.spawnBatches.help': 'Each row is one orchestration call where Claude dispatched multiple subagents in parallel — they share the same internal promptId. The size is how many agents were in the batch. Patterns to look for: large fan-outs (Plan-mode rollouts, parallel research, simulation ticks) usually mean fewer but heavier orchestration calls; many small batches mean Claude is delegating granularly. Solo Task() calls (no fan-out) are excluded so the list isn\'t every agent ever.',
 
+  // Sidechain / delegation KPI
+  'agents.kpi.sidechain.title': 'Subagent share',
+  'agents.kpi.sidechain.desc': 'How much of total spend ran inside subagents (regardless of role classification)',
+  'agents.kpi.sidechain.costShare': 'Spend in subagents',
+  'agents.kpi.sidechain.sessions': 'Sessions',
+
   // Top sessions widget
   'agents.topSessions.title': 'Top agent sessions by cost',
   'agents.topSessions.desc': 'Heaviest individual agent invocations by spend',

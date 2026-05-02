@@ -139,6 +139,14 @@ export type AgentTelemetry = {
     toolUses: number
     durationS: number
   }
+  /** Cross-table KPI: cost of ALL agent sessions in range,
+   *  unfiltered by registry. Divided by the project's totals.cost
+   *  client-side gives the "delegation share" — what fraction of
+   *  AI spend ran inside subagents. */
+  delegation: {
+    cost: number
+    sessions: number
+  }
   byRole: Array<{
     role: string                 // effective label: display_name OR raw role
     sessions: number

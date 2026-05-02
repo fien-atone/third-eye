@@ -537,6 +537,22 @@ app.get('/api/overview', (req, res) => {
     tool_uses: number; api_calls: number
   }>
 
+  // Total subagent cost — NO registry filter. Used to compute the
+  // "delegation share" KPI ("how much of my AI spend ran inside
+  // subagents") which should reflect ALL subagents, not only the
+  // ones the user has acknowledged in the registry. The registry
+  // filter elsewhere is for "what the user wants to see broken
+  // down by role"; the ratio question is broader.
+  const agentDelegationRow = d.prepare(`
+    SELECT COALESCE(SUM(cost_usd), 0) AS cost,
+           COUNT(*)                   AS sessions
+    FROM agent_sessions
+    WHERE ts_start_epoch BETWEEN ? AND ?
+      ${projectKey ? 'AND project = ?' : ''}
+  `).get(...(projectKey ? [startEpoch, endEpoch, projectKey] : [startEpoch, endEpoch])) as {
+    cost: number; sessions: number
+  }
+
   // Spawn batches: agents that share the same prompt_id were
   // dispatched in one parallel orchestration call. HAVING > 1 hides
   // singletons (every Task() with no fan-out gets a unique
@@ -781,6 +797,15 @@ app.get('/api/overview', (req, res) => {
         cost: roundUsd(agentTotals.cost),
         toolUses: agentTotals.tool_uses ?? 0,
         durationS: agentTotals.duration_s ?? 0,
+      },
+      // Cost across ALL agent sessions in range, ignoring registry —
+      // used for the delegation-share KPI. The registry-filtered
+      // totals.cost above answers "of MY classified agents, how much
+      // did they cost?"; this answers "of ALL my AI spend, how much
+      // happened inside subagents?".
+      delegation: {
+        cost: roundUsd(agentDelegationRow.cost),
+        sessions: agentDelegationRow.sessions ?? 0,
       },
       byRole: agentByRole.map(r => ({
         role: r.effective_role,
