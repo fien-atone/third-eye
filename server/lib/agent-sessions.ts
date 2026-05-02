@@ -353,6 +353,8 @@ export async function* scanAgentSessions(): AsyncGenerator<AgentSessionRow> {
       // (used as the role) and a human description (used as the row's
       // display description). Both are optional but agentType is
       // present in essentially every Claude Code 2.x subagent file.
+      // Read failures and parse errors are swallowed silently —
+      // a single corrupt meta file must NOT abort the whole ingest.
       const metaFp = fp.replace(/\.jsonl$/, '.meta.json')
       let metaDesc: string | null = null
       let metaAgentType: string | null = null
@@ -362,8 +364,16 @@ export async function* scanAgentSessions(): AsyncGenerator<AgentSessionRow> {
         if (typeof parsed.description === 'string') metaDesc = parsed.description
         if (typeof parsed.agentType === 'string') metaAgentType = parsed.agentType
       } catch { /* no meta file — leave both null */ }
-      const row = await parseAgentFile(fp, { source: 'subagent', project, metaDesc, metaAgentType })
-      if (row) yield row
+      // Defense in depth — parseAgentFile already returns null on
+      // unreadable files and bad JSONL lines, but if a future change
+      // introduces a path that throws synchronously we don't want to
+      // bring down the whole ingest pipeline. Log+continue.
+      try {
+        const row = await parseAgentFile(fp, { source: 'subagent', project, metaDesc, metaAgentType })
+        if (row) yield row
+      } catch (err) {
+        console.warn(`[agent-sessions] skipped ${fp}: ${(err as Error).message}`)
+      }
     }
   }
 
@@ -375,8 +385,13 @@ export async function* scanAgentSessions(): AsyncGenerator<AgentSessionRow> {
       const key = `task:${project}:${f}`
       if (seen.has(key)) continue
       seen.add(key)
-      const row = await parseAgentFile(join(tasksDir, f), { source: 'task', project })
-      if (row) yield row
+      const fp = join(tasksDir, f)
+      try {
+        const row = await parseAgentFile(fp, { source: 'task', project })
+        if (row) yield row
+      } catch (err) {
+        console.warn(`[agent-sessions] skipped task ${fp}: ${(err as Error).message}`)
+      }
     }
   }
 }

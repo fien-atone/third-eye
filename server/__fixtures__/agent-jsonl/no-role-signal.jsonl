@@ -1,0 +1,2 @@
+{"type":"user","timestamp":"2026-04-30T13:00:00.000Z","promptId":"d4444444-4444-4444-4444-444444444444","isSidechain":true,"agentId":"a000000000000004","message":{"role":"user","content":"npc_id: outsider_branimir tick: 19"}}
+{"type":"assistant","timestamp":"2026-04-30T13:00:05.000Z","requestId":"req-005","message":{"role":"assistant","model":"claude-sonnet-4-5","stop_reason":"end_turn","usage":{"input_tokens":150,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":75},"content":[{"type":"text","text":"OK"}]}}

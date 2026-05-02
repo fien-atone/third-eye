@@ -2,7 +2,7 @@
   "name": "third-eye",
   "version": "2.3.0",
   "private": true,
-  "description": "Self-hosted web dashboard for AI coding spend — Claude Code, Desktop/Cowork, Codex CLI",
+  "description": "Self-hosted web dashboard for AI coding spend \u2014 Claude Code, Desktop/Cowork, Codex CLI",
   "license": "MIT",
   "author": "Ivan Shumov <contact@ivanshumov.com>",
   "repository": {
@@ -29,7 +29,10 @@
     "schedule:install": "npm --prefix server run schedule:install",
     "schedule:uninstall": "npm --prefix server run schedule:uninstall",
     "schedule:status": "npm --prefix server run schedule:status",
-    "typecheck": "npm --prefix client exec -- tsc --noEmit"
+    "typecheck": "npm --prefix client exec -- tsc --noEmit",
+    "test": "npm --prefix server test && npm --prefix client test",
+    "test:server": "npm --prefix server test",
+    "test:client": "npm --prefix client test"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

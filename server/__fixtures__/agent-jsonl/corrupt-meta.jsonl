@@ -1,0 +1,2 @@
+{"type":"user","timestamp":"2026-04-30T14:00:00.000Z","promptId":"e5555555-5555-5555-5555-555555555555","isSidechain":true,"agentId":"a000000000000005","message":{"role":"user","content":"You are the architect. Review the design."}}
+{"type":"assistant","timestamp":"2026-04-30T14:00:05.000Z","requestId":"req-006","message":{"role":"assistant","model":"claude-sonnet-4-5","stop_reason":"end_turn","usage":{"input_tokens":120,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":60},"content":[{"type":"text","text":"Reviewed."}]}}
