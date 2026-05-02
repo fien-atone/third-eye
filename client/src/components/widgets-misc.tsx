@@ -105,6 +105,12 @@ export function MidEllipsis({ text, query, className }: { text: string; query?: 
         return
       }
       const ELLIPSIS = '…'
+      // Floor on truncation: we never collapse below MIN_VISIBLE
+      // characters of the original text (plus the ellipsis). A single
+      // "…" tells the user nothing — full overflow with CSS would be
+      // more useful at that point. This also dodges the worst case of
+      // a stale-font measurement falsely deciding nothing fits.
+      const MIN_VISIBLE = 3
       let lo = 0, hi = text.length - 1
       while (lo < hi) {
         const mid = Math.ceil((lo + hi) / 2)
@@ -114,6 +120,12 @@ export function MidEllipsis({ text, query, className }: { text: string; query?: 
         if (ctx.measureText(candidate).width <= containerW) lo = mid
         else hi = mid - 1
       }
+      if (lo < MIN_VISIBLE) {
+        // Fall back to full text — the parent's overflow:hidden will
+        // clip whatever doesn't fit; better than rendering "…" alone.
+        setDisplay(text)
+        return
+      }
       const startN = Math.ceil(lo / 2)
       const endN = lo - startN
       setDisplay(text.slice(0, startN) + ELLIPSIS + (endN > 0 ? text.slice(text.length - endN) : ''))
@@ -122,7 +134,16 @@ export function MidEllipsis({ text, query, className }: { text: string; query?: 
     compute()
     const ro = new ResizeObserver(compute)
     ro.observe(parent)
-    return () => ro.disconnect()
+    // Web fonts load async — first compute() may fire BEFORE the
+    // real font is ready, in which case ctx.measureText uses fallback
+    // metrics and frequently overestimates width, falsely truncating
+    // a short label like "dnd village" down to "…". Re-measure once
+    // fonts settle. Idempotent if no font swap was needed.
+    let cancelled = false
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      void document.fonts.ready.then(() => { if (!cancelled) compute() })
+    }
+    return () => { cancelled = true; ro.disconnect() }
   }, [text, isHighlighting])
 
   if (isHighlighting) return <span className={className}><HighlightedText text={text} query={query!} /></span>
