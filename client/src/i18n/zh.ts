@@ -6,6 +6,7 @@ export const zh: Dict = {
   'header.refresh': '刷新',
   'header.refreshing': '刷新中…',
   'header.refreshTitle': '重新扫描所有会话文件到本地数据库',
+  'header.autoIngestRunning': '自动刷新进行中…',
   'header.theme.title': '主题',
   'header.theme.cycle': '点击切换',
   'header.theme.light': '浅色',

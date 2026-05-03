@@ -16,13 +16,19 @@ import { semverCompare } from '../lib/semver'
  *  on the not-found screen so the user isn't tempted to navigate within
  *  a broken state. */
 export function AppHeader({
-  lastIngestAt, isRefreshing, onRefresh,
+  lastIngestAt, isRefreshing, autoIngestKind, onRefresh,
   theme, setTheme,
   showTabs, dashboardTabActive, projectsTabActive, dayTabActive,
   version,
 }: {
   lastIngestAt: string | null
   isRefreshing: boolean
+  /** Kind of ingest currently running on the server (incremental |
+   *  full | rebuild), or null when idle. Drives the header spinner
+   *  for background auto-ticks too — without this the user would see
+   *  data change "by itself" with no visual cue that an ingest just
+   *  happened. */
+  autoIngestKind: 'incremental' | 'full' | 'rebuild' | null
   onRefresh: () => void
   theme: Theme
   setTheme: (t: Theme) => void
@@ -108,13 +114,25 @@ export function AppHeader({
             <span className="pulse" />
             {fmtRel(lastIngestAt, t)}
           </span>
+          {/* Spinner state merges manual click + background auto-tick:
+              the user shouldn't have to know who triggered the ingest
+              to interpret "is anything happening right now". The
+              button stays clickable during a pure auto-tick (clicking
+              dedups onto the in-flight scan and doesn't spawn a
+              second one — guaranteed by the server-side lock); only
+              the user's own pending mutation disables it, since
+              rapid double-clicks during their OWN run feel buggy. */}
           <button
             className="ghost"
             onClick={onRefresh}
             disabled={isRefreshing}
-            title={t('header.refreshTitle')}
+            title={
+              isRefreshing ? t('header.refreshing')
+                : autoIngestKind ? t('header.autoIngestRunning')
+                : t('header.refreshTitle')
+            }
           >
-            {isRefreshing ? t('header.refreshing') : t('header.refresh')}
+            {(isRefreshing || autoIngestKind) ? t('header.refreshing') : t('header.refresh')}
           </button>
           <LocaleSwitcher />
           <ThemeToggle theme={theme} setTheme={setTheme} />

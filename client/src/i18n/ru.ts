@@ -6,6 +6,7 @@ export const ru: Dict = {
   'header.refresh': 'Обновить',
   'header.refreshing': 'Обновляю…',
   'header.refreshTitle': 'Пересканировать все session-файлы в локальную БД',
+  'header.autoIngestRunning': 'Идёт автообновление…',
   'header.theme.title': 'Тема',
   'header.theme.cycle': 'клик — переключить',
   'header.theme.light': 'Светлая',

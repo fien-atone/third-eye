@@ -6,6 +6,7 @@ export const en = {
   'header.refresh': 'Refresh',
   'header.refreshing': 'Refreshing…',
   'header.refreshTitle': 'Re-scan all session files into the local DB',
+  'header.autoIngestRunning': 'Auto-refresh in progress…',
   'header.theme.title': 'Theme',
   'header.theme.cycle': 'click to cycle',
   'header.theme.light': 'Light',

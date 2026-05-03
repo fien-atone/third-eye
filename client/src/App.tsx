@@ -187,6 +187,22 @@ export default function App() {
     placeholderData: keepPreviousData,
   })
 
+  // /api/health drives "is anything ingesting right now" — the
+  // header spinner lights up for both manual Refresh AND background
+  // auto-tick by reading this. Polling cadence is dynamic: 2 s while
+  // an ingest is in flight (catch the transition off promptly), 15 s
+  // while idle (cheap baseline). The polled payload is small (one
+  // boolean + a string) so this is safe to leave running.
+  type HealthResponse = {
+    lastIngestAt: string | null
+    ingestInProgress: { kind: 'incremental' | 'full' | 'rebuild'; startedAt: string } | null
+  }
+  const healthQuery = useQuery<HealthResponse>({
+    queryKey: ['health'],
+    queryFn: () => apiGet<HealthResponse>('/api/health'),
+    refetchInterval: query => (query.state.data?.ingestInProgress ? 2_000 : 15_000),
+  })
+
   const refreshMutation = useMutation({
     mutationFn: () => apiPost<{ ok: boolean; durationMs: number; total: number }>('/api/refresh'),
     onSuccess: () => {
@@ -200,6 +216,11 @@ export default function App() {
       qc.invalidateQueries({ queryKey: ['projects'] })
       qc.invalidateQueries({ queryKey: ['insights'] })
       qc.invalidateQueries({ queryKey: ['agents'] })
+      // Health re-poll covers the auto-tick spinner: once the manual
+      // mutation settles, in-flight state may still be true if a
+      // background tick fired during the same window. Force a fresh
+      // /api/health so the header reflects reality right away.
+      qc.invalidateQueries({ queryKey: ['health'] })
     },
   })
 
@@ -289,8 +310,14 @@ export default function App() {
   return (
     <div className="app">
       <AppHeader
-        lastIngestAt={providersQuery.data?.lastIngestAt ?? null}
+        lastIngestAt={healthQuery.data?.lastIngestAt ?? providersQuery.data?.lastIngestAt ?? null}
         isRefreshing={refreshMutation.isPending}
+        // Header lights up its spinner on ANY in-flight ingest, not
+        // just user-clicked ones. Auto-tick + lock-deduped manual
+        // clicks both surface here. The header decides how to merge
+        // the two signals (manual clicks get priority for the
+        // disabled-state on the button itself).
+        autoIngestKind={healthQuery.data?.ingestInProgress?.kind ?? null}
         onRefresh={() => refreshMutation.mutate()}
         theme={theme}
         setTheme={setTheme}

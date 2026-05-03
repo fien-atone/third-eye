@@ -6,6 +6,7 @@ export const es: Dict = {
   'header.refresh': 'Actualizar',
   'header.refreshing': 'Actualizando…',
   'header.refreshTitle': 'Re-escanear todos los archivos de sesión a la BD local',
+  'header.autoIngestRunning': 'Actualización automática en curso…',
   'header.theme.title': 'Tema',
   'header.theme.cycle': 'clic para alternar',
   'header.theme.light': 'Claro',

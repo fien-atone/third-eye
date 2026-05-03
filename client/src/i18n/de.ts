@@ -6,6 +6,7 @@ export const de: Dict = {
   'header.refresh': 'Aktualisieren',
   'header.refreshing': 'Aktualisiere…',
   'header.refreshTitle': 'Alle Session-Dateien in die lokale DB neu einlesen',
+  'header.autoIngestRunning': 'Auto-Aktualisierung läuft…',
   'header.theme.title': 'Theme',
   'header.theme.cycle': 'klicken zum Wechseln',
   'header.theme.light': 'Hell',
