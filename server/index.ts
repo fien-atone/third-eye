@@ -5,6 +5,7 @@ import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { db, getMeta, seedScreenLayouts } from './db.ts'
 import { runIngest } from './ingest.ts'
+import { withIngestLock, IngestBusyError, getActiveIngest } from './lib/ingest-lock.ts'
 import { DEFAULT_LAYOUTS, KNOWN_SCREENS, type ScreenLayout } from './lib/default-layouts.ts'
 import { getLatestRelease, getCheckState, startVersionCheck, applyVersionCheckSettings, seedLatestRelease } from './lib/version-check.ts'
 import { envRead, envReadNumber } from './lib/env.ts'
@@ -324,12 +325,63 @@ app.get('/api/providers', (_req, res) => {
 })
 
 app.post('/api/refresh', async (req, res) => {
+  // Three modes:
+  //   - incremental — fast scan of files mtime'd after last_ingest_at
+  //                   (currently aliases to full; mtime gating lands in
+  //                   a follow-up commit). Default for the manual
+  //                   Refresh button + auto-tick.
+  //   - full        — re-scan everything. Used when the caller wants
+  //                   to be sure nothing was missed, e.g. after a
+  //                   provider config change.
+  //   - rebuild     — truncate every table and re-ingest from scratch.
+  //                   Destructive — UI gates this behind a confirm.
+  //
+  // Lock policy:
+  //   incremental + full → dedup. If something is already running,
+  //     the second caller piggy-backs on the in-flight Promise. Manual
+  //     Refresh while auto-tick is mid-run no longer kicks off two
+  //     parallel scans.
+  //   rebuild → refuse. Returns 409 Conflict when busy because
+  //     truncateAll() racing with an in-flight upsert would corrupt
+  //     history. Client retries once the running op finishes.
+  const modeRaw = typeof req.query.mode === 'string' ? req.query.mode : ''
+  // Back-compat: the old `?full=true` flag still works (header button
+  // and any external scripts in the wild).
+  const legacyFull = req.query.full === 'true' || req.query.full === '1'
+  const mode: 'incremental' | 'full' | 'rebuild' =
+    modeRaw === 'rebuild' ? 'rebuild'
+    : modeRaw === 'full' || legacyFull ? 'full'
+    : modeRaw === 'incremental' ? 'incremental'
+    : 'incremental'
+  const since = typeof req.query.since === 'string' ? req.query.since : undefined
+
   try {
-    const since = typeof req.query.since === 'string' ? req.query.since : undefined
-    const full = req.query.full === 'true' || req.query.full === '1'
-    const stats = await runIngest({ since, full })
-    res.json({ ok: true, ...stats })
+    const { result, deduped } = await withIngestLock(
+      mode,
+      mode === 'rebuild' ? 'refuse' : 'dedup',
+      () => runIngest({
+        since,
+        // Incremental currently runs as full until mtime-gating lands.
+        full: mode === 'full' || mode === 'incremental',
+        rebuild: mode === 'rebuild',
+      }),
+    )
+    // `mode` (API-contract input mode) wins over the `mode` field
+    // runIngest's stats happen to also expose (its internal value
+    // — full/rebuild/since); they're not always equal (incremental
+    // currently runs as full under the hood). Spread first so the
+    // explicit one overwrites.
+    res.json({ ok: true, deduped, ...result, mode })
   } catch (err) {
+    if (err instanceof IngestBusyError) {
+      res.status(409).json({
+        ok: false,
+        error: 'busy',
+        currentKind: err.currentKind,
+        startedAt: new Date(err.startedAt).toISOString(),
+      })
+      return
+    }
     res.status(500).json({ ok: false, error: (err as Error).message })
   }
 })
@@ -1139,7 +1191,22 @@ app.post('/api/agents/:projectId/registry/acknowledge-all', (req, res) => {
   res.json({ acknowledged })
 })
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, lastIngestAt: getMeta('last_ingest_at') }))
+app.get('/api/health', (_req, res) => {
+  // ingestInProgress drives the header spinner / button-state on the
+  // client. null when idle; { kind, startedAt } during an ingest
+  // (regardless of whether it was triggered manually, by the auto-
+  // tick or by Rebuild). Lets the UI distinguish "user clicked
+  // Refresh" from "background tick is running" without two separate
+  // signals.
+  const active = getActiveIngest()
+  res.json({
+    ok: true,
+    lastIngestAt: getMeta('last_ingest_at'),
+    ingestInProgress: active
+      ? { kind: active.kind, startedAt: new Date(active.startedAt).toISOString() }
+      : null,
+  })
+})
 
 // /api/version reports ONLY what the server learned from GitHub. The
 // "current" version and the outdated comparison live entirely on the
@@ -1244,8 +1311,12 @@ async function boot() {
   const last = getMeta('last_ingest_at')
   if (!last) {
     console.log('[ingest] empty DB, running initial ingest…')
-    const stats = await runIngest()
-    console.log('[ingest]', stats)
+    // Initial bootstrap goes through the lock too — a clever user
+    // could hammer /api/refresh during boot before this finishes
+    // and we'd have two parallel scans of an empty DB. Cheap to
+    // guard, no downside.
+    const { result } = await withIngestLock('full', 'dedup', () => runIngest())
+    console.log('[ingest]', result)
   } else {
     console.log(`[ingest] last ingest: ${last}`)
   }
@@ -1254,9 +1325,15 @@ async function boot() {
   const intervalSince = envRead('THIRD_EYE_INGEST_SINCE', 'CODEBURN_INGEST_SINCE') ?? '2h'
   if (intervalMin > 0) {
     console.log(`[ingest] auto-refresh every ${intervalMin}m (since=${intervalSince})`)
+    // Auto-tick uses dedup policy: if a manual Refresh is in flight
+    // when the timer fires, we piggy-back on its result instead of
+    // queuing a second scan. The `deduped` flag in the log line
+    // makes this visible during debugging.
     setInterval(() => {
-      runIngest({ since: intervalSince })
-        .then(s => console.log('[ingest:auto]', { mode: s.mode, total: s.total, durationMs: s.durationMs }))
+      withIngestLock('incremental', 'dedup', () => runIngest({ since: intervalSince }))
+        .then(({ result, deduped }) => console.log('[ingest:auto]', {
+          mode: result.mode, total: result.total, durationMs: result.durationMs, deduped,
+        }))
         .catch(err => console.error('[ingest:auto] failed:', err.message))
     }, intervalMin * 60_000)
   }
