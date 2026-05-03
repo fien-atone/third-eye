@@ -59,7 +59,6 @@ export function buildDashboardCatalog(ctx: DashboardCtx): WidgetDef[] {
     kpiSpendWidget(t, data, granularity, avgPerBucket),
     kpiTokensWidget(t, data),
     kpiCacheWidget(t, data),
-    kpiCodexPlanWidget(t, data),
     kpiScopeWidget(t, data, granularity, inProjectView, activeBuckets),
     costByModelWidget(t, series, granularity, hasAnyData, modelNames),
     tokensWidget(t, series, granularity, hasTokenData),
@@ -93,9 +92,15 @@ export function buildDashboardCatalog(ctx: DashboardCtx): WidgetDef[] {
   // Hour-timeline only meaningful when the series IS hourly — adding it
   // unconditionally would put a 24-bar chart on the daily dashboard
   // where the data is one bar per day. Gate on granularity.
+  // Dashboard / Today widgets that don't make sense scoped to one
+  // project: cost-by-project + top-projects aggregate across projects;
+  // codex-plan is account-level (your ChatGPT plan rate limits apply
+  // to all your work, not to one project). Hour-timeline only when
+  // the series is hourly.
   const cross: WidgetDef[] = [
     costByProjectWidget(t, data, series, granularity, hasAnyData, onSelectProject),
     topProjectsWidget(t, data),
+    kpiCodexPlanWidget(t, data),
   ]
   if (granularity === 'hour') {
     cross.unshift(hourTimelineWidget(t, series, hasAnyData))
