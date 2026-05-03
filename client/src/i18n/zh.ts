@@ -251,6 +251,7 @@ export const zh: Dict = {
   'codexPlanHistory.sub': '每日峰值 %，账户级',
   'codexPlanHistory.help': '每根柱子显示当日 5 小时窗口的峰值利用率。同一天有多个套餐（如 free→plus）时，按套餐堆叠分段。虚线表示次要的 7 天窗口——缓慢累积的周限额。',
   'codexPlanHistory.secondaryName': '7d 窗口',
+  'codexPlanHistory.peakName': '当日峰值',
   'codexPlanHistory.noDataDay': '当日无 Codex 活动',
 
   'kpi.projects': '项目数',

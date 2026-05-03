@@ -27,7 +27,7 @@
  */
 
 import type { Locale } from 'date-fns'
-import { ComposedChart, Bar, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { ComposedChart, Bar, Cell, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import type { WidgetDef } from '../grid'
 import type { T } from '../../i18n'
 import type { Granularity, OverviewResponse } from '../../types'
@@ -42,20 +42,18 @@ type Row = NonNullable<OverviewResponse['codexPlanHistory']>[number]
 // with its own stackId. We can't union the typed fields with a
 // `Record<string, …>` index signature directly — `_row: Row` would
 // fail to satisfy a number/string/null index — so the dynamic
-// plan_* keys live as a parallel any-shape map. Recharts only reads
-// fields by string key, so it doesn't care how strict the type is.
+// One row per day. _max + _maxPlan drive the bar (height + per-row
+// fill via <Cell>); _secondary feeds the 7d-window overlay line.
 type ChartRow = {
   _label: string
   _labelFull: string
   _row: Row
+  _max: number
+  _maxPlan: string
   // _secondary is null on empty buckets so Recharts breaks the line
   // across gaps instead of dragging it down to 0.
   _secondary: number | null
-  // Dynamic per-plan stack values (`plan_free`, `plan_plus`, …).
-  [planKey: `plan_${string}`]: number
 }
-
-const PLAN_KEY_PREFIX = 'plan_'
 
 /** Display order + color palette for known OpenAI plan types. Anything
  *  unrecognised falls back to 'unknown' at the end. The CSS variables
@@ -137,27 +135,52 @@ export function codexPlanHistoryWidget(t: T, data: OverviewResponse, granularity
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
   })
 
-  // Flatten each row's byPlan into top-level keyed fields. Recharts
-  // <Bar dataKey="plan_free" /> reads the segment height from this.
-  // _secondary feeds the overlay line that tracks the 7d-window peak.
-  // Labels come from formatBucket (axis-compact) / formatBucketFull
-  // (tooltip-readable, includes year + weekday) — same helpers other
-  // time-series widgets use, so granularity changes flow uniformly.
+  // Flatten each row to a single bar per day = max(byPlan) value,
+  // colored by the plan that produced that max. Stacking per-plan
+  // peaks turned out to be misleading: each plan's percentage is %
+  // of its OWN limit (separate scales), so summing them produced a
+  // 260%-tall stacked bar on multi-plan days. The single-bar
+  // representation reads correctly as "% of whichever plan was the
+  // worst-pressed today", and the tooltip still surfaces the full
+  // per-plan breakdown for context.
   const chartRows: ChartRow[] = history.map(r => {
-    const out: ChartRow = {
+    const entries = Object.entries(r.byPlan)
+    let maxPlan = 'unknown'
+    let maxValue = 0
+    for (const [plan, pct] of entries) {
+      if (pct > maxValue) { maxValue = pct; maxPlan = plan }
+    }
+    return {
       _label: formatBucket(r.bucket, granularity, dl),
       _labelFull: formatBucketFull(r.bucket, granularity, dl),
       _row: r,
+      _max: maxValue,
+      _maxPlan: maxPlan,
       _secondary: r.secondaryPct,
     }
-    for (const p of planList) {
-      // The template-literal key type narrows to `plan_${string}` at
-      // the type level; the runtime concat gives us the matching key
-      // but TS sees a generic `string`. Cast at the assignment site.
-      ;(out as unknown as Record<string, number>)[PLAN_KEY_PREFIX + p] = r.byPlan[p] ?? 0
-    }
-    return out
   })
+
+  // Custom legend renderer — Recharts derives auto-legend entries
+  // from `<Bar name=...>` and `<Line name=...>`, but we have ONE
+  // bar with per-row Cell colors instead of one Bar per plan, so
+  // the auto-derived legend would only show "Daily peak" + "7d
+  // window". We render the legend manually below: one swatch per
+  // plan that actually appears in the range, plus the dashed line
+  // for the 7d window.
+  const renderLegend = () => (
+    <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 14, paddingTop: 8, fontSize: 12 }}>
+      {planList.map(p => (
+        <span key={p} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ display: 'inline-block', width: 10, height: 10, background: planColor(p), borderRadius: 2 }} />
+          {planLabel(p, t)}
+        </span>
+      ))}
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ display: 'inline-block', width: 14, height: 0, borderTop: '2px dashed var(--text)' }} />
+        {t('codexPlanHistory.secondaryName')}
+      </span>
+    </div>
+  )
 
   return {
     id: 'chart-codex-plan-history',
@@ -182,20 +205,27 @@ export function codexPlanHistoryWidget(t: T, data: OverviewResponse, granularity
                 <ComposedChart data={chartRows} margin={TIMESERIES_MARGIN} barCategoryGap="20%">
                   <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="_label" tickLine={false} axisLine={{ stroke: 'var(--grid)' }} interval="preserveStartEnd" hide={h <= 1} />
-                  <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={fmtPct} width={TIMESERIES_YAXIS_WIDTH} />
+                  {/* Y-axis capped at 100 — every plan's peak is %
+                      of its OWN limit (not additive across plans).
+                      Bars never exceed 100% by definition. */}
+                  <YAxis tickLine={false} axisLine={{ stroke: 'var(--grid)' }} tickFormatter={fmtPct} width={TIMESERIES_YAXIS_WIDTH} domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} />
                   <Tooltip content={<CodexPlanHistoryTooltip t={t} />} cursor={{ fill: 'var(--hover)' }} animationDuration={0} isAnimationActive={false} />
-                  <Legend wrapperStyle={{ paddingTop: 8 }} iconType="square" />
-                  {planList.map((plan, i) => (
-                    <Bar
-                      key={plan}
-                      dataKey={PLAN_KEY_PREFIX + plan}
-                      name={planLabel(plan, t)}
-                      stackId="d"
-                      fill={planColor(plan)}
-                      radius={i === planList.length - 1 ? [3, 3, 0, 0] : 0}
-                      isAnimationActive={false}
-                    />
-                  ))}
+                  <Legend content={renderLegend} />
+                  {/* One bar per day at the day's worst-pressed plan
+                      peak. Per-row Cell fill colors the bar by which
+                      plan that was. Multi-plan days surface in the
+                      tooltip's full breakdown rather than as visual
+                      stack — see the comment on chartRows. */}
+                  <Bar
+                    dataKey="_max"
+                    name={t('codexPlanHistory.peakName')}
+                    radius={[3, 3, 0, 0]}
+                    isAnimationActive={false}
+                  >
+                    {chartRows.map((r, i) => (
+                      <Cell key={i} fill={planColor(r._maxPlan)} />
+                    ))}
+                  </Bar>
                   {/* 7-day cumulative window — overlaid as a smooth line
                       so the user can read "where the weekly meter is"
                       independently from each day's per-plan peaks. */}

@@ -255,6 +255,7 @@ export const en = {
   'codexPlanHistory.sub': 'Daily peak %, account-wide',
   'codexPlanHistory.help': 'Each bar shows that day\'s peak 5h-window usage. Days with multiple plans (free→plus etc.) stack one segment per plan. The dashed line tracks the 7d secondary window — slow-moving cumulative weekly cap.',
   'codexPlanHistory.secondaryName': '7d window',
+  'codexPlanHistory.peakName': 'Daily peak',
   'codexPlanHistory.noDataDay': 'No Codex usage',
 
   'kpi.projects': 'Projects',

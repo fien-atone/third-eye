@@ -593,9 +593,24 @@ export async function aggregateCodexPlanDaily(codexDir?: string): Promise<CodexP
             const iso = typeof entry.timestamp === 'string' ? entry.timestamp : new Date().toISOString()
             const ts = Date.parse(iso)
             if (Number.isNaN(ts)) continue
-            const list = byDay.get(dayKey) ?? []
+            // Bucket by the event's OWN timestamp (in server-local
+            // tz), not by the session-dir's path date. Codex names
+            // each session dir by the start UTC date, so a session
+            // that runs from 22:00 to 03:00 across local midnight
+            // dumps everything into the start-day bucket — making
+            // "today's" data invisible until the user starts a new
+            // session. Translating each sample to its own local-tz
+            // date fixes that. Single-user installs run server +
+            // browser on the same machine so process tz === user
+            // tz; if that ever stops being true, this needs a
+            // tzOffsetMin parameter (it doesn't yet).
+            const eventDate = new Date(ts)
+            const eventDayKey = `${eventDate.getFullYear()}-`
+              + `${String(eventDate.getMonth() + 1).padStart(2, '0')}-`
+              + `${String(eventDate.getDate()).padStart(2, '0')}`
+            const list = byDay.get(eventDayKey) ?? []
             list.push({ ts, iso, rl: rl as Record<string, unknown> })
-            byDay.set(dayKey, list)
+            byDay.set(eventDayKey, list)
           }
         }
       }

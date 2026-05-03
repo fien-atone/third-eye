@@ -251,6 +251,7 @@ export const ru: Dict = {
   'codexPlanHistory.sub': 'Дневной пик %, по всему аккаунту',
   'codexPlanHistory.help': 'Каждый столбик — пик 5-часового окна за день. Если за день было несколько планов (free→plus и т.п.), сегменты стэкуются один на другой по плану. Пунктирная линия — 7-дневное окно, медленный накопительный недельный лимит.',
   'codexPlanHistory.secondaryName': '7д окно',
+  'codexPlanHistory.peakName': 'Дневной пик',
   'codexPlanHistory.noDataDay': 'Нет активности в Codex',
 
   'kpi.projects': 'Проекты',
