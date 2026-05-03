@@ -45,19 +45,21 @@
 }
 
 /* Active variant — fires while an ingest is running (manual or
-   auto-tick). Amber fill, faster cadence, tighter pulse so the
+   auto-tick). Blue fill, faster cadence, tighter pulse so the
    signal reads as "something is happening right now" rather than
-   the calmer green idle pulse. The header's `meta` row picks up
+   the calmer green idle pulse. Blue (over amber/yellow) because
+   yellow universally reads as "warning/problem"; an in-progress
+   data refresh is neither. The header's `meta` row picks up
    `.is-ingesting` so callers can target the parent for layout
    tweaks if needed; the dot itself only needs `.is-active`. */
 .pulse.is-active {
-  background: #f59e0b;
+  background: #3b82f6;
   animation: pulse-active 1s infinite;
 }
 @keyframes pulse-active {
-  0%   { box-shadow: 0 0 0 0 rgba(245,158,11,0.55); }
-  70%  { box-shadow: 0 0 0 7px rgba(245,158,11,0); }
-  100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+  0%   { box-shadow: 0 0 0 0 rgba(59,130,246,0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(59,130,246,0); }
+  100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
 }
 
 @media (max-width: 720px) {
