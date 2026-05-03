@@ -21,15 +21,23 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   // Cancel/close. Avoids the half-applied state where toggling a
   // checkbox immediately changes server behavior; user clearly opts in
   // by clicking Save.
+  // Updates section
   const [draftEnabled, setDraftEnabled] = useState<boolean | null>(null)
   const [draftInterval, setDraftInterval] = useState<number | null>(null)
   const enabled = draftEnabled ?? settings.data?.updates.enabled ?? true
   const intervalSeconds = draftInterval ?? settings.data?.updates.intervalSeconds ?? 3600
+  // Ingest (auto-refresh) section
+  const [draftIngestEnabled, setDraftIngestEnabled] = useState<boolean | null>(null)
+  const [draftIngestInterval, setDraftIngestInterval] = useState<number | null>(null)
+  const ingestEnabled = draftIngestEnabled ?? settings.data?.ingest.enabled ?? false
+  const ingestInterval = draftIngestInterval ?? settings.data?.ingest.intervalSeconds ?? 300
   const isDev = settings.data?.mode === 'dev'
 
   const mutation = useMutation({
-    mutationFn: (next: { enabled: boolean; intervalSeconds: number }) =>
-      apiPatch<SettingsResponse>('/api/settings', { updates: next }),
+    mutationFn: (next: {
+      updates: { enabled: boolean; intervalSeconds: number }
+      ingest: { enabled: boolean; intervalSeconds: number }
+    }) => apiPatch<SettingsResponse>('/api/settings', next),
     onSuccess: data => {
       qc.setQueryData(['settings'], data)
       // Server scheduled a fresh poll ~1 s out; ping the singleton
@@ -37,6 +45,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       // the new state instead of waiting up to 5 s for the next
       // tick.
       setTimeout(pokeVersionPoll, 1_500)
+      // Same idea for /api/health — auto-ingest may have just been
+      // toggled on, header should reflect that immediately.
+      qc.invalidateQueries({ queryKey: ['health'] })
       onClose()
     },
   })
@@ -49,9 +60,14 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
 
   const dirty =
     (draftEnabled !== null && draftEnabled !== settings.data?.updates.enabled) ||
-    (draftInterval !== null && draftInterval !== settings.data?.updates.intervalSeconds)
+    (draftInterval !== null && draftInterval !== settings.data?.updates.intervalSeconds) ||
+    (draftIngestEnabled !== null && draftIngestEnabled !== settings.data?.ingest.enabled) ||
+    (draftIngestInterval !== null && draftIngestInterval !== settings.data?.ingest.intervalSeconds)
 
-  const save = () => mutation.mutate({ enabled, intervalSeconds })
+  const save = () => mutation.mutate({
+    updates: { enabled, intervalSeconds },
+    ingest: { enabled: ingestEnabled, intervalSeconds: ingestInterval },
+  })
 
   return (
     <>
@@ -112,6 +128,49 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               {isDev && (
                 <span className="settings-dev-hint">{t('settings.updates.devHint')}</span>
               )}
+            </div>
+          </section>
+
+          <section className="settings-section">
+            <h3 className="settings-section-title">{t('settings.ingest.title')}</h3>
+            <p className="settings-section-help">{t('settings.ingest.help')}</p>
+
+            <label className="settings-row settings-row-toggle">
+              <span className="settings-row-label">{t('settings.ingest.enabledLabel')}</span>
+              <span className={`toggle${ingestEnabled ? ' is-on' : ''}`}>
+                <input
+                  type="checkbox"
+                  className="toggle-input"
+                  checked={ingestEnabled}
+                  onChange={e => setDraftIngestEnabled(e.target.checked)}
+                />
+                <span className="toggle-track" aria-hidden="true">
+                  <span className="toggle-thumb" />
+                </span>
+              </span>
+            </label>
+
+            <div className={`settings-row settings-row-stacked${ingestEnabled ? '' : ' is-disabled'}`}>
+              <span className="settings-row-label">{t('settings.ingest.frequencyLabel')}</span>
+              <span className="select-wrap">
+                <select
+                  className="select-styled"
+                  value={ingestInterval}
+                  disabled={!ingestEnabled}
+                  onChange={e => setDraftIngestInterval(parseInt(e.target.value, 10))}
+                >
+                  {/* Sub-minute presets only in dev. Production floor is
+                      60 s — see clampIngestInterval in lib/settings.ts. */}
+                  {isDev && <option value={30}>{t('settings.ingest.freq.dev30s')}</option>}
+                  <option value={60}>{t('settings.ingest.freq.every1m')}</option>
+                  <option value={300}>{t('settings.ingest.freq.every5m')}</option>
+                  <option value={900}>{t('settings.ingest.freq.every15m')}</option>
+                  <option value={3600}>{t('settings.ingest.freq.hourly')}</option>
+                </select>
+                <svg className="select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </span>
             </div>
           </section>
         </div>

@@ -38,8 +38,16 @@ export type UpdatesSettings = {
   enabled: boolean
   intervalSeconds: number
 }
+/** Auto-ingest scheduler settings. When enabled, the server runs an
+ *  incremental ingest every `intervalSeconds` and the manual Refresh
+ *  button becomes a "do it now" rather than the only update path. */
+export type IngestSettings = {
+  enabled: boolean
+  intervalSeconds: number
+}
 export type SettingsResponse = {
   updates: UpdatesSettings
+  ingest: IngestSettings
   /** 'dev' unlocks sub-hour polling presets in the settings UI for
    *  testing. Production builds always get 'prod' regardless of what
    *  the client sends — the floor is enforced server-side too. */
