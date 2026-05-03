@@ -102,6 +102,15 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       qc.invalidateQueries({ queryKey: ['insights'] })
       qc.invalidateQueries({ queryKey: ['agents'] })
       qc.invalidateQueries({ queryKey: ['health'] })
+      // Layouts query is keyed `['layout', screen]`. Invalidate
+      // the whole prefix so every screen's layout (dashboard /
+      // project / today) refetches — necessary when the user
+      // checked "Reset saved widget layouts", and harmless when
+      // they didn't (server returns the same row, react-query
+      // structural-shares it). Without this the visible grid
+      // keeps the pre-rebuild layout until next page reload,
+      // even though the DB row was just deleted.
+      qc.invalidateQueries({ queryKey: ['layout'] })
       setConfirmOpen(false)
       // KEEP the modal open — closing it silently after a 2 s
       // server round-trip leaves the user thinking nothing
