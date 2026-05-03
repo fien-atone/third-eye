@@ -14,7 +14,8 @@ import {
   listRegistry, upsertRegistry, deleteRegistry, acknowledgeAllUndetected,
   isProjectConfigured, isAnyProjectConfigured,
 } from './lib/agent-registry.ts'
-import { getSettings, patchUpdates, IS_DEV } from './lib/settings.ts'
+import { getSettings, patchUpdates, patchIngest, IS_DEV } from './lib/settings.ts'
+import { applyAutoIngestSettings } from './lib/auto-ingest.ts'
 
 // Seed default screen layouts on first start (idempotent — never overwrites
 // user customizations once they exist).
@@ -1265,13 +1266,23 @@ if (IS_DEV) {
 }
 
 app.patch('/api/settings', (req, res) => {
-  const body = (req.body ?? {}) as { updates?: Partial<{ enabled: boolean; intervalSeconds: number }> }
+  const body = (req.body ?? {}) as {
+    updates?: Partial<{ enabled: boolean; intervalSeconds: number }>
+    ingest?: Partial<{ enabled: boolean; intervalSeconds: number }>
+  }
   if (body.updates) {
     patchUpdates(body.updates)
     // Settings drive the version-check loop directly — apply them now
     // so the user never has to restart the server (or wait an interval
     // for the change to take effect).
     applyVersionCheckSettings()
+  }
+  if (body.ingest) {
+    patchIngest(body.ingest)
+    // Auto-ingest scheduler is restartable: start/stop the timer or
+    // change its cadence to match the new settings without a server
+    // restart. See lib/auto-ingest.ts.
+    applyAutoIngestSettings()
   }
   res.json({ ...getSettings(), mode: IS_DEV ? 'dev' : 'prod' })
 })
@@ -1321,22 +1332,31 @@ async function boot() {
     console.log(`[ingest] last ingest: ${last}`)
   }
 
+  // Legacy env-driven auto-ingest. Kept for users who configure
+  // their server via THIRD_EYE_INGEST_INTERVAL_MIN at the container
+  // level (e.g. systemd / Docker). This runs IN ADDITION to the
+  // settings-driven auto-tick — both go through the lock with dedup
+  // policy, so overlap is harmless. New users should prefer the UI
+  // toggle (Settings → Auto-refresh).
   const intervalMin = envReadNumber('THIRD_EYE_INGEST_INTERVAL_MIN', 'CODEBURN_INGEST_INTERVAL_MIN') ?? 0
   const intervalSince = envRead('THIRD_EYE_INGEST_SINCE', 'CODEBURN_INGEST_SINCE') ?? '2h'
   if (intervalMin > 0) {
-    console.log(`[ingest] auto-refresh every ${intervalMin}m (since=${intervalSince})`)
-    // Auto-tick uses dedup policy: if a manual Refresh is in flight
-    // when the timer fires, we piggy-back on its result instead of
-    // queuing a second scan. The `deduped` flag in the log line
-    // makes this visible during debugging.
+    console.log(`[ingest] env-driven auto-refresh every ${intervalMin}m (since=${intervalSince})`)
     setInterval(() => {
       withIngestLock('incremental', 'dedup', () => runIngest({ since: intervalSince }))
-        .then(({ result, deduped }) => console.log('[ingest:auto]', {
+        .then(({ result, deduped }) => console.log('[ingest:auto:env]', {
           mode: result.mode, total: result.total, durationMs: result.durationMs, deduped,
         }))
-        .catch(err => console.error('[ingest:auto] failed:', err.message))
+        .catch(err => console.error('[ingest:auto:env] failed:', err.message))
     }, intervalMin * 60_000)
   }
+
+  // Settings-driven auto-tick. Reads the persisted ingest section
+  // and starts a timer if enabled; the same call from the
+  // /api/settings PATCH handler restarts the timer when the user
+  // changes interval or toggles the feature. Off by default — user
+  // opts in.
+  applyAutoIngestSettings()
 
   // Bind to loopback by default — the server reads your session data, so it should not be LAN-accessible
   // without intent. Override via THIRD_EYE_HOST=0.0.0.0 for Docker / container scenarios.

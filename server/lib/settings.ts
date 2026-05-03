@@ -28,8 +28,24 @@ export type UpdatesSettings = {
   intervalSeconds: number
 }
 
+export type IngestSettings = {
+  /** Master switch for the in-app auto-ingest timer. Off (the
+   *  default) → only the manual Refresh button + the legacy env-
+   *  driven THIRD_EYE_INGEST_INTERVAL_MIN trigger ingests. The user
+   *  who enables this is opting into background scans; we don't do
+   *  it by default because some users prefer to control when their
+   *  Claude session dirs are read (e.g. on shared dev machines). */
+  enabled: boolean
+  /** Tick interval in seconds. Auto-tick fires every N seconds and
+   *  attempts an incremental ingest (dedup'd through the lock —
+   *  if a manual Refresh is in flight, the tick piggy-backs on it).
+   *  Allowed minimum: 30 in dev, 60 in prod. */
+  intervalSeconds: number
+}
+
 export type Settings = {
   updates: UpdatesSettings
+  ingest: IngestSettings
 }
 
 const DEFAULTS: Settings = {
@@ -42,11 +58,25 @@ const DEFAULTS: Settings = {
     // 1h is an easier number for users to reason about.
     intervalSeconds: 3600,
   },
+  ingest: {
+    // Off by default. The user enables it explicitly from Settings
+    // when they want to stop having to click Refresh manually.
+    enabled: false,
+    // 5 minutes — frequent enough that "I just used Codex" data
+    // shows up promptly, infrequent enough not to thrash disk on
+    // huge ~/.claude/projects trees. The UI offers presets
+    // (1m / 5m / 15m / 1h).
+    intervalSeconds: 300,
+  },
 }
 
-const MIN_INTERVAL_DEV_S = 30
-const MIN_INTERVAL_PROD_S = 3600
-const MAX_INTERVAL_S = 30 * 24 * 3600 // 30 days
+const MIN_UPDATES_INTERVAL_DEV_S = 30
+const MIN_UPDATES_INTERVAL_PROD_S = 3600
+const MAX_UPDATES_INTERVAL_S = 30 * 24 * 3600 // 30 days
+
+const MIN_INGEST_INTERVAL_DEV_S = 30
+const MIN_INGEST_INTERVAL_PROD_S = 60
+const MAX_INGEST_INTERVAL_S = 24 * 3600 // 1 day
 
 function readSection<K extends keyof Settings>(key: K): Settings[K] {
   const row = db().prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
@@ -64,7 +94,11 @@ function readSection<K extends keyof Settings>(key: K): Settings[K] {
     // to a prod-safe value at read time.
     if (key === 'updates') {
       const m = merged as UpdatesSettings
-      return { ...m, intervalSeconds: clampInterval(m.intervalSeconds) } as Settings[K]
+      return { ...m, intervalSeconds: clampUpdatesInterval(m.intervalSeconds) } as Settings[K]
+    }
+    if (key === 'ingest') {
+      const m = merged as IngestSettings
+      return { ...m, intervalSeconds: clampIngestInterval(m.intervalSeconds) } as Settings[K]
     }
     return merged
   } catch {
@@ -79,21 +113,40 @@ function writeSection<K extends keyof Settings>(key: K, value: Settings[K]) {
 }
 
 export function getSettings(): Settings {
-  return { updates: readSection('updates') }
+  return {
+    updates: readSection('updates'),
+    ingest: readSection('ingest'),
+  }
 }
 
 export function patchUpdates(patch: Partial<UpdatesSettings>): UpdatesSettings {
   const current = readSection('updates')
   const next: UpdatesSettings = {
     enabled: typeof patch.enabled === 'boolean' ? patch.enabled : current.enabled,
-    intervalSeconds: clampInterval(patch.intervalSeconds ?? current.intervalSeconds),
+    intervalSeconds: clampUpdatesInterval(patch.intervalSeconds ?? current.intervalSeconds),
   }
   writeSection('updates', next)
   return next
 }
 
-function clampInterval(n: unknown): number {
+export function patchIngest(patch: Partial<IngestSettings>): IngestSettings {
+  const current = readSection('ingest')
+  const next: IngestSettings = {
+    enabled: typeof patch.enabled === 'boolean' ? patch.enabled : current.enabled,
+    intervalSeconds: clampIngestInterval(patch.intervalSeconds ?? current.intervalSeconds),
+  }
+  writeSection('ingest', next)
+  return next
+}
+
+function clampUpdatesInterval(n: unknown): number {
   const v = typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : DEFAULTS.updates.intervalSeconds
-  const min = IS_DEV ? MIN_INTERVAL_DEV_S : MIN_INTERVAL_PROD_S
-  return Math.max(min, Math.min(MAX_INTERVAL_S, v))
+  const min = IS_DEV ? MIN_UPDATES_INTERVAL_DEV_S : MIN_UPDATES_INTERVAL_PROD_S
+  return Math.max(min, Math.min(MAX_UPDATES_INTERVAL_S, v))
+}
+
+function clampIngestInterval(n: unknown): number {
+  const v = typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : DEFAULTS.ingest.intervalSeconds
+  const min = IS_DEV ? MIN_INGEST_INTERVAL_DEV_S : MIN_INGEST_INTERVAL_PROD_S
+  return Math.max(min, Math.min(MAX_INGEST_INTERVAL_S, v))
 }
