@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useT } from '../i18n'
-import { apiGet, apiPatch } from '../api'
+import { apiGet, apiPatch, apiPost } from '../api'
 import type { SettingsResponse } from '../types'
 import { pokeVersionPoll } from '../lib/version-poll'
+import { ConfirmDialog } from './confirm-dialog'
 
 /** Settings modal. Opened from the gear icon in AppHeader. Currently
  *  hosts only the Updates section — but the section/grid scaffolding
@@ -63,6 +64,38 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
     (draftInterval !== null && draftInterval !== settings.data?.updates.intervalSeconds) ||
     (draftIngestEnabled !== null && draftIngestEnabled !== settings.data?.ingest.enabled) ||
     (draftIngestInterval !== null && draftIngestInterval !== settings.data?.ingest.intervalSeconds)
+
+  // Rebuild is destructive (truncates every ingest table and re-
+  // imports from disk), so we gate it behind a Confirm dialog and
+  // a separate mutation. The /api/refresh endpoint returns 409
+  // Conflict if anything else is in flight (manual refresh,
+  // auto-tick), which we surface as `rebuildError`. Successful
+  // completion triggers the same cache invalidations as a regular
+  // refresh — every ingest-derived view needs to refetch.
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [rebuildError, setRebuildError] = useState<string | null>(null)
+  const rebuild = useMutation({
+    mutationFn: () => apiPost<{ ok: boolean; mode: string; total: number }>('/api/refresh?mode=rebuild'),
+    onSuccess: () => {
+      setRebuildError(null)
+      qc.invalidateQueries({ queryKey: ['providers'] })
+      qc.invalidateQueries({ queryKey: ['overview'] })
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      qc.invalidateQueries({ queryKey: ['insights'] })
+      qc.invalidateQueries({ queryKey: ['agents'] })
+      qc.invalidateQueries({ queryKey: ['health'] })
+      setConfirmOpen(false)
+      onClose()
+    },
+    onError: (err: Error) => {
+      // The api helpers throw with the response body's `error` field
+      // when a non-2xx comes back; "busy" maps to our 409. Anything
+      // else (network, 500) falls back to a generic message.
+      const msg = err.message || 'unknown'
+      setRebuildError(msg)
+      setConfirmOpen(false)
+    },
+  })
 
   const save = () => mutation.mutate({
     updates: { enabled, intervalSeconds },
@@ -173,7 +206,51 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               </span>
             </div>
           </section>
+
+          {/* Maintenance — destructive operations live behind their
+              own section + confirm dialog so they're never one click
+              away. Rebuild is the only entry today; full DB export /
+              import etc. will land here later. */}
+          <section className="settings-section">
+            <h3 className="settings-section-title">{t('settings.maintenance.title')}</h3>
+            <p className="settings-section-help">{t('settings.maintenance.help')}</p>
+
+            <div className="settings-row settings-row-stacked">
+              <span className="settings-row-label">{t('settings.maintenance.rebuildLabel')}</span>
+              <button
+                type="button"
+                className="ghost is-destructive"
+                onClick={() => { setRebuildError(null); setConfirmOpen(true) }}
+                disabled={rebuild.isPending}
+              >
+                {rebuild.isPending ? t('settings.maintenance.rebuilding') : t('settings.maintenance.rebuildButton')}
+              </button>
+              {rebuildError && (
+                <span className="settings-error">{
+                  rebuildError === 'busy'
+                    ? t('settings.maintenance.busyError')
+                    : t('settings.maintenance.genericError', { msg: rebuildError })
+                }</span>
+              )}
+            </div>
+          </section>
         </div>
+
+        <ConfirmDialog
+          open={confirmOpen}
+          tone="destructive"
+          title={t('settings.maintenance.confirmTitle')}
+          message={
+            <>
+              <p>{t('settings.maintenance.confirmBody1')}</p>
+              <p>{t('settings.maintenance.confirmBody2')}</p>
+            </>
+          }
+          confirmLabel={t('settings.maintenance.confirmYes')}
+          cancelLabel={t('settings.cancel')}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => rebuild.mutate()}
+        />
 
         <div className="update-modal-footer">
           <button onClick={onClose}>{t('settings.cancel')}</button>
