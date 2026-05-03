@@ -4,6 +4,90 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] — 2026-05-03
+
+The Codex release. First-class telemetry for OpenAI's Codex /
+ChatGPT plan, end-to-end: every JSONL session is now correctly
+parsed (originator-case, turn_context model swaps, Codex Desktop),
+the dual-window rate-limit payload (5h primary + 7d secondary)
+turns into a daily KPI on the Today view and a stacked per-day
+history chart on the dashboard, and the binding "limit reached"
+signal — Plus/Pro credits exhaustion — is surfaced as its own
+metric distinct from the percentage windows. Also: dashboard
+filters now persist in the URL, so refresh/back/share-link work.
+
+### Added
+
+- **Codex plan KPI (Today view).** Three-panel widget — plan
+  type, peak 5h-window utilization for the day, and Plus/Pro
+  credits state — composed from the day's `rate_limits` samples.
+  Sizes 1×1 / 2×1 / 3×1; the value column stays short ("0", "∞",
+  the balance number) so 1×1 fits cleanly while the descriptive
+  word ("exhausted", "unlimited") drops to the sub-line. The
+  reset-countdown ("resets in 4h") is hidden on past-day views
+  where the window has long since cycled.
+- **Codex plan history chart (Dashboard).** Stacked bars per day,
+  one colored segment per `plan_type` active that day (free /
+  plus / pro / go / enterprise), height = peak primary % during
+  that plan. The 7d secondary window overlays as a dashed line
+  on top — slow-moving cumulative weekly cap, distinct from the
+  per-day spikes the bars show. Visible Legend, gap-honoring
+  (idle days break the line instead of dragging to zero), bucket
+  granularity tracks the dashboard control bar (day/week/month).
+- **Per-day Codex plan storage.** New `codex_plan_daily` table
+  with per-plan peaks, full snapshot, and `by_plan_json` for the
+  stacked breakdown. Rebuilt every ingest; cheap for realistic
+  Codex usage.
+- **`screens` field on `WidgetDef`.** Declarative whitelist of
+  surfaces a widget can appear on (`'dashboard' | 'project' |
+  'today'`). Replaces the ad-hoc `if (inProjectView) …` gating
+  scattered across the widget registry. Catalog filters in one
+  place; saved layouts referencing screen-incompatible widgets
+  get scrubbed automatically.
+- **URL-persisted dashboard filters.** Date range, granularity
+  and provider chips now live in the hash query
+  (`#/?from=…&to=…&g=week&p=codex`, same shape on
+  `#/project/<id>`). Refresh, back-forward and shared links all
+  preserve the view. Default-preset values are dropped from the
+  URL so a user on defaults still sees a clean `#/`.
+
+### Changed
+
+- **Codex `cache_write` honestly null when unavailable.** OpenAI
+  rolls cache-write into `input_tokens` rather than reporting it
+  separately, so a Codex-only scope that previously displayed
+  "0 tokens cached" now shows "—" with a tooltip explaining
+  why. Mixed scopes (Claude + Codex) keep the real number from
+  the Claude side.
+- **Codex `rate_limit_reached` derived from `credits.has_credits`.**
+  The documented `rate_limit_reached_type` field turns out to be
+  rarely populated in practice; the binding signal on paid plans
+  is `credits.has_credits === false`. The KPI's red "Limit
+  reached" accent now triggers on the actual signal CLI uses.
+- **Default Today granularity for the Codex plan KPI.** Past-day
+  views (`/day/2026-04-06`) read from the daily aggregate, not
+  the latest snapshot — navigating back through history shows
+  each day's actual peak, not today's number applied to
+  yesterday's date.
+
+### Fixed
+
+- **Codex Desktop sessions ingested.** The originator field
+  ships as `"Codex Desktop"` (capital C) in the desktop client
+  while CLI uses `"codex"`; the originator check is now
+  case-insensitive, so Desktop sessions land in the dashboard
+  alongside CLI ones.
+- **All Codex calls no longer collapse to "GPT-5".** The model
+  string lives in `turn_context` events, not `session_meta`,
+  on newer Codex versions. We now track turn_context updates
+  through the session and re-resolve the model on every call.
+- **Stale model column on re-ingest.** `model=excluded.model`
+  was missing from the `api_calls` upsert SET clause, so a
+  re-ingest after a model change kept the old name. Fixed.
+- **Codex pricing cache moved off `~/.cache/codeburn`.** Stale
+  pre-rename location lingered after the CodeBurn → Third Eye
+  migration. Now writes to `~/.cache/third-eye`.
+
 ## [2.4.0] — 2026-05-02
 
 The agent telemetry release. Surfacing what your AI subagents
