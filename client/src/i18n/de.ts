@@ -191,6 +191,23 @@ export const de: Dict = {
   'kpi.output': 'Ausgabe',
   'kpi.read': 'Lesen',
   'kpi.write': 'Schreiben',
+  'kpi.cacheWriteUnavailable': 'OpenAI meldet Cache-Schreibvorgänge nicht — ihr Prompt-Caching ist implizit, kein eigenes Feld.',
+
+
+  'codexPlan.title': 'Codex-Plan',
+  'codexPlan.description': 'OpenAI-Limit-Auslastung aus der letzten Codex-Sitzung — Plan, %-Auslastung, Zeit bis zum Reset.',
+  'codexPlan.planLabel': 'Plan',
+  'codexPlan.usedLabel': 'Genutzt',
+  'codexPlan.stateLabel': 'Status',
+  'codexPlan.empty': 'Keine Codex-Sitzungen in diesem Bereich.',
+  'codexPlan.unknown': 'Unbekannt',
+  'codexPlan.planFree': 'Free',
+  'codexPlan.resetsInFmt': 'Reset in {time}',
+  'codexPlan.minutesFmt': '{n}min',
+  'codexPlan.resetting': 'jetzt',
+  'codexPlan.limitReached': 'Limit erreicht',
+  'codexPlan.staleTooltip': 'Snapshot von {when} — älter als 24h, das Plan-Fenster ist möglicherweise schon zurückgesetzt.',
+
   'kpi.projects': 'Projekte',
   'kpi.active': 'Aktive',
   'kpi.apiCalls': 'API-Aufrufe',

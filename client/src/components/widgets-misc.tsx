@@ -294,9 +294,12 @@ export function KpiGroup({ title, children }: { title: string; children: React.R
   )
 }
 
-export function KpiMetric({ label, value, sub }: { label: string; value: string; sub?: string }) {
+export function KpiMetric({ label, value, sub, title }: { label: string; value: string; sub?: string; title?: string }) {
   return (
-    <div className="kpi-metric">
+    // title= becomes a native browser tooltip on hover. Used to
+    // explain "—" placeholders for metrics whose data source
+    // doesn't supply the value (e.g. cache write for Codex).
+    <div className="kpi-metric" title={title}>
       <div className="label">{label}</div>
       <div className="value">{value}</div>
       {sub && <div className="sub">{sub}</div>}

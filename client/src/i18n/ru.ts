@@ -191,6 +191,23 @@ export const ru: Dict = {
   'kpi.output': 'Вывод',
   'kpi.read': 'Чтение',
   'kpi.write': 'Запись',
+  'kpi.cacheWriteUnavailable': 'OpenAI не возвращает запись кэша через API — их prompt caching неявный, нет отдельного поля.',
+
+
+  'codexPlan.title': 'План Codex',
+  'codexPlan.description': 'Использование лимитов OpenAI из свежей Codex-сессии — план, % использовано, до сброса.',
+  'codexPlan.planLabel': 'План',
+  'codexPlan.usedLabel': 'Использовано',
+  'codexPlan.stateLabel': 'Состояние',
+  'codexPlan.empty': 'В этом срезе нет Codex-сессий.',
+  'codexPlan.unknown': 'Неизвестно',
+  'codexPlan.planFree': 'Free',
+  'codexPlan.resetsInFmt': 'сбросится через {time}',
+  'codexPlan.minutesFmt': '{n}мин',
+  'codexPlan.resetting': 'сейчас',
+  'codexPlan.limitReached': 'Лимит достигнут',
+  'codexPlan.staleTooltip': 'Срез сделан {when} — старше 24ч, окно плана могло сброситься.',
+
   'kpi.projects': 'Проекты',
   'kpi.active': 'Активно',
   'kpi.apiCalls': 'API-вызовов',

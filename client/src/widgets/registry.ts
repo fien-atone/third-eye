@@ -10,6 +10,7 @@ import type { WidgetDef } from './grid'
 import { kpiSpendWidget } from './dashboard/kpi-spend'
 import { kpiTokensWidget } from './dashboard/kpi-tokens'
 import { kpiCacheWidget } from './dashboard/kpi-cache'
+import { kpiCodexPlanWidget } from './dashboard/kpi-codex-plan'
 import { kpiScopeWidget } from './dashboard/kpi-scope'
 import { costByProjectWidget } from './dashboard/cost-by-project'
 import { costByModelWidget } from './dashboard/cost-by-model'
@@ -58,6 +59,7 @@ export function buildDashboardCatalog(ctx: DashboardCtx): WidgetDef[] {
     kpiSpendWidget(t, data, granularity, avgPerBucket),
     kpiTokensWidget(t, data),
     kpiCacheWidget(t, data),
+    kpiCodexPlanWidget(t, data),
     kpiScopeWidget(t, data, granularity, inProjectView, activeBuckets),
     costByModelWidget(t, series, granularity, hasAnyData, modelNames),
     tokensWidget(t, series, granularity, hasTokenData),

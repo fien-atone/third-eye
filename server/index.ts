@@ -449,12 +449,22 @@ app.get('/api/overview', (req, res) => {
     SELECT SUM(cost_usd) AS cost, COUNT(*) AS calls,
            SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
            SUM(cache_read) AS cache_read, SUM(cache_write) AS cache_write,
-           COUNT(DISTINCT project) AS projects
+           COUNT(DISTINCT project) AS projects,
+           -- Count calls from providers whose API actually reports
+           -- cache_write tokens. Currently: anything that's not Codex.
+           -- OpenAI's prompt caching is implicit (writes have no
+           -- separate cost or token field), so summing cache_write
+           -- across a Codex-only scope produces a misleading "0".
+           -- We use this count to flip cache_write to NULL in that
+           -- case, and the UI renders NULL as "—" (not "0").
+           SUM(CASE WHEN provider != 'codex' THEN 1 ELSE 0 END) AS cache_write_supported_calls,
+           SUM(CASE WHEN provider  = 'codex' THEN 1 ELSE 0 END) AS codex_calls
     FROM api_calls
     WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where}
   `).get(...baseParams) as {
     cost: number | null; calls: number; input_tokens: number | null; output_tokens: number | null;
     cache_read: number | null; cache_write: number | null; projects: number;
+    cache_write_supported_calls: number; codex_calls: number;
   }
 
   // ─── Agent telemetry ───────────────────────────────────────────────
@@ -751,9 +761,23 @@ app.get('/api/overview', (req, res) => {
       inputTokens: totals.input_tokens ?? 0,
       outputTokens: totals.output_tokens ?? 0,
       cacheRead: totals.cache_read ?? 0,
-      cacheWrite: totals.cache_write ?? 0,
+      // null when the scope contains no provider that reports cache
+      // writes (currently: only Codex). UI distinguishes null ("—",
+      // "no data") from 0 ("zero writes happened, here's the proof").
+      cacheWrite: totals.cache_write_supported_calls > 0 ? (totals.cache_write ?? 0) : null,
       projects: totals.projects ?? 0,
     },
+    // Codex / ChatGPT plan-usage snapshot. Only forwarded when the
+    // current scope contains Codex calls — on Claude-only views the
+    // plan-state is irrelevant noise. Latest sample lives in meta;
+    // ingest refreshes it.
+    codexPlan: ((): unknown => {
+      const codexCount = totals.codex_calls
+      if (!codexCount || codexCount === 0) return null
+      const raw = getMeta('codex_plan_latest')
+      if (!raw) return null
+      try { return JSON.parse(raw) } catch { return null }
+    })(),
     series,
     models: modelTotals.map(m => ({
       name: m.name, calls: m.calls, cost: roundUsd(m.cost),

@@ -16,7 +16,14 @@ export function kpiCacheWidget(t: T, data: OverviewResponse): WidgetDef {
     render: () => (
       <KpiGroup title={t('kpi.cache')}>
         <KpiMetric label={t('kpi.read')} value={fmtTokens(data.totals.cacheRead)} />
-        <KpiMetric label={t('kpi.write')} value={fmtTokens(data.totals.cacheWrite)} />
+        <KpiMetric
+          label={t('kpi.write')}
+          // null = the data sources in scope (e.g. Codex-only) don't
+          // report cache writes. Show "—" with an explanatory tooltip
+          // instead of the misleading "0 tokens".
+          value={data.totals.cacheWrite === null ? '—' : fmtTokens(data.totals.cacheWrite)}
+          title={data.totals.cacheWrite === null ? t('kpi.cacheWriteUnavailable') : undefined}
+        />
       </KpiGroup>
     ),
   }

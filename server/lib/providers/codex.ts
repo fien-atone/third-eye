@@ -344,3 +344,109 @@ export function createCodexProvider(codexDir?: string): Provider {
 }
 
 export const codex = createCodexProvider()
+
+// ──────────────────────────────────────────────────────────────────────
+// Rate-limits snapshot (separate from the regular per-call ingest)
+// ──────────────────────────────────────────────────────────────────────
+
+/** Account-level snapshot of the user's Codex / ChatGPT plan usage,
+ *  pulled out of the rate_limits payload that Codex includes in
+ *  every token_count event. Anthropic's API doesn't have an
+ *  equivalent — this is OpenAI/Codex-only. */
+export type CodexPlanSnapshot = {
+  planType: string | null              // 'free' | 'ChatGPT Plus' | 'Pro' | 'Enterprise' | …
+  limitId: string | null               // server-side limit identifier
+  limitName: string | null             // human-readable label, e.g. '5 hour limit'
+  primary: CodexLimitWindow | null     // main rate window
+  secondary: CodexLimitWindow | null   // optional second window (some plans have both)
+  credits: number | null               // remaining credits on paid plans, null on free
+  rateLimitReachedType: string | null  // non-null when user hit a limit recently
+  capturedAt: string                   // ISO of the token_count event we got this from
+}
+
+export type CodexLimitWindow = {
+  usedPercent: number      // 0–100
+  windowMinutes: number    // duration of the rolling window
+  resetsAt: number         // unix epoch SECONDS when the window resets
+}
+
+/** Walk the latest Codex rollout file and return the most recent
+ *  rate_limits payload. We don't aggregate across files because
+ *  rate_limits are point-in-time account state — only the absolute
+ *  latest sample is meaningful. Returns null when no Codex sessions
+ *  exist or none of them carry rate_limits. */
+export async function getLatestCodexPlanSnapshot(codexDir?: string): Promise<CodexPlanSnapshot | null> {
+  const root = join(getCodexDir(codexDir), 'sessions')
+  // Walk year/month/day descending to find the freshest session file.
+  let candidates: { path: string; mtime: number }[] = []
+  let years: string[] = []
+  try { years = await readdir(root) } catch { return null }
+  // Sort newest-first lexicographically (works because 4-digit year).
+  years.sort((a, b) => b.localeCompare(a))
+  for (const year of years) {
+    if (!/^\d{4}$/.test(year)) continue
+    const yearDir = join(root, year)
+    const months = (await readdir(yearDir).catch(() => [] as string[])).sort((a, b) => b.localeCompare(a))
+    for (const month of months) {
+      if (!/^\d{2}$/.test(month)) continue
+      const monthDir = join(yearDir, month)
+      const days = (await readdir(monthDir).catch(() => [] as string[])).sort((a, b) => b.localeCompare(a))
+      for (const day of days) {
+        if (!/^\d{2}$/.test(day)) continue
+        const dayDir = join(monthDir, day)
+        const files = (await readdir(dayDir).catch(() => [] as string[])).filter(
+          f => f.startsWith('rollout-') && f.endsWith('.jsonl'),
+        )
+        for (const f of files) {
+          const fp = join(dayDir, f)
+          const s = await stat(fp).catch(() => null)
+          if (s?.isFile()) candidates.push({ path: fp, mtime: s.mtimeMs })
+        }
+        if (candidates.length > 0) break  // found something today; stop digging
+      }
+      if (candidates.length > 0) break
+    }
+    if (candidates.length > 0) break
+  }
+  if (candidates.length === 0) return null
+  // Pick the newest by mtime to handle multiple rollouts on the same day.
+  candidates.sort((a, b) => b.mtime - a.mtime)
+
+  // Read each candidate from newest, scan for the LAST rate_limits
+  // entry. We only need the freshest file unless it lacks rate_limits
+  // (rare — practically every token_count event carries them).
+  for (const c of candidates) {
+    const text = await readFile(c.path, 'utf-8').catch(() => '')
+    if (!text) continue
+    let lastSnapshot: CodexPlanSnapshot | null = null
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue
+      let entry: Record<string, unknown>
+      try { entry = JSON.parse(line) } catch { continue }
+      const payload = (entry as { payload?: Record<string, unknown> }).payload
+      const rl = payload && (payload as { rate_limits?: Record<string, unknown> }).rate_limits
+      if (!rl || typeof rl !== 'object') continue
+      const ts = typeof entry.timestamp === 'string' ? entry.timestamp : new Date().toISOString()
+      lastSnapshot = {
+        planType: (rl.plan_type as string | null) ?? null,
+        limitId: (rl.limit_id as string | null) ?? null,
+        limitName: (rl.limit_name as string | null) ?? null,
+        primary: rl.primary ? toWindow(rl.primary as Record<string, unknown>) : null,
+        secondary: rl.secondary ? toWindow(rl.secondary as Record<string, unknown>) : null,
+        credits: typeof rl.credits === 'number' ? rl.credits : null,
+        rateLimitReachedType: (rl.rate_limit_reached_type as string | null) ?? null,
+        capturedAt: ts,
+      }
+    }
+    if (lastSnapshot) return lastSnapshot
+  }
+  return null
+}
+
+function toWindow(o: Record<string, unknown>): CodexLimitWindow {
+  return {
+    usedPercent: typeof o.used_percent === 'number' ? o.used_percent : 0,
+    windowMinutes: typeof o.window_minutes === 'number' ? o.window_minutes : 0,
+    resetsAt: typeof o.resets_at === 'number' ? o.resets_at : 0,
+  }
+}

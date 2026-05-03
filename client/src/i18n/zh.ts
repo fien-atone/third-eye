@@ -191,6 +191,23 @@ export const zh: Dict = {
   'kpi.output': '输出',
   'kpi.read': '读取',
   'kpi.write': '写入',
+  'kpi.cacheWriteUnavailable': 'OpenAI 的 API 不报告缓存写入 — 它们的 prompt 缓存是隐式的，没有单独字段。',
+
+
+  'codexPlan.title': 'Codex 套餐',
+  'codexPlan.description': '来自最新 Codex 会话的 OpenAI 限额使用情况 — 套餐、已用百分比、重置时间。',
+  'codexPlan.planLabel': '套餐',
+  'codexPlan.usedLabel': '已用',
+  'codexPlan.stateLabel': '状态',
+  'codexPlan.empty': '范围内无 Codex 会话。',
+  'codexPlan.unknown': '未知',
+  'codexPlan.planFree': '免费',
+  'codexPlan.resetsInFmt': '{time} 后重置',
+  'codexPlan.minutesFmt': '{n}分钟',
+  'codexPlan.resetting': '正在重置',
+  'codexPlan.limitReached': '已达到限额',
+  'codexPlan.staleTooltip': '快照来自 {when} — 已超过 24 小时，套餐窗口可能已重置。',
+
   'kpi.projects': '项目数',
   'kpi.active': '活跃',
   'kpi.apiCalls': 'API 调用',

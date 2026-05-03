@@ -8,6 +8,7 @@ import { readdir, readFile, stat } from 'fs/promises'
 import { join } from 'path'
 import { db, setMeta, truncateAll, type CallRow } from './db.ts'
 import { claudeDesktopSessionsDir } from './lib/claude-paths.ts'
+import { getLatestCodexPlanSnapshot } from './lib/providers/codex.ts'
 import { scanAgentSessions } from './lib/agent-sessions.ts'
 
 function shortenProjectLabel(key: string): string {
@@ -294,6 +295,18 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
   setMeta('last_ingest_at', new Date().toISOString())
   setMeta('last_ingest_rows', String(rows.length))
   setMeta('last_ingest_agent_rows', String(agentRows))
+
+  // Codex rate-limits snapshot — account-level state pulled out of
+  // the latest token_count event. Stored as a singleton meta entry
+  // (overwritten each ingest); the widget reads the freshest value.
+  // null is also stored explicitly so a previously-recorded snapshot
+  // doesn't linger after the user uninstalls Codex.
+  try {
+    const plan = await getLatestCodexPlanSnapshot()
+    setMeta('codex_plan_latest', plan ? JSON.stringify(plan) : '')
+  } catch (err) {
+    console.warn('[ingest] codex plan snapshot failed:', (err as Error).message)
+  }
 
   return {
     durationMs: Date.now() - t0,

@@ -98,9 +98,27 @@ export type OverviewResponse = {
     inputTokens: number
     outputTokens: number
     cacheRead: number
-    cacheWrite: number
+    /** null when the scope's data sources don't report cache write
+     *  (Codex's prompt caching is implicit — writes are folded into
+     *  input_tokens at no extra cost, no separate field). UI must
+     *  distinguish this from a true zero (rare but possible: a
+     *  Claude session with all-uncached prompts). */
+    cacheWrite: number | null
     projects: number
   }
+  /** Codex / ChatGPT plan-usage snapshot. Present only when the
+   *  current scope contains Codex calls. Fields mirror the
+   *  CodexPlanSnapshot shape in server/lib/providers/codex.ts. */
+  codexPlan?: {
+    planType: string | null
+    limitId: string | null
+    limitName: string | null
+    primary: { usedPercent: number; windowMinutes: number; resetsAt: number } | null
+    secondary: { usedPercent: number; windowMinutes: number; resetsAt: number } | null
+    credits: number | null
+    rateLimitReachedType: string | null
+    capturedAt: string
+  } | null
   series: Array<Record<string, number | string>>
   models: Array<{
     name: string
