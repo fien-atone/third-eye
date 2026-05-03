@@ -146,7 +146,7 @@ export function AppHeader({
               the user's own pending mutation disables it, since
               rapid double-clicks during their OWN run feel buggy. */}
           <button
-            className="ghost"
+            className="ghost btn-stable"
             onClick={onRefresh}
             disabled={isRefreshing}
             title={
@@ -155,7 +155,19 @@ export function AppHeader({
                 : t('header.refreshTitle')
             }
           >
-            {(isRefreshing || autoIngestKind) ? t('header.refreshing') : t('header.refresh')}
+            {/* Stable-width pattern: render BOTH labels stacked in the
+                same grid cell, hide the inactive one. Width is sized to
+                the longest label so the button doesn't widen mid-tick.
+                Translations vary — "Refresh"/"Refreshing…" widths differ
+                in every locale — and a hard min-width in px would either
+                clip or over-pad. The grid trick auto-fits whatever the
+                current locale's longest label happens to be. */}
+            <span className="btn-label-active" aria-hidden={!(isRefreshing || autoIngestKind)}>
+              {t('header.refreshing')}
+            </span>
+            <span className="btn-label-idle" aria-hidden={isRefreshing || !!autoIngestKind}>
+              {t('header.refresh')}
+            </span>
           </button>
           <LocaleSwitcher />
           <ThemeToggle theme={theme} setTheme={setTheme} />

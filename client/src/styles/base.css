@@ -103,6 +103,30 @@ button:hover { background: var(--hover); color: var(--text); border-color: var(-
 button.active { background: var(--text); border-color: var(--text); color: var(--bg); }
 button.ghost { background: transparent; border-color: transparent; padding: 6px 8px; }
 button.ghost:hover { background: var(--hover); border-color: var(--border); }
+
+/* Stable-width button — keeps a uniform footprint across two
+   labels (e.g. "Refresh" / "Refreshing…") so the surrounding
+   layout doesn't jiggle when state flips. Children are stacked in
+   one grid cell; width follows the widest of them, regardless of
+   which label is currently visible. */
+button.btn-stable {
+  display: inline-grid;
+  grid-template-columns: max-content;
+  align-items: center;
+  justify-items: center;
+}
+button.btn-stable > .btn-label-idle,
+button.btn-stable > .btn-label-active {
+  grid-column: 1; grid-row: 1;
+}
+button.btn-stable > [aria-hidden='true'] {
+  /* visibility:hidden (not display:none) preserves the box so the
+     grid cell still measures both labels and picks the wider one
+     for the button's intrinsic width. pointer-events:none avoids
+     hover glitches landing on the invisible label. */
+  visibility: hidden;
+  pointer-events: none;
+}
 button.primary { background: var(--accent); border-color: var(--accent); color: white; }
 button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: white; }
 button:disabled { opacity: 0.55; cursor: wait; }
