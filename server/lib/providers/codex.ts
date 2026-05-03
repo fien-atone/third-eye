@@ -84,9 +84,16 @@ async function readFirstLine(filePath: string): Promise<CodexEntry | null> {
 async function isValidCodexSession(filePath: string): Promise<{ valid: boolean; meta?: CodexEntry }> {
   const entry = await readFirstLine(filePath)
   if (!entry) return { valid: false }
+  // Originator naming changed across Codex versions:
+  //   - codex_vscode  (old VSCode extension, lowercase)
+  //   - codex_cli     (CLI)
+  //   - Codex Desktop (newer Desktop app, capital C with a space)
+  // Accept anything starting with "codex" regardless of case so a
+  // future originator naming change doesn't silently drop a month
+  // of session data again.
   const valid = entry.type === 'session_meta' &&
     typeof entry.payload?.originator === 'string' &&
-    entry.payload.originator.startsWith('codex')
+    entry.payload.originator.toLowerCase().startsWith('codex')
   return { valid, meta: valid ? entry : undefined }
 }
 
