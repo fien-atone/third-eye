@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useT } from '../i18n'
 import { hrefFor, navigate } from '../router'
 import { Logo } from '../Logo'
@@ -41,6 +41,20 @@ export function AppHeader({
   const t = useT()
   const [updateOpen, setUpdateOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Force a re-render every 30 s so the relative timestamp
+  // ("just now" → "1m ago" → …) advances even when no other state
+  // changes. Without this, react-query's structural sharing on the
+  // /api/health poll returns the same `lastIngestAt` reference
+  // across refetches, the component skips re-rendering, and the
+  // wall-clock-derived `fmtRel(...)` value freezes at whatever it
+  // was on first paint. fmtRel rounds down to whole minutes, so
+  // 30 s cadence is plenty — no risk of users staring at a stale
+  // "just now" past the one-minute boundary.
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick(n => n + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
   // Compute "outdated" client-side: compare the bundle version the user
   // is actually looking at (__APP_VERSION__, baked in at Vite build time)
   // against the latest GitHub release the server polled. Doing the
