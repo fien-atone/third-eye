@@ -4,6 +4,64 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1] — 2026-05-03
+
+The Rebuild flow shipped in 2.6.0 had a foot-gun and a few visual
+gaps. This patch makes it actually usable: the user picks what
+gets wiped, sees clear feedback during and after the operation,
+and the dashboard reflects layout resets without a page reload.
+
+### Added
+
+- **Selective Rebuild.** The Rebuild dialog now has three opt-in
+  checkboxes for the destructive extras — favorited projects +
+  custom labels, agent role configuration, saved widget layouts.
+  All default OFF. Telemetry tables (api_calls, tool_events,
+  agent_sessions, codex_plan_daily) are always wiped — that's
+  what Rebuild is for. Server accepts
+  `?reset=projects,agents,layouts` on `POST /api/refresh?mode=rebuild`.
+- **Success line in Settings.** A successful Rebuild now keeps
+  the modal open and shows a green "Done — N rows re-imported in
+  X.Xs" line under the button. Previously the modal closed
+  silently on success, which made the operation feel like
+  nothing happened.
+- **`ApiError` class.** The `api.ts` wrapper now parses non-2xx
+  bodies as JSON when shaped that way and exposes `code` (e.g.
+  "busy" — 409 Conflict from the ingest lock) plus the full
+  `body`. Existing string-compares (`err.message === 'busy'`) Just
+  Work — the message becomes the code when one is present.
+
+### Fixed
+
+- **Rebuild used to silently nuke favorites + agent role config.**
+  `truncateAll` always wiped `projects` and `agent_registry` along
+  with telemetry, with no UI to opt out. Now those tables are only
+  cleared when the user explicitly checks the matching box in the
+  Rebuild dialog. Bug-fix, not behavior change — the previous
+  behavior wasn't intentional.
+- **"Reset saved widget layouts" didn't apply without a page
+  reload.** The grid's layout query was invalidated but
+  react-query returned the stale cached layout synchronously on
+  WidgetGrid's remount, so GridStack initialized with old
+  positions and the fresh data had nowhere to land. Now the cache
+  entry is evicted (`removeQueries` not `invalidateQueries`)
+  before the layoutEpoch bump, so the next mount has no stale
+  data to fall back on and the grid re-renders to defaults right
+  away.
+- **409 Conflict from the lock surfaced as raw JSON.** When the
+  user clicked Rebuild while an auto-tick was in flight, the old
+  api wrapper threw the entire response body as the error
+  message; the rebuild handler's `err.message === 'busy'` check
+  never matched and the UI fell through to a generic-error path
+  that printed the JSON dump verbatim. The new `ApiError` parses
+  the body and surfaces the friendly "ingest is running, try
+  again" hint as designed.
+- **`codex_plan_daily` rows survived Rebuild.** Telemetry-derived
+  table missed the `truncateAll` list (added in 2.5.0 after the
+  helper was last touched). Practically harmless — the next
+  ingest re-aggregated it — but semantically inconsistent with
+  "wipe and re-import". Added.
+
 ## [2.6.0] — 2026-05-03
 
 The hands-off release. Auto-ingest now runs as a configurable
