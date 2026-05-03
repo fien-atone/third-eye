@@ -19,7 +19,7 @@ export function AppHeader({
   lastIngestAt, isRefreshing, autoIngestKind, onRefresh,
   theme, setTheme,
   showTabs, dashboardTabActive, projectsTabActive, dayTabActive,
-  version,
+  version, onLayoutsReset,
 }: {
   lastIngestAt: string | null
   isRefreshing: boolean
@@ -37,6 +37,12 @@ export function AppHeader({
   projectsTabActive: boolean
   dayTabActive: boolean
   version: VersionResponse | undefined
+  /** Bumped by SettingsModal after a Rebuild that wiped the
+   *  screen_layouts table. Threads up to App, which bumps
+   *  layoutEpoch so WidgetGrid remounts GridStack from the freshly-
+   *  reseeded layout. Without this the visible grid keeps the pre-
+   *  rebuild positions until next page reload. */
+  onLayoutsReset: () => void
 }) {
   const t = useT()
   const [updateOpen, setUpdateOpen] = useState(false)
@@ -223,7 +229,7 @@ export function AppHeader({
         </div>
       )}
       {updateOpen && version && <UpdateModal version={version} onClose={() => setUpdateOpen(false)} />}
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} onLayoutsReset={onLayoutsReset} />}
     </>
   )
 }

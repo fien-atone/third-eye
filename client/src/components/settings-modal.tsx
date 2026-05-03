@@ -9,7 +9,16 @@ import { pokeVersionPoll } from '../lib/version-poll'
  *  hosts only the Updates section — but the section/grid scaffolding
  *  is already in place so adding a new settings group later is just a
  *  new <section> inside the body. */
-export function SettingsModal({ onClose }: { onClose: () => void }) {
+export function SettingsModal({ onClose, onLayoutsReset }: {
+  onClose: () => void
+  /** Called after a successful Rebuild when "Reset saved widget
+   *  layouts" was checked. Lets the host (App.tsx) bump the
+   *  WidgetGrid's layoutEpoch so GridStack tears down and
+   *  re-initializes from the freshly-reseeded layout. Cache
+   *  invalidation alone isn't enough — GridStack only reads its
+   *  positions on init. */
+  onLayoutsReset: () => void
+}) {
   const t = useT()
   const qc = useQueryClient()
   const settings = useQuery<SettingsResponse>({
@@ -111,6 +120,13 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       // keeps the pre-rebuild layout until next page reload,
       // even though the DB row was just deleted.
       qc.invalidateQueries({ queryKey: ['layout'] })
+      // GridStack only reads positions on init, so a query refetch
+      // alone leaves the visible grid frozen on the pre-rebuild
+      // layout. The host bumps `layoutEpoch` to remount WidgetGrid
+      // from scratch with the new (default) data. Only fires when
+      // resetLayouts was actually checked — calling unconditionally
+      // would needlessly reflow the grid every Rebuild.
+      if (resetLayouts) onLayoutsReset()
       setConfirmOpen(false)
       // KEEP the modal open — closing it silently after a 2 s
       // server round-trip leaves the user thinking nothing

@@ -330,6 +330,12 @@ export default function App() {
         projectsTabActive={projectsTabActive}
         dayTabActive={dayTabActive}
         version={versionQuery.data}
+        // Rebuild → "Reset saved widget layouts" checked: bump the
+        // grid epoch so WidgetGrid tears down GridStack and re-
+        // initializes from the freshly-reseeded default layout.
+        // Cache invalidation alone leaves the visible grid frozen
+        // on the old positions until the next page reload.
+        onLayoutsReset={() => setLayoutEpoch(e => e + 1)}
       />
 
       {serverDown && <ServerDownBanner onRetry={retryAll} />}
