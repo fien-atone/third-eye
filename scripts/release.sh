@@ -49,6 +49,17 @@ if git rev-parse "v${ver}" >/dev/null 2>&1; then
   exit 1
 fi
 
+# Pre-flight: run the same gates CI will enforce on the tag (full
+# production build + test suite). Catches `tsc -b` errors that
+# `tsc -p ... --noEmit` misses (project-references mode is stricter)
+# and saves a round-trip through "push tag → CI fails → amend →
+# force-push → retag". release.yml still runs these for real on the
+# tagged commit; this is just the local fast-fail before pushing.
+echo "→ pre-flight: npm test"
+npm test --silent
+echo "→ pre-flight: npm run build"
+npm run build --silent
+
 # Bump version in all three package.json files (no other side effects).
 for f in package.json client/package.json server/package.json; do
   sed -i.bak -E 's/("version"[[:space:]]*:[[:space:]]*")[^"]+(")/\1'"${ver}"'\2/' "$f"

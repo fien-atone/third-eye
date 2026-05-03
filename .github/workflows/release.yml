@@ -1,10 +1,23 @@
 name: Release
 
-# Triggers when scripts/release.sh pushes a vX.Y.Z tag. Pulls the
-# matching ## [X.Y.Z] section out of CHANGELOG.md and creates a
-# GitHub Release page with it. The release is marked "Latest" iff
-# this is the highest semver tag in the repo (skips for backported
-# patches to old major lines).
+# Triggers when scripts/release.sh pushes a vX.Y.Z tag. The publish
+# job pulls the matching ## [X.Y.Z] section out of CHANGELOG.md and
+# creates a GitHub Release page with it. The release is marked
+# "Latest" iff this is the highest semver tag in the repo (skips for
+# backported patches to old major lines).
+#
+# The publish job is GATED on `build` and `test` succeeding against
+# the exact tagged commit. Previously the release page got published
+# in parallel with the main-branch build pipeline — which meant a
+# tag could ship even when the production build failed (it did, on
+# v2.5.0 first try). Recovering from a published-but-broken release
+# is tedious (delete the release, retag the fixed commit, force-push);
+# never publishing in the first place is much cleaner.
+#
+# Recovering from a failed run: amend the tagged commit with the fix,
+# delete the local + remote tag, retag the fixed commit, force-push
+# main + push the tag. release.yml then re-fires and publishes if
+# green.
 on:
   push:
     tags:
@@ -14,7 +27,36 @@ permissions:
   contents: write
 
 jobs:
+  # Mirrors build.yml — production build of the tagged commit.
+  # Inlined rather than reused-via-workflow_call so each job stays
+  # readable in isolation; build.yml itself is skipped on tag pushes
+  # (its trigger has tags-ignore), so this is the only build that
+  # runs for the tag.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+
+  # Mirrors test.yml — vitest across both workspaces.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test
+
   publish:
+    needs: [build, test]
     runs-on: ubuntu-latest
     steps:
       - name: Check out the tagged commit
