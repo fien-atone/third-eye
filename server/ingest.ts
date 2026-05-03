@@ -156,7 +156,13 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
     )
     ON CONFLICT(dedup_key) DO UPDATE SET
       ts=excluded.ts, ts_epoch=excluded.ts_epoch, cost_usd=excluded.cost_usd,
-      category=excluded.category, model_short=excluded.model_short,
+      category=excluded.category,
+      -- include the raw model column too, not only model_short.
+      -- When a parser fix changes how we resolve the model name
+      -- (e.g. picking up a new Codex turn_context shape), re-ingest
+      -- should refresh the raw value too — otherwise SQL queries
+      -- grouping by model see stale values while the UI is correct.
+      model=excluded.model, model_short=excluded.model_short,
       git_branch=excluded.git_branch, cc_version=excluded.cc_version,
       has_plan_mode=excluded.has_plan_mode, has_todo_write=excluded.has_todo_write,
       file_count=excluded.file_count

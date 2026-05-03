@@ -142,9 +142,22 @@ async function discoverSessionsInDir(codexDir: string): Promise<SessionSource[]>
   return sources
 }
 
+/** Codex carries the model name in different places depending on
+ *  version and event type:
+ *    - session_meta.payload.model       — legacy, removed in newer
+ *      Codex (Desktop). Empty there now.
+ *    - turn_context.payload.model       — current location, written
+ *      once per turn. Tracked into sessionModel by the parser loop.
+ *    - event_msg.payload.info.model     — legacy event_msg shape.
+ *    - event_msg.payload.info.model_name — alt legacy.
+ *    - event_msg.payload.model          — defensive fallback for
+ *      any future shape that drops the .info nesting.
+ *  Default 'gpt-5' is the last-resort fallback so cost math still
+ *  runs against a known pricing row instead of crashing. */
 function resolveModel(info: CodexEntry['payload'], sessionModel?: string): string {
   return info?.info?.model
     ?? info?.info?.model_name
+    ?? (info as { model?: string } | undefined)?.model
     ?? sessionModel
     ?? 'gpt-5'
 }
@@ -180,7 +193,22 @@ function createParser(source: SessionSource, seenKeys: Set<string>): SessionPars
 
         if (entry.type === 'session_meta') {
           sessionId = entry.payload?.session_id ?? basename(source.path, '.jsonl')
+          // Older Codex versions wrote the model into session_meta;
+          // newer ones (Desktop app) don't, and a turn_context entry
+          // carries it instead. Take whichever's present.
           sessionModel = entry.payload?.model
+          continue
+        }
+
+        // turn_context arrives once per turn in current Codex; it
+        // carries payload.model = 'gpt-5.5' (or similar). Track it so
+        // subsequent token_count events use the correct model for
+        // cost math instead of falling back to the 'gpt-5' default.
+        if (entry.type === 'turn_context') {
+          const turnModel = (entry.payload as { model?: string } | undefined)?.model
+          if (typeof turnModel === 'string' && turnModel.length > 0) {
+            sessionModel = turnModel
+          }
           continue
         }
 
