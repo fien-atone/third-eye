@@ -1338,9 +1338,16 @@ async function boot() {
   // settings-driven auto-tick — both go through the lock with dedup
   // policy, so overlap is harmless. New users should prefer the UI
   // toggle (Settings → Auto-refresh).
+  //
+  // Deprecated as of 2.6.0; planned removal in 3.0. We log a
+  // one-shot warning at boot when the env var is set so operators
+  // see the deprecation in their container logs without breaking
+  // anything that's currently working.
   const intervalMin = envReadNumber('THIRD_EYE_INGEST_INTERVAL_MIN', 'CODEBURN_INGEST_INTERVAL_MIN') ?? 0
   const intervalSince = envRead('THIRD_EYE_INGEST_SINCE', 'CODEBURN_INGEST_SINCE') ?? '2h'
   if (intervalMin > 0) {
+    console.warn('[ingest] DEPRECATED: THIRD_EYE_INGEST_INTERVAL_MIN will be removed in 3.0.')
+    console.warn('[ingest] Migrate to Settings → Auto-refresh (or PATCH /api/settings ingest=...) instead.')
     console.log(`[ingest] env-driven auto-refresh every ${intervalMin}m (since=${intervalSince})`)
     setInterval(() => {
       withIngestLock('incremental', 'dedup', () => runIngest({ since: intervalSince }))

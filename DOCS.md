@@ -37,8 +37,10 @@ The compose file:
 - Mounts `~/.claude` and `~/.codex` read-only into the container via
   `${USER_HOME:-${HOME:-${USERPROFILE}}}` — picks the right home on any shell
 - Persists SQLite to `./server/data/` on the host
-- Runs incremental ingest every 15 minutes (`THIRD_EYE_INGEST_INTERVAL_MIN`,
-  window `THIRD_EYE_INGEST_SINCE=2h`)
+- Runs incremental ingest every 15 minutes via the legacy
+  `THIRD_EYE_INGEST_INTERVAL_MIN` env var (deprecated; set
+  `THIRD_EYE_INGEST_INTERVAL_MIN=0` and use Settings → Auto-refresh
+  inside the dashboard once it's reachable; full removal in 3.0)
 - Health check via `/api/health`
 - Binds the in-container server to `0.0.0.0` (only what you list under `ports:`
   gets exposed on the host)
@@ -124,11 +126,16 @@ persisted in the local DB and the timer hot-reloads — no restart.
 Same lock-coordinated path as the manual Refresh button, so the
 two never overlap.
 
-#### Headless / Docker setups (legacy)
+#### Headless / Docker setups (deprecated)
 
-When there's no UI to reach the Settings modal, two alternatives
-remain. Both still work and are still supported, but the in-app
-path above is preferred when available.
+> **Deprecated as of 2.6.0.** Both alternatives below are kept
+> working through the 2.x line but **will be removed in 3.0**. New
+> setups should use the in-app **Settings → Auto-refresh** path
+> above. Headless deployments (Docker, systemd, no UI access) are
+> the only remaining justification — and even those can use the
+> in-app path by hitting `PATCH /api/settings` once at provisioning
+> time. Existing 2.5-and-below installs keep working unchanged
+> until 3.0; the deprecation is announce-now / remove-later.
 
 ##### Env-var (Docker / systemd)
 
