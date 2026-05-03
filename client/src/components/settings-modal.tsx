@@ -103,7 +103,7 @@ export function SettingsModal({ onClose, onLayoutsReset }: {
         `/api/refresh?mode=rebuild${reset}`,
       )
     },
-    onSuccess: data => {
+    onSuccess: async data => {
       setRebuildError(null)
       qc.invalidateQueries({ queryKey: ['providers'] })
       qc.invalidateQueries({ queryKey: ['overview'] })
@@ -111,22 +111,27 @@ export function SettingsModal({ onClose, onLayoutsReset }: {
       qc.invalidateQueries({ queryKey: ['insights'] })
       qc.invalidateQueries({ queryKey: ['agents'] })
       qc.invalidateQueries({ queryKey: ['health'] })
-      // Layouts query is keyed `['layout', screen]`. Invalidate
-      // the whole prefix so every screen's layout (dashboard /
-      // project / today) refetches — necessary when the user
-      // checked "Reset saved widget layouts", and harmless when
-      // they didn't (server returns the same row, react-query
-      // structural-shares it). Without this the visible grid
-      // keeps the pre-rebuild layout until next page reload,
-      // even though the DB row was just deleted.
-      qc.invalidateQueries({ queryKey: ['layout'] })
-      // GridStack only reads positions on init, so a query refetch
-      // alone leaves the visible grid frozen on the pre-rebuild
-      // layout. The host bumps `layoutEpoch` to remount WidgetGrid
-      // from scratch with the new (default) data. Only fires when
-      // resetLayouts was actually checked — calling unconditionally
-      // would needlessly reflow the grid every Rebuild.
-      if (resetLayouts) onLayoutsReset()
+      if (resetLayouts) {
+        // CRITICAL ordering: react-query invalidate is async; if we
+        // bump layoutEpoch first, WidgetGrid remounts with the
+        // STALE cached layout (the post-mount useQuery returns it
+        // synchronously while the background refetch is still in
+        // flight). GridStack initializes with old positions and the
+        // background refetch's eventual result has nowhere to land.
+        //
+        // Remove the cached layouts entirely so the next mount has
+        // no choice but to fetch fresh, then bump epoch to remount.
+        // removeQueries (not invalidateQueries) is the right tool:
+        // it evicts so useQuery's first read in the new tree is
+        // a fetching state, not a stale-data state.
+        qc.removeQueries({ queryKey: ['layout'] })
+        onLayoutsReset()
+      } else {
+        // Telemetry-only rebuild: layouts didn't change, no need
+        // to remount the grid. Still nudge react-query so any
+        // cached projects-tab list / agent registry settles.
+        qc.invalidateQueries({ queryKey: ['layout'] })
+      }
       setConfirmOpen(false)
       // KEEP the modal open — closing it silently after a 2 s
       // server round-trip leaves the user thinking nothing
