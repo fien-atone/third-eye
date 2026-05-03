@@ -207,6 +207,32 @@ export default function App() {
     refetchInterval: query => (query.state.data?.ingestInProgress ? 1_500 : 3_000),
   })
 
+  // Auto-tick invalidation. The server runs ingests in the
+  // background but doesn't push to clients — without a nudge from
+  // here the dashboard would keep showing whatever overview data
+  // was cached at the user's last manual Refresh click. Watch
+  // healthQuery for the in-flight → idle transition (tick just
+  // finished, fresh data sitting in the DB) and invalidate the
+  // ingest-derived caches so the UI refetches against the new
+  // state. lastIngestAt change is the canonical "something new
+  // landed" signal.
+  const lastIngestAt = healthQuery.data?.lastIngestAt ?? null
+  const seenIngestAt = useRef<string | null>(null)
+  useEffect(() => {
+    if (!lastIngestAt) return
+    if (seenIngestAt.current === lastIngestAt) return
+    if (seenIngestAt.current !== null) {
+      // Skip the very first observation — that's the initial mount,
+      // not a fresh tick. Only invalidate on subsequent changes.
+      qc.invalidateQueries({ queryKey: ['providers'] })
+      qc.invalidateQueries({ queryKey: ['overview'] })
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      qc.invalidateQueries({ queryKey: ['insights'] })
+      qc.invalidateQueries({ queryKey: ['agents'] })
+    }
+    seenIngestAt.current = lastIngestAt
+  }, [lastIngestAt, qc])
+
   const refreshMutation = useMutation({
     mutationFn: () => apiPost<{ ok: boolean; durationMs: number; total: number }>('/api/refresh'),
     onSuccess: () => {
