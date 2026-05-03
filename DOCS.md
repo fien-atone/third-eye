@@ -115,7 +115,32 @@ curl -X POST http://localhost:4317/api/refresh                # full
 curl -X POST 'http://localhost:4317/api/refresh?since=1h'     # incremental
 ```
 
-### Scheduler (one command, cross-platform)
+### Auto-refresh
+
+**Preferred: in-app.** Open the dashboard, click the gear icon in
+the header, then **Settings → Auto-refresh**, toggle on and pick
+an interval (1m / 5m / 15m / 1h). Off by default. The setting is
+persisted in the local DB and the timer hot-reloads — no restart.
+Same lock-coordinated path as the manual Refresh button, so the
+two never overlap.
+
+#### Headless / Docker setups (legacy)
+
+When there's no UI to reach the Settings modal, two alternatives
+remain. Both still work and are still supported, but the in-app
+path above is preferred when available.
+
+##### Env-var (Docker / systemd)
+
+```bash
+-e THIRD_EYE_INGEST_INTERVAL_MIN=15
+```
+
+Hard-coded at boot. The in-process timer this spawns shares the
+same lock as the in-app one — both can run side-by-side without
+overlap.
+
+##### OS scheduler (launchd / cron / schtasks)
 
 ```bash
 npm run schedule:install      # register hourly ingest
@@ -129,11 +154,9 @@ npm run schedule:uninstall    # remove
 | Linux   | `cron` user crontab  | `crontab -l`, tagged `# org.thirdeye.ingest` |
 | Windows | `schtasks` user task | Task Scheduler → `ThirdEyeIngest` |
 
-Runs `npm run ingest:hour` every hour. Absolute npm path resolved at install
-time, so nvm / fnm / Homebrew keep working. Log: `~/.third-eye-ingest.log`.
-Idempotent — safe to re-run.
-
-Inside Docker, use `THIRD_EYE_INGEST_INTERVAL_MIN` instead (default 15 min).
+Shells out to `npm run ingest:hour` every hour from the OS. Absolute
+npm path resolved at install time, so nvm / fnm / Homebrew keep
+working. Log: `~/.third-eye-ingest.log`. Idempotent — safe to re-run.
 
 ### Destructive rebuild
 

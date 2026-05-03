@@ -4,6 +4,78 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] — 2026-05-03
+
+The hands-off release. Auto-ingest now runs as a configurable
+in-app timer instead of forcing the user to either click Refresh
+on a schedule or wire up an environment variable at boot. Every
+ingest path — manual click, auto-tick, or destructive Rebuild —
+goes through a single in-process lock so they can never overlap;
+the header surfaces "something is happening" with an immediate
+blue pulse so the user can tell the dashboard isn't stale.
+
+### Added
+
+- **In-app auto-refresh.** New Settings → Auto-refresh section
+  with a toggle + interval dropdown (1m / 5m (default) / 15m /
+  1h, plus 30s in dev). Off by default — opt-in. The timer is
+  hot-reloadable: changing the interval or toggling the feature
+  applies without a server restart. The legacy
+  `THIRD_EYE_INGEST_INTERVAL_MIN` env var still works in parallel
+  for container-driven scheduling.
+- **Ingest lock with two policies.** Manual Refresh and the
+  auto-tick share the dedup policy: a second caller piggy-backs
+  on whatever is in-flight instead of spawning a parallel scan.
+  Rebuild uses refuse policy and returns 409 Conflict when
+  busy, since racing TRUNCATE with concurrent upserts would
+  corrupt history. The new `ingestInProgress` field on
+  `/api/health` surfaces the active kind so the UI can show a
+  unified spinner regardless of who triggered the ingest.
+- **Maintenance → Rebuild.** New Settings section with a single
+  destructive entry: re-create the local DB from `~/.claude/projects`
+  and `~/.codex/sessions` from scratch. Gated behind a confirm
+  dialog spelling out exactly what gets wiped (api_calls,
+  agent_sessions, projects, metadata) versus what stays (saved
+  widget layouts, settings). Catches the lock's 409 with a
+  friendly "ingest is running, try again" hint.
+- **Live "is ingesting" signal in the header.** The pulse dot
+  next to the last-refresh timestamp turns blue and pulses 2×
+  faster while any ingest is in flight (manual or auto), with the
+  tooltip flipping to "Auto-refresh in progress". The signal
+  reacts synchronously to a manual click — no 3-second polling
+  lag while waiting for the next /api/health to confirm what we
+  already know we just kicked off. The relative timestamp itself
+  also ticks forward every 30 s so "just now" doesn't freeze
+  for the lifetime of the tab.
+
+### Changed
+
+- **Refresh button no longer jiggles the layout.** The label
+  flips between "Refresh" and "Refreshing…" of different widths
+  used to scoot the locale switcher and theme toggle left/right
+  on every tick. Both labels now render stacked in a single grid
+  cell so the button width is intrinsically the wider of the
+  two — works in every locale without per-translation magic.
+- **Release pipeline gates publish on build + test.** The release
+  workflow used to run `publish` in parallel with the main-branch
+  build; if the build broke, the GitHub Release page got created
+  anyway (this happened on v2.5.0 first try). `release.yml` now
+  has its own build + test jobs that mirror CI, and `publish`
+  declares `needs: [build, test]` — no green CI, no release page.
+  `scripts/release.sh` also runs the same gates locally before
+  bumping versions, catching errors before they ever reach
+  origin.
+
+### Fixed
+
+- **Three hardcoded aria-labels translated.** "prev" / "next" on
+  the date-picker month navigator and "Add widget to empty slot"
+  in the customize grid were shipping in English regardless of
+  locale — screen-reader users on non-English builds heard the
+  English literals. Audit pass found these by grepping aria-label
+  patterns without a t() call. Brand strings (Logo, the Third Eye
+  H1) intentionally left as-is.
+
 ## [2.5.0] — 2026-05-03
 
 The Codex release. First-class telemetry for OpenAI's Codex /

@@ -58,11 +58,13 @@ npm install
 npm start
 ```
 
-Open http://localhost:4317. To auto-refresh hourly:
+Open http://localhost:4317. To auto-refresh, open the gear icon
+in the header and enable **Settings → Auto-refresh** (off by
+default; pick an interval from 1m to 1h).
 
-```bash
-npm run schedule:install
-```
+For headless / Docker setups without UI access, see
+`DOCS.md` for the legacy `THIRD_EYE_INGEST_INTERVAL_MIN` env var
+and `npm run schedule:install` cron-based path.
 
 ### Let an AI do it for you
 
@@ -78,10 +80,11 @@ Cursor, ChatGPT, or any other coding AI:
 > 2. Pick the best install method for my system — Docker if I have it running
 >    (preferred), otherwise Node 20+ via `npm install && npm start`.
 > 3. Start it and verify `http://localhost:4317` responds.
-> 4. Set up hourly auto-ingest so data stays fresh:
->    - Docker: nothing to do, it's on by default.
->    - Node: run `npm run schedule:install`.
-> 5. Open http://localhost:4317 in my default browser.
+> 4. Open http://localhost:4317 in my default browser, then enable
+>    Auto-refresh from Settings (gear icon → Auto-refresh →
+>    pick 5 minutes → Save). For headless setups: tell me whether
+>    to set `THIRD_EYE_INGEST_INTERVAL_MIN=15` in env or run
+>    `npm run schedule:install` for OS-level scheduling.
 >
 > Stop and ask me before making any ambiguous decision (e.g., exposing beyond
 > localhost, picking a non-default port). Show me the URL at the end.
