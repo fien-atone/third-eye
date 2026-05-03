@@ -130,13 +130,27 @@ export function AppHeader({
               "this is when data was last refreshed" (idle) from "an
               ingest is running right now" (active). The label flip
               alone is too easy to miss for a 6-second auto-tick. */}
-          <span
-            className={`meta${autoIngestKind ? ' is-ingesting' : ''}`}
-            title={autoIngestKind ? t('header.autoIngestRunning') : t('header.lastRefresh')}
-          >
-            <span className={`pulse${autoIngestKind ? ' is-active' : ''}`} />
-            {fmtRel(lastIngestAt, t)}
-          </span>
+          {/* The "something is happening" signal merges three sources:
+              - autoIngestKind: ingest the SERVER reports as in-flight
+                (auto-tick or manual click another tab triggered).
+              - isRefreshing: THIS tab's pending click. Flips
+                synchronously with mutate(), giving instant feedback —
+                without it there's up to 3 s of lag waiting for the
+                next /api/health poll to confirm what we already know
+                we just kicked off. Visually identical, semantically
+                "we asked for it locally". */}
+          {(() => {
+            const ingesting = !!autoIngestKind || isRefreshing
+            return (
+              <span
+                className={`meta${ingesting ? ' is-ingesting' : ''}`}
+                title={ingesting ? t('header.autoIngestRunning') : t('header.lastRefresh')}
+              >
+                <span className={`pulse${ingesting ? ' is-active' : ''}`} />
+                {fmtRel(lastIngestAt, t)}
+              </span>
+            )
+          })()}
           {/* Spinner state merges manual click + background auto-tick:
               the user shouldn't have to know who triggered the ingest
               to interpret "is anything happening right now". The
