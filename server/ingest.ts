@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto'
 import { createInterface } from 'readline'
 import { readdir, readFile, stat } from 'fs/promises'
 import { join } from 'path'
-import { db, setMeta, truncateAll, type CallRow } from './db.ts'
+import { db, setMeta, truncateAll, type CallRow, type RebuildTargets } from './db.ts'
 import { claudeDesktopSessionsDir } from './lib/claude-paths.ts'
 import { getLatestCodexPlanSnapshot, aggregateCodexPlanDaily } from './lib/providers/codex.ts'
 import { scanAgentSessions } from './lib/agent-sessions.ts'
@@ -120,7 +120,16 @@ export function parseSince(expr: string): Date {
   return new Date(Date.now() - n * mult)
 }
 
-export type IngestOpts = { since?: string; full?: boolean; rebuild?: boolean }
+export type IngestOpts = {
+  since?: string
+  full?: boolean
+  rebuild?: boolean
+  /** Optional flags forwarded to truncateAll when `rebuild=true`.
+   *  Lets the caller (UI / CLI) opt into wiping user-configured
+   *  tables on top of the always-wiped telemetry. Ignored when
+   *  rebuild is false. */
+  rebuildTargets?: RebuildTargets
+}
 
 export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
   const t0 = Date.now()
@@ -128,9 +137,9 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
   let mode = 'full'
   let wiped: { calls: number; projects: number } | undefined
   if (opts.rebuild) {
-    wiped = truncateAll()
+    wiped = truncateAll(opts.rebuildTargets ?? {})
     mode = 'rebuild'
-    console.log(`[rebuild] wiped ${wiped.calls} calls, ${wiped.projects} projects`)
+    console.log(`[rebuild] wiped ${wiped.calls} calls, ${wiped.projects} projects (targets: ${JSON.stringify(opts.rebuildTargets ?? {})})`)
   }
 
   await loadPricing()

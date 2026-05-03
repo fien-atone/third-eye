@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useT } from '../i18n'
+import { useT, type T } from '../i18n'
 import { apiGet, apiPatch, apiPost } from '../api'
 import type { SettingsResponse } from '../types'
 import { pokeVersionPoll } from '../lib/version-poll'
-import { ConfirmDialog } from './confirm-dialog'
 
 /** Settings modal. Opened from the gear icon in AppHeader. Currently
  *  hosts only the Updates section — but the section/grid scaffolding
@@ -72,11 +71,30 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   // auto-tick), which we surface as `rebuildError`. Successful
   // completion triggers the same cache invalidations as a regular
   // refresh — every ingest-derived view needs to refetch.
+  // Rebuild dialog state. The user picks which user-configured
+  // tables (projects favorites / agent role config / widget
+  // layouts) to wipe on top of the always-wiped telemetry. All
+  // optional resets default to OFF — "I think my data is stale"
+  // shouldn't silently nuke favorites the user spent time
+  // setting.
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [resetProjects, setResetProjects] = useState(false)
+  const [resetAgents, setResetAgents] = useState(false)
+  const [resetLayouts, setResetLayouts] = useState(false)
   const [rebuildError, setRebuildError] = useState<string | null>(null)
+  const [rebuildSuccessAt, setRebuildSuccessAt] = useState<{ rows: number; ms: number } | null>(null)
   const rebuild = useMutation({
-    mutationFn: () => apiPost<{ ok: boolean; mode: string; total: number }>('/api/refresh?mode=rebuild'),
-    onSuccess: () => {
+    mutationFn: (targets: { projects: boolean; agents: boolean; layouts: boolean }) => {
+      const flags: string[] = []
+      if (targets.projects) flags.push('projects')
+      if (targets.agents) flags.push('agents')
+      if (targets.layouts) flags.push('layouts')
+      const reset = flags.length > 0 ? `&reset=${flags.join(',')}` : ''
+      return apiPost<{ ok: boolean; mode: string; total: number; durationMs: number }>(
+        `/api/refresh?mode=rebuild${reset}`,
+      )
+    },
+    onSuccess: data => {
       setRebuildError(null)
       qc.invalidateQueries({ queryKey: ['providers'] })
       qc.invalidateQueries({ queryKey: ['overview'] })
@@ -85,17 +103,29 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       qc.invalidateQueries({ queryKey: ['agents'] })
       qc.invalidateQueries({ queryKey: ['health'] })
       setConfirmOpen(false)
-      onClose()
+      // KEEP the modal open — closing it silently after a 2 s
+      // server round-trip leaves the user thinking nothing
+      // happened. Show the success line; they close manually
+      // when ready.
+      setRebuildSuccessAt({ rows: data.total ?? 0, ms: data.durationMs ?? 0 })
     },
     onError: (err: Error) => {
-      // The api helpers throw with the response body's `error` field
-      // when a non-2xx comes back; "busy" maps to our 409. Anything
-      // else (network, 500) falls back to a generic message.
+      // ApiError (api.ts) maps the 409's JSON `error` field to
+      // err.message, so plain string compare works for "busy".
+      // Anything else (network, 500) falls back to genericError
+      // formatting downstream.
       const msg = err.message || 'unknown'
       setRebuildError(msg)
+      setRebuildSuccessAt(null)
       setConfirmOpen(false)
     },
   })
+
+  const startRebuild = () => {
+    setRebuildError(null)
+    setRebuildSuccessAt(null)
+    rebuild.mutate({ projects: resetProjects, agents: resetAgents, layouts: resetLayouts })
+  }
 
   const save = () => mutation.mutate({
     updates: { enabled, intervalSeconds },
@@ -220,7 +250,17 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 className="ghost is-destructive"
-                onClick={() => { setRebuildError(null); setConfirmOpen(true) }}
+                onClick={() => {
+                  setRebuildError(null)
+                  setRebuildSuccessAt(null)
+                  // Reset checkbox state every time the dialog
+                  // opens — destructive choices are intentional,
+                  // not sticky.
+                  setResetProjects(false)
+                  setResetAgents(false)
+                  setResetLayouts(false)
+                  setConfirmOpen(true)
+                }}
                 disabled={rebuild.isPending}
               >
                 {rebuild.isPending ? t('settings.maintenance.rebuilding') : t('settings.maintenance.rebuildButton')}
@@ -232,30 +272,130 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                     : t('settings.maintenance.genericError', { msg: rebuildError })
                 }</span>
               )}
+              {rebuildSuccessAt && !rebuildError && (
+                <span className="settings-success">{t('settings.maintenance.successFmt', {
+                  rows: rebuildSuccessAt.rows.toLocaleString(),
+                  seconds: (rebuildSuccessAt.ms / 1000).toFixed(1),
+                })}</span>
+              )}
             </div>
           </section>
         </div>
 
-        <ConfirmDialog
-          open={confirmOpen}
-          tone="destructive"
-          title={t('settings.maintenance.confirmTitle')}
-          message={
-            <>
-              <p>{t('settings.maintenance.confirmBody1')}</p>
-              <p>{t('settings.maintenance.confirmBody2')}</p>
-            </>
-          }
-          confirmLabel={t('settings.maintenance.confirmYes')}
-          cancelLabel={t('settings.cancel')}
-          onCancel={() => setConfirmOpen(false)}
-          onConfirm={() => rebuild.mutate()}
-        />
+        {confirmOpen && (
+          <RebuildDialog
+            t={t}
+            isPending={rebuild.isPending}
+            resetProjects={resetProjects}
+            setResetProjects={setResetProjects}
+            resetAgents={resetAgents}
+            setResetAgents={setResetAgents}
+            resetLayouts={resetLayouts}
+            setResetLayouts={setResetLayouts}
+            onCancel={() => setConfirmOpen(false)}
+            onConfirm={startRebuild}
+          />
+        )}
 
         <div className="update-modal-footer">
           <button onClick={onClose}>{t('settings.cancel')}</button>
           <button className="primary" onClick={save} disabled={!dirty || mutation.isPending}>
             {mutation.isPending ? t('settings.saving') : t('settings.save')}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/** Modal that lets the user pick what gets wiped on Rebuild.
+ *  Telemetry tables (api_calls, tool_events, agent_sessions,
+ *  codex_plan_daily) are always wiped — that's the point of
+ *  Rebuild — so they're shown as a non-toggleable line. The three
+ *  optional categories below correspond 1:1 to RebuildTargets on
+ *  the server (lib/db.ts). All default OFF: a user clicking
+ *  Rebuild because they think their data is stale shouldn't
+ *  silently nuke project favorites or role configurations.
+ *
+ *  Confirm button stays disabled until the rebuild request lands;
+ *  during that window the label flips to "Rebuilding…" so the
+ *  user has feedback during the 2–7 s server round-trip. */
+function RebuildDialog({
+  t, isPending,
+  resetProjects, setResetProjects,
+  resetAgents, setResetAgents,
+  resetLayouts, setResetLayouts,
+  onCancel, onConfirm,
+}: {
+  t: T
+  isPending: boolean
+  resetProjects: boolean
+  setResetProjects: (v: boolean) => void
+  resetAgents: boolean
+  setResetAgents: (v: boolean) => void
+  resetLayouts: boolean
+  setResetLayouts: (v: boolean) => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isPending) onCancel()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [isPending, onCancel])
+  return (
+    <>
+      <div className="confirm-backdrop" onClick={isPending ? undefined : onCancel} />
+      <div className="confirm-dialog rebuild-dialog" role="dialog" aria-modal="true" aria-label={t('settings.maintenance.confirmTitle')}>
+        <h3 className="confirm-title">{t('settings.maintenance.confirmTitle')}</h3>
+        <div className="confirm-message">
+          <p>{t('settings.maintenance.confirmAlwaysIntro')}</p>
+          <ul className="rebuild-targets-always">
+            <li>{t('settings.maintenance.targetTelemetry')}</li>
+          </ul>
+          <p>{t('settings.maintenance.confirmOptionalIntro')}</p>
+          <label className="rebuild-target-row">
+            <input type="checkbox" checked={resetProjects}
+              disabled={isPending}
+              onChange={e => setResetProjects(e.target.checked)} />
+            <span>
+              <strong>{t('settings.maintenance.targetProjectsLabel')}</strong>
+              <span className="rebuild-target-help">{t('settings.maintenance.targetProjectsHelp')}</span>
+            </span>
+          </label>
+          <label className="rebuild-target-row">
+            <input type="checkbox" checked={resetAgents}
+              disabled={isPending}
+              onChange={e => setResetAgents(e.target.checked)} />
+            <span>
+              <strong>{t('settings.maintenance.targetAgentsLabel')}</strong>
+              <span className="rebuild-target-help">{t('settings.maintenance.targetAgentsHelp')}</span>
+            </span>
+          </label>
+          <label className="rebuild-target-row">
+            <input type="checkbox" checked={resetLayouts}
+              disabled={isPending}
+              onChange={e => setResetLayouts(e.target.checked)} />
+            <span>
+              <strong>{t('settings.maintenance.targetLayoutsLabel')}</strong>
+              <span className="rebuild-target-help">{t('settings.maintenance.targetLayoutsHelp')}</span>
+            </span>
+          </label>
+        </div>
+        <div className="confirm-actions">
+          <button type="button" className="confirm-btn-cancel" onClick={onCancel} disabled={isPending}>
+            {t('settings.cancel')}
+          </button>
+          <button
+            type="button"
+            className="confirm-btn-ok is-destructive"
+            onClick={onConfirm}
+            disabled={isPending}
+            autoFocus
+          >
+            {isPending ? t('settings.maintenance.rebuilding') : t('settings.maintenance.confirmYes')}
           </button>
         </div>
       </div>

@@ -28,3 +28,46 @@
 .confirm-btn-ok:hover { filter: brightness(1.08); }
 @keyframes pop-in { from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
+
+/* Rebuild dialog — confirm-dialog plus checkboxes for the
+   optional reset categories. Wider min-width because the rows
+   carry both a label and a help line. */
+.rebuild-dialog { min-width: 420px; max-width: 520px; }
+.rebuild-targets-always {
+  margin: 4px 0 14px 18px; padding: 0;
+  color: var(--text-dim); font-size: 13px;
+}
+.rebuild-target-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+.rebuild-target-row:first-of-type { border-top: none; }
+.rebuild-target-row > input[type='checkbox'] {
+  margin-top: 2px;
+}
+.rebuild-target-row > span {
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: 13px;
+}
+.rebuild-target-help {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: normal;
+}
+
+/* Inline status lines beside the Rebuild button in Settings →
+   Maintenance. Error reuses the existing destructive red; success
+   gets a soft green so a successful rebuild is visibly confirmed
+   rather than the modal closing silently. */
+.settings-error {
+  color: var(--bad, #d23b3b);
+  font-size: 12px;
+  margin-top: 6px;
+}
+.settings-success {
+  color: var(--good, #16a34a);
+  font-size: 12px;
+  margin-top: 6px;
+}

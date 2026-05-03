@@ -245,19 +245,53 @@ export function seedScreenLayouts(defaults: Record<string, unknown>) {
   }
 }
 
-export function truncateAll(): { calls: number; projects: number } {
+/** What a Rebuild operation should wipe. The telemetry tables
+ *  (`api_calls`, `tool_events`, `agent_sessions`, `codex_plan_daily`)
+ *  always go — that's what "rebuild from session files" means.
+ *  The optional flags expose user-configured tables; default false
+ *  so a generic Rebuild call preserves everything the user spent
+ *  time setting up.
+ *
+ *  Earlier versions (≤2.6.0) silently included `projects` and
+ *  `agent_registry` in the always-wipe list, nuking favorites and
+ *  custom role display names on every Rebuild. The Settings UI now
+ *  asks the user which optional categories to include, defaulting
+ *  to "telemetry only" — this type is what flows through. */
+export type RebuildTargets = {
+  /** Wipe `projects` rows (favorites + custom labels). The next
+   *  ingest's upsert re-creates rows for projects still on disk,
+   *  but with default auto-derived labels and is_favorite=0. */
+  resetProjects?: boolean
+  /** Wipe `agent_registry` (per-project agent role display names,
+   *  enabled flags, merged_into mappings). Manage Agents starts
+   *  fresh; raw role strings still come back from the next ingest
+   *  but the user has to re-classify. */
+  resetAgents?: boolean
+  /** Wipe `screen_layouts`. Reverts every screen to the seeded
+   *  default layout. Settings.* (auto-refresh, version polling)
+   *  is NOT included here — that's `resetSettings` (not yet
+   *  exposed; would only make sense as a separate self-destruct
+   *  button). */
+  resetLayouts?: boolean
+}
+
+export function truncateAll(targets: RebuildTargets = {}): { calls: number; projects: number } {
   const d = db()
   const calls = (d.prepare('SELECT COUNT(*) AS n FROM api_calls').get() as { n: number }).n
   const projects = (d.prepare('SELECT COUNT(*) AS n FROM projects').get() as { n: number }).n
+  // Always wipe telemetry — that's the whole point of Rebuild.
+  // Each statement independent so a future schema mishap on one
+  // table doesn't abort the rest.
   d.exec(`
     DELETE FROM api_calls;
     DELETE FROM tool_events;
-    DELETE FROM projects;
     DELETE FROM agent_sessions;
-    DELETE FROM agent_registry;
     DELETE FROM codex_plan_daily;
     DELETE FROM meta WHERE key LIKE 'last_ingest%' OR key LIKE 'codex_plan%';
   `)
+  if (targets.resetProjects) d.exec('DELETE FROM projects;')
+  if (targets.resetAgents) d.exec('DELETE FROM agent_registry;')
+  if (targets.resetLayouts) d.exec('DELETE FROM screen_layouts;')
   d.exec('VACUUM')
   return { calls, projects }
 }

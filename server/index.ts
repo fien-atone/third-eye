@@ -355,6 +355,21 @@ app.post('/api/refresh', async (req, res) => {
     : modeRaw === 'incremental' ? 'incremental'
     : 'incremental'
   const since = typeof req.query.since === 'string' ? req.query.since : undefined
+  // Rebuild-only knobs: which user-configured tables (if any) to
+  // wipe on top of the always-wiped telemetry. Comma-separated
+  // list in `?reset=projects,agents,layouts` keeps the API URL-
+  // friendly and lets bash callers stay on a single line. Anything
+  // unrecognised is silently dropped.
+  const resetTargets = (() => {
+    if (mode !== 'rebuild') return {}
+    const raw = typeof req.query.reset === 'string' ? req.query.reset : ''
+    const set = new Set(raw.split(',').map(s => s.trim()).filter(Boolean))
+    return {
+      resetProjects: set.has('projects'),
+      resetAgents: set.has('agents'),
+      resetLayouts: set.has('layouts'),
+    }
+  })()
 
   try {
     const { result, deduped } = await withIngestLock(
@@ -365,6 +380,7 @@ app.post('/api/refresh', async (req, res) => {
         // Incremental currently runs as full until mtime-gating lands.
         full: mode === 'full' || mode === 'incremental',
         rebuild: mode === 'rebuild',
+        rebuildTargets: resetTargets,
       }),
     )
     // `mode` (API-contract input mode) wins over the `mode` field
