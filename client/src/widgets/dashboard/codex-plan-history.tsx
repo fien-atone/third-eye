@@ -39,7 +39,11 @@ type Row = NonNullable<OverviewResponse['codexPlanHistory']>[number]
 // One Recharts row per bucket (day/week/month — driven by dashboard
 // granularity). byPlan is flattened into top-level keys
 // (`plan_free`, `plan_plus`, …) so each plan can be a separate <Bar>
-// with its own stackId.
+// with its own stackId. We can't union the typed fields with a
+// `Record<string, …>` index signature directly — `_row: Row` would
+// fail to satisfy a number/string/null index — so the dynamic
+// plan_* keys live as a parallel any-shape map. Recharts only reads
+// fields by string key, so it doesn't care how strict the type is.
 type ChartRow = {
   _label: string
   _labelFull: string
@@ -47,7 +51,9 @@ type ChartRow = {
   // _secondary is null on empty buckets so Recharts breaks the line
   // across gaps instead of dragging it down to 0.
   _secondary: number | null
-} & Record<string, number | string | null>
+  // Dynamic per-plan stack values (`plan_free`, `plan_plus`, …).
+  [planKey: `plan_${string}`]: number
+}
 
 const PLAN_KEY_PREFIX = 'plan_'
 
@@ -144,7 +150,12 @@ export function codexPlanHistoryWidget(t: T, data: OverviewResponse, granularity
       _row: r,
       _secondary: r.secondaryPct,
     }
-    for (const p of planList) out[PLAN_KEY_PREFIX + p] = r.byPlan[p] ?? 0
+    for (const p of planList) {
+      // The template-literal key type narrows to `plan_${string}` at
+      // the type level; the runtime concat gives us the matching key
+      // but TS sees a generic `string`. Cast at the assignment site.
+      ;(out as unknown as Record<string, number>)[PLAN_KEY_PREFIX + p] = r.byPlan[p] ?? 0
+    }
     return out
   })
 

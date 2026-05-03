@@ -37,11 +37,15 @@ export function kpiAgentDelegationWidget(t: T, data: OverviewResponse): WidgetDe
   // Main project tokens are split across fields in the totals block —
   // include all four kinds so the denominator is "all tokens the
   // project moved", matching the agent-side totalTokens definition.
+  // cacheWrite is null on Codex-only scopes (OpenAI doesn't report
+  // a separate cache-write count). Treat null as 0 for the
+  // "tokens spent at all" denominator — better than blowing up
+  // the whole KPI when some calls in scope come from Codex.
   const projectTokens =
     data.totals.inputTokens +
     data.totals.outputTokens +
     data.totals.cacheRead +
-    data.totals.cacheWrite
+    (data.totals.cacheWrite ?? 0)
 
   return {
     id: 'kpi-agent-delegation',

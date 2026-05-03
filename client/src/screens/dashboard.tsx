@@ -88,7 +88,7 @@ export function Dashboard({ data, modelNames, granularity, onSelectProject, inPr
     _labelFull: formatBucketFull(row.bucket as string, granularity, dl),
   }))
   const hasAnyData = data.totals.calls > 0
-  const hasTokenData = data.totals.inputTokens + data.totals.outputTokens + data.totals.cacheRead + data.totals.cacheWrite > 0
+  const hasTokenData = data.totals.inputTokens + data.totals.outputTokens + data.totals.cacheRead + (data.totals.cacheWrite ?? 0) > 0
 
   // ─── Widget catalog ─────────────────────────────────────────────────
   // Each widget lives in its own file under src/widgets/dashboard/ and
