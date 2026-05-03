@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query'
 import { applyTheme, getStoredTheme, type Theme } from './theme'
-import { useRoute, navigate } from './router'
+import { useRoute, readRoute, navigate, type RouteFilters } from './router'
 import { useScreenLayout, type ScreenLayout } from './widgets/grid'
 import { useT } from './i18n'
 import type { Granularity, OverviewResponse, ProvidersResponse, ProjectsResponse, VersionResponse } from './types'
-import { useDateLocale } from './lib/format'
+import { parseLocalDate, toInputDate, useDateLocale } from './lib/format'
 import { apiGet, apiPost, dashboardParams } from './api'
 import { ProjectsPage } from './screens/projects-page'
 import { Dashboard } from './screens/dashboard'
@@ -19,11 +19,98 @@ import { AppHeader } from './components/app-header'
 import { DashboardControls, DASHBOARD_DEFAULT_PRESET } from './components/dashboard-controls'
 
 export default function App() {
-  const init = DASHBOARD_DEFAULT_PRESET.get(1)
-  const [start, setStart] = useState<Date>(init.start)
-  const [end, setEnd] = useState<Date>(init.end)
-  const [granularity, setGranularity] = useState<Granularity>(init.granularity)
-  const [selectedProviders, setSelectedProviders] = useState<string[]>([])
+  const route = useRoute()
+
+  // ─── Dashboard filters: URL is the source of truth ───────────────────
+  // The user's date range, granularity and provider selection live in
+  // the URL hash query so refresh / back-forward / shared links all
+  // preserve the view. State here is derived from `route.filters`;
+  // user-driven changes go through `navigate(..., { replace: true })`
+  // which rewrites the hash and lets useRoute push the new value back
+  // through this derive-and-render loop. Replace-mode keeps history
+  // clean — every keystroke in the date picker would otherwise add a
+  // browser-history entry. The "Today" view feeds different routes
+  // (`/today`, `/day/:date`) and ignores filters entirely.
+  //
+  // Default preset is computed ONCE at mount via useRef so it doesn't
+  // shift as time passes (each render of `new Date()` would otherwise
+  // re-anchor "30 days ago" and gradually drag the implicit window).
+  const presetRef = useRef<{ start: Date; end: Date; granularity: Granularity } | null>(null)
+  if (!presetRef.current) presetRef.current = DASHBOARD_DEFAULT_PRESET.get(1)
+  const preset = presetRef.current
+
+  const filters: RouteFilters | undefined =
+    route.name === 'home' || route.name === 'project' ? route.filters : undefined
+
+  // Derived state: read URL → fall back to preset. parseLocalDate is
+  // memoized on the string so React.memo'd children don't see a new
+  // Date instance on every render.
+  const start = useMemo(
+    () => (filters?.from ? parseLocalDate(filters.from) : preset.start),
+    [filters?.from, preset],
+  )
+  const end = useMemo(
+    () => (filters?.to ? parseLocalDate(filters.to) : preset.end),
+    [filters?.to, preset],
+  )
+  const granularity: Granularity = filters?.granularity ?? preset.granularity
+  const selectedProviders = useMemo(
+    () => filters?.providers ?? [],
+    [filters?.providers],
+  )
+
+  // updateFilters merges a patch into the current filter set and
+  // pushes a new URL. Routes that don't carry filters (projects /
+  // today / day / notfound) silently ignore the call — those screens
+  // don't expose the dashboard control bar anyway. Empty arrays /
+  // preset-matching values are dropped so the URL stays at `#/`
+  // when the user is on defaults.
+  const updateFilters = useCallback(
+    (patch: Partial<{ start: Date; end: Date; granularity: Granularity; providers: string[] }>) => {
+      // Read live route+filters synchronously so chained calls (e.g.
+      // a preset click that fires setStart→setEnd→setGranularity in
+      // rapid succession) compose against the latest URL, not the
+      // stale React-derived snapshot. Each navigate() rewrites the
+      // hash synchronously; React state catches up later.
+      const live = readRoute()
+      if (live.name !== 'home' && live.name !== 'project') return
+      const liveFilters = live.filters
+      const liveStart = liveFilters?.from ? parseLocalDate(liveFilters.from) : preset.start
+      const liveEnd = liveFilters?.to ? parseLocalDate(liveFilters.to) : preset.end
+      const liveG = liveFilters?.granularity ?? preset.granularity
+      const liveProviders = liveFilters?.providers ?? []
+
+      const nextStart = patch.start ?? liveStart
+      const nextEnd = patch.end ?? liveEnd
+      const nextG = patch.granularity ?? liveG
+      const nextProviders = patch.providers ?? liveProviders
+      const next: RouteFilters = {}
+      // Only emit filters that differ from preset, so navigating
+      // around with default settings keeps URLs short.
+      const fromStr = toInputDate(nextStart)
+      const toStr = toInputDate(nextEnd)
+      if (fromStr !== toInputDate(preset.start)) next.from = fromStr
+      if (toStr !== toInputDate(preset.end)) next.to = toStr
+      if (nextG !== preset.granularity) next.granularity = nextG
+      if (nextProviders.length > 0) next.providers = nextProviders
+      const compact = Object.keys(next).length > 0 ? next : undefined
+      if (live.name === 'home') {
+        navigate({ name: 'home', filters: compact }, { replace: true })
+      } else {
+        navigate({ name: 'project', id: live.id, filters: compact }, { replace: true })
+      }
+    },
+    [preset],
+  )
+
+  const setStart = useCallback((d: Date) => updateFilters({ start: d }), [updateFilters])
+  const setEnd = useCallback((d: Date) => updateFilters({ end: d }), [updateFilters])
+  const setGranularity = useCallback((g: Granularity) => updateFilters({ granularity: g }), [updateFilters])
+  const setSelectedProviders = useCallback(
+    (next: string[]) => updateFilters({ providers: next }),
+    [updateFilters],
+  )
+
   const [theme, setTheme] = useState<Theme>(getStoredTheme())
   // Customize / edit-layout mode for the widget grid. Per-screen — resets
   // automatically when the user navigates away from the dashboard or
@@ -42,7 +129,6 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize)
   }, [])
   useEffect(() => { if (isNarrow && editingLayout) setEditingLayout(false) }, [isNarrow, editingLayout])
-  const route = useRoute()
   const projectId = route.name === 'project' ? route.id : null
   const isNotFound = route.name === 'notfound'
   const isProjectsTab = route.name === 'projects'
@@ -185,9 +271,12 @@ export default function App() {
 
   const claudeInScope = selectedProviders.length === 0 || selectedProviders.includes('claude')
 
-  const toggleProvider = (id: string) => {
-    setSelectedProviders(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-  }
+  const toggleProvider = useCallback((id: string) => {
+    const next = selectedProviders.includes(id)
+      ? selectedProviders.filter(x => x !== id)
+      : [...selectedProviders, id]
+    setSelectedProviders(next)
+  }, [selectedProviders, setSelectedProviders])
 
   const serverDown = providersQuery.isError || overviewQuery.isError
   const retryAll = () => {
