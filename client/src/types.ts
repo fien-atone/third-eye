@@ -106,19 +106,48 @@ export type OverviewResponse = {
     cacheWrite: number | null
     projects: number
   }
-  /** Codex / ChatGPT plan-usage snapshot. Present only when the
-   *  current scope contains Codex calls. Fields mirror the
-   *  CodexPlanSnapshot shape in server/lib/providers/codex.ts. */
+  /** Codex / ChatGPT plan-usage snapshot for the day in scope. Present
+   *  only when the request is single-day AND that day has Codex calls.
+   *  Fields mirror CodexPlanSnapshot in server/lib/providers/codex.ts.
+   *
+   *  primary/secondary represent the day's PEAK window utilization
+   *  (worst case the user hit). `credits` carries the day's LATEST
+   *  premium-credits state — for paid plans this is the binding
+   *  signal CLI uses to say "limit reached" (independent of windows).
+   *  `limitId='premium'` flags that premium samples were seen on the
+   *  day, telling the widget to surface credits prominently. */
   codexPlan?: {
     planType: string | null
     limitId: string | null
     limitName: string | null
     primary: { usedPercent: number; windowMinutes: number; resetsAt: number } | null
     secondary: { usedPercent: number; windowMinutes: number; resetsAt: number } | null
-    credits: number | null
+    credits: { hasCredits: boolean | null; unlimited: boolean | null; balance: string | null } | null
     rateLimitReachedType: string | null
     capturedAt: string
   } | null
+  /** Codex plan history — per-day rows for multi-day ranges, drives
+   *  the Dashboard's plan-trajectory line chart. Inverse of `codexPlan`
+   *  above: present on multi-day, null on single-day. */
+  codexPlanHistory?: Array<{
+    /** Bucket key in dashboard granularity. day: 'YYYY-MM-DD',
+     *  week: 'YYYY-MM-DD' (week start), month: 'YYYY-MM'. */
+    bucket: string
+    /** Peak 5h-window utilization within the bucket (max of daily peaks). */
+    primaryPct: number
+    /** Peak 7d-window % within the bucket (max of daily peaks), or null
+     *  when no Codex day fell inside this bucket — the overlay line
+     *  breaks across these gaps so we don't fake a "0%" reading. */
+    secondaryPct: number | null
+    /** Per-plan_type peak 5h-window % aggregated across all days in
+     *  the bucket. The bar chart renders one colored stacked segment
+     *  per entry. Empty on buckets with no Codex usage. */
+    byPlan: Record<string, number>
+    /** True if any day in the bucket had credits.hasCredits === false. */
+    creditsExhausted: boolean
+    /** Number of Codex-active days inside the bucket. 0 = empty bucket. */
+    dayCount: number
+  }> | null
   series: Array<Record<string, number | string>>
   models: Array<{
     name: string

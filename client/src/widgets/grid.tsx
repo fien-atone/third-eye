@@ -30,6 +30,11 @@ export type WidgetSection = 'general' | 'insights' | 'agents'
  *  dimensions in grid units, so widgets can adapt their content (drop
  *  legends at small heights, show fewer rows in tables, etc.). Updates
  *  on any layout change persisted to the server (debounce ~no debounce). */
+/** Identifier for a screen that can host a widget grid. Kept in sync with
+ *  the `screen` string passed to <WidgetGrid> by each top-level screen
+ *  component (see Dashboard / DayView). */
+export type WidgetScreen = 'dashboard' | 'project' | 'today'
+
 export type WidgetDef = {
   id: string
   title: string
@@ -42,6 +47,11 @@ export type WidgetDef = {
   sizes?: WidgetSize[]
   minW?: number
   minH?: number
+  /** Screens this widget is eligible for. The catalog builder filters by
+   *  the active screen, so a widget declaring `['today']` will only be
+   *  registered (and therefore only appear in the picker / be honored in
+   *  saved layouts) on the Today view. Omitted = all screens. */
+  screens?: WidgetScreen[]
   render: (ctx: { editing: boolean; w: number; h: number }) => React.ReactNode
 }
 

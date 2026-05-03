@@ -207,6 +207,31 @@ function migrate(d: Database.Database) {
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`)
+
+  // Per-day Codex plan-usage peaks. One row per local-tz day (matching
+  // the YYYY/MM/DD directory layout Codex itself uses). primary_pct is
+  // the maximum used_percent observed across all rate_limits samples
+  // on that day; the full snapshot stores the captured-at sample so
+  // the widget can show plan name, secondary window, reset countdown,
+  // etc. Rebuilt during ingest from the rollout files. Lets the Today
+  // view show that day's peak when navigating to past dates rather
+  // than always reading the latest sample (which would be wrong for
+  // every day except today). See lib/providers/codex.ts.
+  d.exec(`CREATE TABLE IF NOT EXISTS codex_plan_daily (
+    day            TEXT PRIMARY KEY,    -- YYYY-MM-DD (Codex sessions dir day)
+    primary_pct    REAL NOT NULL,
+    secondary_pct  REAL NOT NULL,
+    snapshot       TEXT NOT NULL,        -- JSON CodexPlanSnapshot at peak primary
+    updated_at     TEXT NOT NULL
+  )`)
+
+  // by_plan_json — peak primary % keyed by plan_type for the day, e.g.
+  // {"free":30,"plus":98}. Drives the Dashboard's stacked-bar history
+  // widget (each plan = its own colored segment). Optional column,
+  // added after the table existed in the wild — older rows have NULL
+  // and the widget falls back to a single-segment bar coloured by the
+  // snapshot's planType.
+  addCol("ALTER TABLE codex_plan_daily ADD COLUMN by_plan_json TEXT")
 }
 
 /** Seed default layouts on first startup. Idempotent: INSERT OR IGNORE

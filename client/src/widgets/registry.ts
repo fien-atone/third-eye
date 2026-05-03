@@ -7,10 +7,13 @@ import type { T } from '../i18n'
 import type { Granularity, InsightsResponse, OverviewResponse } from '../types'
 import type { WidgetDef } from './grid'
 
+
+
 import { kpiSpendWidget } from './dashboard/kpi-spend'
 import { kpiTokensWidget } from './dashboard/kpi-tokens'
 import { kpiCacheWidget } from './dashboard/kpi-cache'
 import { kpiCodexPlanWidget } from './dashboard/kpi-codex-plan'
+import { codexPlanHistoryWidget } from './dashboard/codex-plan-history'
 import { kpiScopeWidget } from './dashboard/kpi-scope'
 import { costByProjectWidget } from './dashboard/cost-by-project'
 import { costByModelWidget } from './dashboard/cost-by-model'
@@ -49,11 +52,26 @@ export type DashboardCtx = {
   hasTokenData: boolean
   activeBuckets: number
   avgPerBucket: number
+  /** Date-fns locale used for axis/tooltip date formatting. Pass-through
+   *  from the dashboard so granularity-aware labels (week ranges, month
+   *  names) render in the user's chosen language. */
+  dl: Locale
+  /** Which screen this catalog feeds — used to gate widgets that
+   *  only make sense on a specific surface (e.g. the Codex plan
+   *  KPI is daily-snapshot-shaped, only meaningful on Today). */
+  screen: 'dashboard' | 'project' | 'today'
+}
+
+/** Drop widgets whose `screens` declaration excludes the active screen.
+ *  Widgets without a `screens` field are eligible everywhere — that's
+ *  the historical default, and most widgets don't need to opt in. */
+function filterByScreen(catalog: WidgetDef[], screen: 'dashboard' | 'project' | 'today'): WidgetDef[] {
+  return catalog.filter(w => !w.screens || w.screens.includes(screen))
 }
 
 export function buildDashboardCatalog(ctx: DashboardCtx): WidgetDef[] {
   const { t, data, modelNames, granularity, onSelectProject, inProjectView, series,
-    hasAnyData, hasTokenData, activeBuckets, avgPerBucket } = ctx
+    hasAnyData, hasTokenData, activeBuckets, avgPerBucket, dl, screen } = ctx
   // Widgets shared between the Dashboard and the Project view.
   const shared: WidgetDef[] = [
     kpiSpendWidget(t, data, granularity, avgPerBucket),
@@ -71,7 +89,7 @@ export function buildDashboardCatalog(ctx: DashboardCtx): WidgetDef[] {
   // dashboard would show cross-project aggregates that can't be
   // configured there, so gate on inProjectView.
   if (inProjectView) {
-    return [
+    return filterByScreen([
       ...shared,
       kpiAgentSessionsWidget(t, data),
       kpiAgentTokensPerSessionWidget(t, data),
@@ -81,7 +99,7 @@ export function buildDashboardCatalog(ctx: DashboardCtx): WidgetDef[] {
       agentTimelineWidget(t, data, series, granularity),
       agentToolSpectrumWidget(t, data),
       agentSpawnBatchesWidget(t, data),
-    ]
+    ], screen)
   }
   // Dashboard-only widgets: "cost by project" and "top projects" aggregate
   // ACROSS projects — showing them inside a single project's view makes no
@@ -92,20 +110,22 @@ export function buildDashboardCatalog(ctx: DashboardCtx): WidgetDef[] {
   // Hour-timeline only meaningful when the series IS hourly — adding it
   // unconditionally would put a 24-bar chart on the daily dashboard
   // where the data is one bar per day. Gate on granularity.
-  // Dashboard / Today widgets that don't make sense scoped to one
-  // project: cost-by-project + top-projects aggregate across projects;
-  // codex-plan is account-level (your ChatGPT plan rate limits apply
-  // to all your work, not to one project). Hour-timeline only when
-  // the series is hourly.
+  // Cross-project widgets: cost-by-project + top-projects aggregate
+  // across projects (no sense inside a single project's view, which
+  // is why this whole block runs only for !inProjectView). The
+  // kpi-codex-plan widget self-declares `screens: ['today']`, so it's
+  // registered here unconditionally and filtered out below for
+  // non-Today screens. Hour-timeline only when the series is hourly.
   const cross: WidgetDef[] = [
     costByProjectWidget(t, data, series, granularity, hasAnyData, onSelectProject),
     topProjectsWidget(t, data),
     kpiCodexPlanWidget(t, data),
+    codexPlanHistoryWidget(t, data, granularity, dl),
   ]
   if (granularity === 'hour') {
     cross.unshift(hourTimelineWidget(t, series, hasAnyData))
   }
-  return [...shared, ...cross]
+  return filterByScreen([...shared, ...cross], screen)
 }
 
 export type InsightsCtx = {

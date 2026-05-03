@@ -8,7 +8,7 @@ import { readdir, readFile, stat } from 'fs/promises'
 import { join } from 'path'
 import { db, setMeta, truncateAll, type CallRow } from './db.ts'
 import { claudeDesktopSessionsDir } from './lib/claude-paths.ts'
-import { getLatestCodexPlanSnapshot } from './lib/providers/codex.ts'
+import { getLatestCodexPlanSnapshot, aggregateCodexPlanDaily } from './lib/providers/codex.ts'
 import { scanAgentSessions } from './lib/agent-sessions.ts'
 
 function shortenProjectLabel(key: string): string {
@@ -298,14 +298,40 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
 
   // Codex rate-limits snapshot — account-level state pulled out of
   // the latest token_count event. Stored as a singleton meta entry
-  // (overwritten each ingest); the widget reads the freshest value.
-  // null is also stored explicitly so a previously-recorded snapshot
-  // doesn't linger after the user uninstalls Codex.
+  // (overwritten each ingest); kept around for any caller that wants
+  // "the freshest sample regardless of day" (currently nothing — the
+  // Today widget reads from codex_plan_daily below — but cheap to
+  // maintain). Empty-string also written when null so a previously-
+  // recorded snapshot doesn't linger after the user uninstalls Codex.
   try {
     const plan = await getLatestCodexPlanSnapshot()
     setMeta('codex_plan_latest', plan ? JSON.stringify(plan) : '')
   } catch (err) {
     console.warn('[ingest] codex plan snapshot failed:', (err as Error).message)
+  }
+
+  // Per-day plan-usage peaks — full rebuild every ingest. Drives
+  // the Today-view widget so navigating to a past date shows that
+  // day's peak, not the latest sample. We DELETE+INSERT under one
+  // transaction so old days that no longer have backing rollouts
+  // (rare — would mean the user pruned their ~/.codex/sessions tree)
+  // disappear from the table cleanly.
+  try {
+    const rows = await aggregateCodexPlanDaily()
+    const d = db()
+    const tx = d.transaction((rs: typeof rows) => {
+      d.prepare('DELETE FROM codex_plan_daily').run()
+      const stmt = d.prepare(
+        'INSERT INTO codex_plan_daily (day, primary_pct, secondary_pct, snapshot, by_plan_json, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      const now = new Date().toISOString()
+      for (const r of rs) {
+        stmt.run(r.day, r.primaryPct, r.secondaryPct, JSON.stringify(r.snapshot), JSON.stringify(r.byPlan), now)
+      }
+    })
+    tx(rows)
+  } catch (err) {
+    console.warn('[ingest] codex plan daily aggregate failed:', (err as Error).message)
   }
 
   return {

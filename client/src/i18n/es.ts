@@ -195,9 +195,9 @@ export const es: Dict = {
 
 
   'codexPlan.title': 'Plan Codex',
-  'codexPlan.description': 'Uso de los límites de OpenAI de la última sesión Codex — plan, % usado, tiempo hasta el reseteo.',
+  'codexPlan.description': 'Estado del plan Codex / ChatGPT del día — pico de uso de la ventana, tipo de plan y bolsa de créditos Plus/Pro cuando aplica.',
   'codexPlan.planLabel': 'Plan',
-  'codexPlan.usedLabel': 'Usado',
+  'codexPlan.usedLabel': 'Usado (5h)',
   'codexPlan.stateLabel': 'Estado',
   'codexPlan.empty': 'No hay sesiones de Codex en este rango.',
   'codexPlan.unknown': 'Desconocido',
@@ -206,7 +206,16 @@ export const es: Dict = {
   'codexPlan.minutesFmt': '{n}m',
   'codexPlan.resetting': 'ahora',
   'codexPlan.limitReached': 'Límite alcanzado',
-  'codexPlan.staleTooltip': 'Captura de {when} — más de 24h, la ventana del plan ya pudo resetearse.',
+  'codexPlan.creditsLabel': 'Créditos',
+  'codexPlan.creditsExhausted': 'Agotados',
+  'codexPlan.creditsUnlimited': 'Ilimitados',
+
+  'codexPlanHistory.title': 'Historial del plan Codex',
+  'codexPlanHistory.description': 'Pico diario de la ventana de 5h durante el rango, coloreado por plan, con la ventana de 7d superpuesta.',
+  'codexPlanHistory.sub': 'Pico diario %, a nivel de cuenta',
+  'codexPlanHistory.help': 'Cada barra muestra el pico de la ventana de 5h ese día. Los días con varios planes (free→plus, etc.) apilan un segmento por plan. La línea discontinua sigue la ventana secundaria de 7d, el tope semanal acumulado.',
+  'codexPlanHistory.secondaryName': 'Ventana 7d',
+  'codexPlanHistory.noDataDay': 'Sin actividad en Codex',
 
   'kpi.projects': 'Proyectos',
   'kpi.active': 'Activos',

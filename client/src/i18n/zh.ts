@@ -195,9 +195,9 @@ export const zh: Dict = {
 
 
   'codexPlan.title': 'Codex 套餐',
-  'codexPlan.description': '来自最新 Codex 会话的 OpenAI 限额使用情况 — 套餐、已用百分比、重置时间。',
+  'codexPlan.description': '当日 Codex / ChatGPT 套餐状态 — 窗口峰值用量、套餐类型，以及 Plus/Pro 信用额度池（如适用）。',
   'codexPlan.planLabel': '套餐',
-  'codexPlan.usedLabel': '已用',
+  'codexPlan.usedLabel': '已用（5小时）',
   'codexPlan.stateLabel': '状态',
   'codexPlan.empty': '范围内无 Codex 会话。',
   'codexPlan.unknown': '未知',
@@ -206,7 +206,16 @@ export const zh: Dict = {
   'codexPlan.minutesFmt': '{n}分钟',
   'codexPlan.resetting': '正在重置',
   'codexPlan.limitReached': '已达到限额',
-  'codexPlan.staleTooltip': '快照来自 {when} — 已超过 24 小时，套餐窗口可能已重置。',
+  'codexPlan.creditsLabel': '信用额度',
+  'codexPlan.creditsExhausted': '已耗尽',
+  'codexPlan.creditsUnlimited': '无限制',
+
+  'codexPlanHistory.title': 'Codex 套餐历史',
+  'codexPlanHistory.description': '所选范围内每日 5 小时窗口峰值，按套餐着色，并叠加 7 天窗口走线。',
+  'codexPlanHistory.sub': '每日峰值 %，账户级',
+  'codexPlanHistory.help': '每根柱子显示当日 5 小时窗口的峰值利用率。同一天有多个套餐（如 free→plus）时，按套餐堆叠分段。虚线表示次要的 7 天窗口——缓慢累积的周限额。',
+  'codexPlanHistory.secondaryName': '7d 窗口',
+  'codexPlanHistory.noDataDay': '当日无 Codex 活动',
 
   'kpi.projects': '项目数',
   'kpi.active': '活跃',

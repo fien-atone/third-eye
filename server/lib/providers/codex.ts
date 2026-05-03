@@ -349,25 +349,56 @@ export const codex = createCodexProvider()
 // Rate-limits snapshot (separate from the regular per-call ingest)
 // ──────────────────────────────────────────────────────────────────────
 
-/** Account-level snapshot of the user's Codex / ChatGPT plan usage,
- *  pulled out of the rate_limits payload that Codex includes in
- *  every token_count event. Anthropic's API doesn't have an
- *  equivalent — this is OpenAI/Codex-only. */
+/** Account-level snapshot of the user's Codex / ChatGPT plan usage.
+ *
+ *  Composite shape — Codex emits TWO independent limit families in
+ *  the same JSONL stream and a per-day summary needs both:
+ *    • `limit_id="codex"` samples carry rolling windows (primary 5h,
+ *      secondary 7d) with `used_percent`. Stored as primary/secondary.
+ *    • `limit_id="premium"` samples carry `credits` (Plus / Pro
+ *      overage pool), with primary/secondary always null.
+ *  When credits are exhausted Codex CLI reports "limit reached" even
+ *  if the 5h window is at 50% — so credits is the binding signal on
+ *  paid plans, not the windows.
+ *
+ *  For per-day rows: primary/secondary hold the day's PEAK
+ *  `used_percent` (worst-case window utilization), credits holds the
+ *  LATEST premium sample of the day (current credit state at end of
+ *  day, or close to it). `planType`, `limitId`, `capturedAt` come
+ *  from the latest sample on that day. `rateLimitReachedType` is
+ *  preserved when ANY sample on the day had it set (rare in practice
+ *  — Codex doesn't seem to populate it currently). */
 export type CodexPlanSnapshot = {
-  planType: string | null              // 'free' | 'ChatGPT Plus' | 'Pro' | 'Enterprise' | …
-  limitId: string | null               // server-side limit identifier
-  limitName: string | null             // human-readable label, e.g. '5 hour limit'
-  primary: CodexLimitWindow | null     // main rate window
-  secondary: CodexLimitWindow | null   // optional second window (some plans have both)
-  credits: number | null               // remaining credits on paid plans, null on free
-  rateLimitReachedType: string | null  // non-null when user hit a limit recently
-  capturedAt: string                   // ISO of the token_count event we got this from
+  planType: string | null              // 'free' | 'plus' | 'pro' | …
+  /** Marks which limit family is the user-facing constraint. 'premium'
+   *  when premium samples exist on the day (credits then tells the
+   *  real story); 'codex' otherwise. */
+  limitId: string | null
+  limitName: string | null             // human-readable label, often null
+  primary: CodexLimitWindow | null     // peak 5h-window utilization for the day
+  secondary: CodexLimitWindow | null   // peak 7d-window utilization for the day
+  credits: CodexCredits | null         // latest premium-credits state (paid plans only)
+  rateLimitReachedType: string | null  // non-null if any sample on the day had it
+  capturedAt: string                   // ISO of the latest sample on this day
 }
 
 export type CodexLimitWindow = {
   usedPercent: number      // 0–100
   windowMinutes: number    // duration of the rolling window
   resetsAt: number         // unix epoch SECONDS when the window resets
+}
+
+export type CodexCredits = {
+  /** Plus / Pro plans set this false when the user has burned through
+   *  their overage allowance — Codex CLI surfaces "limit reached" at
+   *  this point, regardless of primary/secondary window state. */
+  hasCredits: boolean | null
+  /** Some plans (Enterprise / Edu) report unlimited credits. */
+  unlimited: boolean | null
+  /** Stringified balance. Codex stores it as a string ("0", "12500")
+   *  rather than a number so very large numbers don't lose precision —
+   *  pass through verbatim. */
+  balance: string | null
 }
 
 /** Walk the latest Codex rollout file and return the most recent
@@ -427,16 +458,7 @@ export async function getLatestCodexPlanSnapshot(codexDir?: string): Promise<Cod
       const rl = payload && (payload as { rate_limits?: Record<string, unknown> }).rate_limits
       if (!rl || typeof rl !== 'object') continue
       const ts = typeof entry.timestamp === 'string' ? entry.timestamp : new Date().toISOString()
-      lastSnapshot = {
-        planType: (rl.plan_type as string | null) ?? null,
-        limitId: (rl.limit_id as string | null) ?? null,
-        limitName: (rl.limit_name as string | null) ?? null,
-        primary: rl.primary ? toWindow(rl.primary as Record<string, unknown>) : null,
-        secondary: rl.secondary ? toWindow(rl.secondary as Record<string, unknown>) : null,
-        credits: typeof rl.credits === 'number' ? rl.credits : null,
-        rateLimitReachedType: (rl.rate_limit_reached_type as string | null) ?? null,
-        capturedAt: ts,
-      }
+      lastSnapshot = snapshotFromRateLimits(rl as Record<string, unknown>, ts)
     }
     if (lastSnapshot) return lastSnapshot
   }
@@ -449,4 +471,207 @@ function toWindow(o: Record<string, unknown>): CodexLimitWindow {
     windowMinutes: typeof o.window_minutes === 'number' ? o.window_minutes : 0,
     resetsAt: typeof o.resets_at === 'number' ? o.resets_at : 0,
   }
+}
+
+/** Per-day peak rate-limit snapshot. The day key uses the Codex session
+ *  directory layout (YYYY/MM/DD) — that's the same local-tz day the
+ *  Today view URL is keyed on, so a /day/2026-05-03 lookup hits the
+ *  matching row.
+ *
+ *  `byPlan` carries the peak primary % for each `plan_type` that was
+ *  active during the day, computed from `limit_id="codex"` samples
+ *  only. Drives the Dashboard history bar chart, where each plan
+ *  becomes a distinctly-colored stacked segment. Single-plan days
+ *  have one entry; days where the user toggled across plans/sessions
+ *  ship multiple entries. */
+export type CodexPlanDailyRow = {
+  day: string
+  primaryPct: number
+  secondaryPct: number
+  byPlan: Record<string, number>
+  snapshot: CodexPlanSnapshot
+}
+
+function toCredits(c: unknown): CodexCredits | null {
+  if (!c || typeof c !== 'object') return null
+  const o = c as Record<string, unknown>
+  // Codex sometimes ships a credits object with all-null fields on
+  // free plans; keep it (null fields convey "no info" downstream)
+  // rather than collapsing to a missing object, which would be
+  // indistinguishable from "no premium sample at all".
+  return {
+    hasCredits: typeof o.has_credits === 'boolean' ? o.has_credits : null,
+    unlimited: typeof o.unlimited === 'boolean' ? o.unlimited : null,
+    balance: typeof o.balance === 'string' ? o.balance : null,
+  }
+}
+
+function snapshotFromRateLimits(rl: Record<string, unknown>, capturedAt: string): CodexPlanSnapshot {
+  return {
+    planType: (rl.plan_type as string | null) ?? null,
+    limitId: (rl.limit_id as string | null) ?? null,
+    limitName: (rl.limit_name as string | null) ?? null,
+    primary: rl.primary ? toWindow(rl.primary as Record<string, unknown>) : null,
+    secondary: rl.secondary ? toWindow(rl.secondary as Record<string, unknown>) : null,
+    credits: toCredits(rl.credits),
+    rateLimitReachedType: (rl.rate_limit_reached_type as string | null) ?? null,
+    capturedAt,
+  }
+}
+
+/** Internal: one normalized rate_limits sample with timestamp. */
+type RlSample = {
+  ts: number              // epoch ms for sorting
+  iso: string             // original ISO string
+  rl: Record<string, unknown>
+}
+
+/** Walk every Codex rollout file and produce a per-day SUMMARY snapshot
+ *  that reflects what Codex CLI itself would have shown that day. Two
+ *  things differ from a naïve "peak primary" approach:
+ *
+ *  1. Codex emits TWO independent limit families per session — `codex`
+ *     (rolling 5h/7d windows) and `premium` (Plus/Pro credit pool, no
+ *     windows). Naïvely picking the sample with max `primary.used_percent`
+ *     ignores premium entirely (its primary is always null) and hides
+ *     the case where the user has 50% in their 5h window but 0 credits
+ *     left — which is when CLI says "limit reached".
+ *
+ *  2. `plan_type` can flip mid-day across `free` / `plus` / `pro`
+ *     within the same rollout (multiple OpenAI auth tokens / session
+ *     refreshes). Taking the LATEST sample's plan_type matches what
+ *     CLI shows at end of day.
+ *
+ *  Composite rules:
+ *    • primary  = peak (used_percent) across `limit_id=codex` samples,
+ *                 with windowMinutes/resetsAt from the peak sample.
+ *    • secondary = peak across `limit_id=codex` samples (independently
+ *                  of primary peak — can come from a different sample).
+ *    • credits  = latest by-time `credits` block from `limit_id=premium`
+ *                 samples (current pool state at end of day).
+ *    • planType, capturedAt = latest sample by time.
+ *    • limitId  = 'premium' if any premium samples seen (binding
+ *                 constraint), else 'codex'. UI uses this to decide
+ *                 which signal to highlight.
+ *    • rateLimitReachedType = first non-null observed (rare; Codex
+ *                             rarely populates this).
+ *
+ *  Cheap full rebuild on every ingest: rate_limits payloads are tiny,
+ *  even a heavy user has <100 rollouts/day with a few hundred samples
+ *  each. Incrementalize via mtime later if it shows up in profiles. */
+export async function aggregateCodexPlanDaily(codexDir?: string): Promise<CodexPlanDailyRow[]> {
+  const root = join(getCodexDir(codexDir), 'sessions')
+  let years: string[] = []
+  try { years = await readdir(root) } catch { return [] }
+  // Collect raw samples per day first; summarize after.
+  const byDay = new Map<string, RlSample[]>()
+  for (const year of years) {
+    if (!/^\d{4}$/.test(year)) continue
+    const yearDir = join(root, year)
+    const months = (await readdir(yearDir).catch(() => [] as string[]))
+    for (const month of months) {
+      if (!/^\d{2}$/.test(month)) continue
+      const monthDir = join(yearDir, month)
+      const days = (await readdir(monthDir).catch(() => [] as string[]))
+      for (const day of days) {
+        if (!/^\d{2}$/.test(day)) continue
+        const dayKey = `${year}-${month}-${day}`
+        const dayDir = join(monthDir, day)
+        const files = (await readdir(dayDir).catch(() => [] as string[])).filter(
+          f => f.startsWith('rollout-') && f.endsWith('.jsonl'),
+        )
+        for (const f of files) {
+          const text = await readFile(join(dayDir, f), 'utf-8').catch(() => '')
+          if (!text) continue
+          for (const line of text.split('\n')) {
+            if (!line.trim() || !line.includes('"rate_limits"')) continue
+            let entry: Record<string, unknown>
+            try { entry = JSON.parse(line) } catch { continue }
+            const payload = (entry as { payload?: Record<string, unknown> }).payload
+            const rl = payload && (payload as { rate_limits?: Record<string, unknown> }).rate_limits
+            if (!rl || typeof rl !== 'object') continue
+            const iso = typeof entry.timestamp === 'string' ? entry.timestamp : new Date().toISOString()
+            const ts = Date.parse(iso)
+            if (Number.isNaN(ts)) continue
+            const list = byDay.get(dayKey) ?? []
+            list.push({ ts, iso, rl: rl as Record<string, unknown> })
+            byDay.set(dayKey, list)
+          }
+        }
+      }
+    }
+  }
+
+  const out: CodexPlanDailyRow[] = []
+  for (const [day, samples] of byDay) {
+    samples.sort((a, b) => a.ts - b.ts)
+    const latest = samples[samples.length - 1]
+
+    let peakPrimary = -1
+    let peakPrimarySample: RlSample | null = null
+    let peakSecondary = -1
+    let peakSecondarySample: RlSample | null = null
+    let lastPremium: RlSample | null = null
+    let reachedType: string | null = null
+    let sawPremium = false
+    // Per-plan peak primary %. Distinct from `peakPrimary` (the
+    // overall day peak): when the user worked across plans (e.g.
+    // free in the morning, plus in the afternoon) we keep both
+    // values so the bar chart can render each plan as its own
+    // colored stacked segment.
+    const byPlan = new Map<string, number>()
+
+    for (const s of samples) {
+      const lid = s.rl.limit_id
+      const rt = (s.rl.rate_limit_reached_type as string | null) ?? null
+      if (rt && !reachedType) reachedType = rt
+
+      if (lid === 'codex') {
+        const p = s.rl.primary as { used_percent?: number } | undefined
+        const sec = s.rl.secondary as { used_percent?: number } | undefined
+        const planType = (s.rl.plan_type as string | null) ?? 'unknown'
+        if (p && typeof p.used_percent === 'number') {
+          if (p.used_percent > peakPrimary) {
+            peakPrimary = p.used_percent
+            peakPrimarySample = s
+          }
+          const cur = byPlan.get(planType) ?? -1
+          if (p.used_percent > cur) byPlan.set(planType, p.used_percent)
+        }
+        if (sec && typeof sec.used_percent === 'number' && sec.used_percent > peakSecondary) {
+          peakSecondary = sec.used_percent
+          peakSecondarySample = s
+        }
+      } else if (lid === 'premium') {
+        sawPremium = true
+        // Latest premium sample wins — credits change over the day,
+        // we want the final state.
+        lastPremium = s
+      }
+    }
+
+    const snapshot: CodexPlanSnapshot = {
+      planType: (latest.rl.plan_type as string | null) ?? null,
+      limitId: sawPremium ? 'premium' : 'codex',
+      limitName: (latest.rl.limit_name as string | null) ?? null,
+      primary: peakPrimarySample
+        ? toWindow(peakPrimarySample.rl.primary as Record<string, unknown>)
+        : null,
+      secondary: peakSecondarySample
+        ? toWindow(peakSecondarySample.rl.secondary as Record<string, unknown>)
+        : null,
+      credits: lastPremium ? toCredits(lastPremium.rl.credits) : null,
+      rateLimitReachedType: reachedType,
+      capturedAt: latest.iso,
+    }
+
+    out.push({
+      day,
+      primaryPct: peakPrimary >= 0 ? peakPrimary : 0,
+      secondaryPct: peakSecondary >= 0 ? peakSecondary : 0,
+      byPlan: Object.fromEntries(byPlan),
+      snapshot,
+    })
+  }
+  return out.sort((a, b) => a.day.localeCompare(b.day))
 }

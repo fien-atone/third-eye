@@ -195,9 +195,9 @@ export const ru: Dict = {
 
 
   'codexPlan.title': 'План Codex',
-  'codexPlan.description': 'Использование лимитов OpenAI из свежей Codex-сессии — план, % использовано, до сброса.',
+  'codexPlan.description': 'Состояние плана Codex / ChatGPT за день — пик использования окна, тип плана и пул кредитов Plus/Pro, когда применимо.',
   'codexPlan.planLabel': 'План',
-  'codexPlan.usedLabel': 'Использовано',
+  'codexPlan.usedLabel': 'Использовано (5ч)',
   'codexPlan.stateLabel': 'Состояние',
   'codexPlan.empty': 'В этом срезе нет Codex-сессий.',
   'codexPlan.unknown': 'Неизвестно',
@@ -206,7 +206,16 @@ export const ru: Dict = {
   'codexPlan.minutesFmt': '{n}мин',
   'codexPlan.resetting': 'сейчас',
   'codexPlan.limitReached': 'Лимит достигнут',
-  'codexPlan.staleTooltip': 'Срез сделан {when} — старше 24ч, окно плана могло сброситься.',
+  'codexPlan.creditsLabel': 'Кредиты',
+  'codexPlan.creditsExhausted': 'Исчерпаны',
+  'codexPlan.creditsUnlimited': 'Безлимитные',
+
+  'codexPlanHistory.title': 'История плана Codex',
+  'codexPlanHistory.description': 'Дневной пик 5-часового окна за период, цвет — план; поверх пунктиром идёт 7-дневное окно.',
+  'codexPlanHistory.sub': 'Дневной пик %, по всему аккаунту',
+  'codexPlanHistory.help': 'Каждый столбик — пик 5-часового окна за день. Если за день было несколько планов (free→plus и т.п.), сегменты стэкуются один на другой по плану. Пунктирная линия — 7-дневное окно, медленный накопительный недельный лимит.',
+  'codexPlanHistory.secondaryName': '7д окно',
+  'codexPlanHistory.noDataDay': 'Нет активности в Codex',
 
   'kpi.projects': 'Проекты',
   'kpi.active': 'Активно',

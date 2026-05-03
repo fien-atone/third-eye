@@ -195,9 +195,9 @@ export const de: Dict = {
 
 
   'codexPlan.title': 'Codex-Plan',
-  'codexPlan.description': 'OpenAI-Limit-Auslastung aus der letzten Codex-Sitzung — Plan, %-Auslastung, Zeit bis zum Reset.',
+  'codexPlan.description': 'Codex-/ChatGPT-Plan-Status für den Tag — Spitzen-Fensterauslastung, Plan-Typ und Plus/Pro-Guthabenpool, wenn vorhanden.',
   'codexPlan.planLabel': 'Plan',
-  'codexPlan.usedLabel': 'Genutzt',
+  'codexPlan.usedLabel': 'Genutzt (5h)',
   'codexPlan.stateLabel': 'Status',
   'codexPlan.empty': 'Keine Codex-Sitzungen in diesem Bereich.',
   'codexPlan.unknown': 'Unbekannt',
@@ -206,7 +206,16 @@ export const de: Dict = {
   'codexPlan.minutesFmt': '{n}min',
   'codexPlan.resetting': 'jetzt',
   'codexPlan.limitReached': 'Limit erreicht',
-  'codexPlan.staleTooltip': 'Snapshot von {when} — älter als 24h, das Plan-Fenster ist möglicherweise schon zurückgesetzt.',
+  'codexPlan.creditsLabel': 'Guthaben',
+  'codexPlan.creditsExhausted': 'Aufgebraucht',
+  'codexPlan.creditsUnlimited': 'Unbegrenzt',
+
+  'codexPlanHistory.title': 'Codex-Plan-Historie',
+  'codexPlanHistory.description': 'Tägliche Spitzenauslastung des 5h-Fensters über den Zeitraum, nach Plan eingefärbt, mit überlagertem 7d-Fenster.',
+  'codexPlanHistory.sub': 'Tägliche Spitze %, kontoweit',
+  'codexPlanHistory.help': 'Jeder Balken zeigt die Spitzenauslastung des 5h-Fensters an diesem Tag. Tage mit mehreren Plänen (free→plus etc.) stapeln je ein Segment pro Plan. Die gestrichelte Linie folgt dem sekundären 7d-Fenster — die kumulative Wochengrenze.',
+  'codexPlanHistory.secondaryName': '7d-Fenster',
+  'codexPlanHistory.noDataDay': 'Keine Codex-Aktivität',
 
   'kpi.projects': 'Projekte',
   'kpi.active': 'Aktive',

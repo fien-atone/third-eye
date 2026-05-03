@@ -15,7 +15,7 @@ function parseHourBucket(b: string): { date: Date; hour: number } {
   return { date: parseLocalDate(d), hour: parseInt(h.slice(0, 2), 10) }
 }
 
-function formatBucket(bucket: string, g: Granularity, dl: Locale): string {
+export function formatBucket(bucket: string, g: Granularity, dl: Locale): string {
   if (g === 'hour') {
     const { hour } = parseHourBucket(bucket)
     return `${String(hour).padStart(2, '0')}:00`
@@ -33,7 +33,7 @@ function formatBucket(bucket: string, g: Granularity, dl: Locale): string {
 /** Long-form bucket label for tooltips: includes year + weekday so users
  *  reading the popup don't have to guess what year a "12 Mar" point is.
  *  Axis labels stay compact (formatBucket above) for visual density. */
-function formatBucketFull(bucket: string, g: Granularity, dl: Locale): string {
+export function formatBucketFull(bucket: string, g: Granularity, dl: Locale): string {
   if (g === 'hour') {
     const { date, hour } = parseHourBucket(bucket)
     const next = (hour + 1) % 24
@@ -100,9 +100,12 @@ export function Dashboard({ data, modelNames, granularity, onSelectProject, inPr
 
   const projectId = data.frame.project?.id ?? null
 
+  const screen = screenOverride ?? (inProjectView ? 'project' : 'dashboard')
+
   const catalog: WidgetDef[] = buildDashboardCatalog({
     t, data, modelNames, granularity, onSelectProject, inProjectView,
-    series, hasAnyData, hasTokenData, activeBuckets, avgPerBucket,
+    series, hasAnyData, hasTokenData, activeBuckets, avgPerBucket, dl,
+    screen: screen as 'dashboard' | 'project' | 'today',
   })
 
   // ─── Insights widgets — only registered when project view + data is loaded.
@@ -135,8 +138,6 @@ export function Dashboard({ data, modelNames, granularity, onSelectProject, inPr
     catalog.push(...buildInsightsCatalog({ t, data: effectiveInsights, projectKey: insightsProjectKey ?? null, dl }))
   }
   if (extraWidgets && extraWidgets.length > 0) catalog.push(...extraWidgets)
-
-  const screen = screenOverride ?? (inProjectView ? 'project' : 'dashboard')
 
   return (
     <>

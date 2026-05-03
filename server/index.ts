@@ -768,15 +768,123 @@ app.get('/api/overview', (req, res) => {
       projects: totals.projects ?? 0,
     },
     // Codex / ChatGPT plan-usage snapshot. Only forwarded when the
-    // current scope contains Codex calls — on Claude-only views the
-    // plan-state is irrelevant noise. Latest sample lives in meta;
-    // ingest refreshes it.
+    // request resolves to a SINGLE day (start === end as raw query
+    // params), which matches the Today-view URL shape. For multi-day
+    // ranges (Dashboard, Project) a single peak number isn't
+    // meaningful and the widget shouldn't be on those screens anyway
+    // (gated declaratively via `screens: ['today']` on the WidgetDef).
+    // The day key is the same YYYY-MM-DD the client sent, which lines
+    // up with codex_plan_daily.day (Codex's own session-dir day).
     codexPlan: ((): unknown => {
       const codexCount = totals.codex_calls
       if (!codexCount || codexCount === 0) return null
-      const raw = getMeta('codex_plan_latest')
-      if (!raw) return null
-      try { return JSON.parse(raw) } catch { return null }
+      const startStr = typeof req.query.start === 'string' ? req.query.start : null
+      const endStr = typeof req.query.end === 'string' ? req.query.end : null
+      if (!startStr || startStr !== endStr) return null
+      const row = db().prepare('SELECT snapshot FROM codex_plan_daily WHERE day = ?').get(startStr) as
+        | { snapshot: string }
+        | undefined
+      if (!row) return null
+      try { return JSON.parse(row.snapshot) } catch { return null }
+    })(),
+    // Multi-day Codex plan history. Inverse of codexPlan above:
+    // populated only when the range covers MORE than one day, fed
+    // straight from the same codex_plan_daily table. The Dashboard's
+    // history widget renders a line chart out of this; on Today
+    // (single-day) and Project (account-wide rate-limits make no
+    // sense scoped to one project) the field is null and the widget
+    // self-gates via `screens: ['dashboard']`. Only days actually
+    // present in the table are included — sparse ranges are honored
+    // (no synthesized zero rows). Codex-call gate kept so the
+    // history doesn't appear on Claude-only views.
+    codexPlanHistory: ((): unknown => {
+      const codexCount = totals.codex_calls
+      if (!codexCount || codexCount === 0) return null
+      const startStr = typeof req.query.start === 'string' ? req.query.start : null
+      const endStr = typeof req.query.end === 'string' ? req.query.end : null
+      if (!startStr || !endStr || startStr === endStr) return null
+      const rows = db().prepare(
+        'SELECT day, primary_pct, secondary_pct, snapshot, by_plan_json FROM codex_plan_daily WHERE day BETWEEN ? AND ? ORDER BY day',
+      ).all(startStr, endStr) as Array<{
+        day: string; primary_pct: number; secondary_pct: number; snapshot: string; by_plan_json: string | null
+      }>
+
+      // Map each daily row to its bucket key under the dashboard's
+      // current granularity (day/week/month/hour). Day strings are
+      // already in local-tz YYYY-MM-DD shape (Codex session dirs use
+      // local TZ), so the math here is timezone-free.
+      const dayToBucket = (dayStr: string): string => {
+        if (granularity === 'day' || granularity === 'hour') return dayStr
+        const [y, m, d] = dayStr.split('-').map(Number)
+        const dt = new Date(Date.UTC(y, m - 1, d))
+        if (granularity === 'week') {
+          const weekday = dt.getUTCDay()
+          const diff = (weekday - weekStartsOn + 7) % 7
+          dt.setUTCDate(dt.getUTCDate() - diff)
+          const yy = dt.getUTCFullYear()
+          const mm = String(dt.getUTCMonth() + 1).padStart(2, '0')
+          const dd = String(dt.getUTCDate()).padStart(2, '0')
+          return `${yy}-${mm}-${dd}`
+        }
+        // month
+        return `${y}-${String(m).padStart(2, '0')}`
+      }
+
+      // Aggregate daily rows into buckets. Per-bucket peaks: primary
+      // and per-plan use max() of daily peaks (the worst day in the
+      // bucket dominates the bar). Secondary stays null until we see
+      // at least one Codex day in the bucket. exhausted = OR.
+      type Agg = {
+        primary: number
+        secondary: number | null
+        byPlan: Map<string, number>
+        exhausted: boolean
+        dayCount: number
+      }
+      const agg = new Map<string, Agg>()
+      for (const k of bucketKeys) {
+        agg.set(k, { primary: 0, secondary: null, byPlan: new Map(), exhausted: false, dayCount: 0 })
+      }
+      for (const r of rows) {
+        const bk = dayToBucket(r.day)
+        const a = agg.get(bk)
+        if (!a) continue
+        let snap: { planType?: string | null; credits?: { hasCredits?: boolean | null } | null } | null = null
+        try { snap = JSON.parse(r.snapshot) } catch {}
+        let byPlan: Record<string, number> = {}
+        if (r.by_plan_json) {
+          try { byPlan = JSON.parse(r.by_plan_json) as Record<string, number> } catch {}
+        }
+        if (Object.keys(byPlan).length === 0 && snap?.planType) {
+          byPlan = { [snap.planType]: r.primary_pct }
+        }
+        if (r.primary_pct > a.primary) a.primary = r.primary_pct
+        if (typeof r.secondary_pct === 'number') {
+          a.secondary = a.secondary === null ? r.secondary_pct : Math.max(a.secondary, r.secondary_pct)
+        }
+        for (const [p, pct] of Object.entries(byPlan)) {
+          const cur = a.byPlan.get(p) ?? 0
+          if (pct > cur) a.byPlan.set(p, pct)
+        }
+        if (snap?.credits?.hasCredits === false) a.exhausted = true
+        a.dayCount += 1
+      }
+
+      return bucketKeys.map(bk => {
+        const a = agg.get(bk)!
+        return {
+          bucket: bk,
+          // Empty bucket: every plan-segment column ends up at zero
+          // height, secondary null so the line breaks. The X-axis
+          // tick still renders, keeping bar widths consistent across
+          // sparse ranges.
+          primaryPct: a.primary,
+          secondaryPct: a.dayCount === 0 ? null : a.secondary,
+          byPlan: Object.fromEntries(a.byPlan),
+          creditsExhausted: a.exhausted,
+          dayCount: a.dayCount,
+        }
+      })
     })(),
     series,
     models: modelTotals.map(m => ({
