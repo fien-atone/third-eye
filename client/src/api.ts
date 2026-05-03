@@ -13,11 +13,45 @@ import type { Granularity } from './types'
 // path is correct.
 const API_BASE = import.meta.env.DEV ? 'http://127.0.0.1:4317' : ''
 
+/** Error thrown for non-2xx responses. The wrapped server payload
+ *  (when JSON-shaped) is exposed as fields so callers can branch
+ *  on `code` (e.g. "busy" → 409 Conflict from /api/refresh's lock)
+ *  without parsing JSON out of `message` themselves. */
+export class ApiError extends Error {
+  status: number
+  /** `error` field from the server's JSON body, when present.
+   *  Stable identifiers like "busy" are safe to compare against. */
+  code: string | null
+  /** Full parsed body, when JSON. Lets callers inspect extras
+   *  like `currentKind` / `startedAt` for the busy case. */
+  body: Record<string, unknown> | null
+  constructor(
+    status: number,
+    code: string | null,
+    body: Record<string, unknown> | null,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+    this.body = body
+  }
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(API_BASE + path, init)
   if (!r.ok) {
-    const body = await r.text().catch(() => '')
-    throw new Error(body || `HTTP ${r.status} on ${path}`)
+    const text = await r.text().catch(() => '')
+    let parsed: Record<string, unknown> | null = null
+    try { parsed = text ? (JSON.parse(text) as Record<string, unknown>) : null } catch { /* not JSON */ }
+    const code = typeof parsed?.error === 'string' ? parsed.error : null
+    // Prefer the parsed `error` code as the user-facing message —
+    // it's a short identifier callers branch on. Fall back to raw
+    // body text (already what the old wrapper threw), then to a
+    // generic HTTP status line.
+    const message = code ?? text ?? `HTTP ${r.status} on ${path}`
+    throw new ApiError(r.status, code, parsed, message)
   }
   return r.json() as Promise<T>
 }

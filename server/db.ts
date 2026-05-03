@@ -249,7 +249,15 @@ export function truncateAll(): { calls: number; projects: number } {
   const d = db()
   const calls = (d.prepare('SELECT COUNT(*) AS n FROM api_calls').get() as { n: number }).n
   const projects = (d.prepare('SELECT COUNT(*) AS n FROM projects').get() as { n: number }).n
-  d.exec('DELETE FROM api_calls; DELETE FROM tool_events; DELETE FROM projects; DELETE FROM agent_sessions; DELETE FROM agent_registry; DELETE FROM meta WHERE key LIKE \'last_ingest%\';')
+  d.exec(`
+    DELETE FROM api_calls;
+    DELETE FROM tool_events;
+    DELETE FROM projects;
+    DELETE FROM agent_sessions;
+    DELETE FROM agent_registry;
+    DELETE FROM codex_plan_daily;
+    DELETE FROM meta WHERE key LIKE 'last_ingest%' OR key LIKE 'codex_plan%';
+  `)
   d.exec('VACUUM')
   return { calls, projects }
 }
