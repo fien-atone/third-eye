@@ -66,6 +66,17 @@ blue pulse so the user can tell the dashboard isn't stale.
   bumping versions, catching errors before they ever reach
   origin.
 
+### Deprecated
+
+- **`THIRD_EYE_INGEST_INTERVAL_MIN` env var** and the OS-scheduler
+  scripts (`npm run schedule:install` / `:status` / `:uninstall`).
+  Both keep working unchanged through the 2.x line and will be
+  **removed in 3.0**. Migrate to **Settings → Auto-refresh** in
+  the dashboard, or `PATCH /api/settings { ingest: { enabled:
+  true, intervalSeconds: 900 } }` for headless provisioning. The
+  server logs a one-shot deprecation warning at boot when the env
+  var is set, so operators see the notice in their container logs.
+
 ### Fixed
 
 - **Three hardcoded aria-labels translated.** "prev" / "next" on
