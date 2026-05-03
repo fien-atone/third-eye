@@ -189,10 +189,14 @@ export default function App() {
 
   // /api/health drives "is anything ingesting right now" — the
   // header spinner lights up for both manual Refresh AND background
-  // auto-tick by reading this. Polling cadence is dynamic: 2 s while
-  // an ingest is in flight (catch the transition off promptly), 15 s
-  // while idle (cheap baseline). The polled payload is small (one
-  // boolean + a string) so this is safe to leave running.
+  // auto-tick by reading this. Polling cadence is dynamic: 1.5 s
+  // while an ingest is in flight (catch the transition off
+  // promptly), 3 s while idle. The fast idle cadence is needed to
+  // RELIABLY see the spinner during a short auto-tick — a typical
+  // full ingest finishes in 5–7 s, so anything sparser than ~3 s
+  // would miss most ticks (probability of catching a 6 s window
+  // when polling every 15 s is only 6/15 ≈ 40%). The payload is
+  // ~80 bytes; ~20 req/min is rounding error.
   type HealthResponse = {
     lastIngestAt: string | null
     ingestInProgress: { kind: 'incremental' | 'full' | 'rebuild'; startedAt: string } | null
@@ -200,7 +204,7 @@ export default function App() {
   const healthQuery = useQuery<HealthResponse>({
     queryKey: ['health'],
     queryFn: () => apiGet<HealthResponse>('/api/health'),
-    refetchInterval: query => (query.state.data?.ingestInProgress ? 2_000 : 15_000),
+    refetchInterval: query => (query.state.data?.ingestInProgress ? 1_500 : 3_000),
   })
 
   const refreshMutation = useMutation({

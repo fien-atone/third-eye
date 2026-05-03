@@ -110,8 +110,17 @@ export function AppHeader({
               acts on data) and is visually separated from "app version
               freshness" on the left. The pulse dot already implies
               live-data; tooltip spells out what the timestamp means. */}
-          <span className="meta" title={t('header.lastRefresh')}>
-            <span className="pulse" />
+          {/* Pulse dot doubles as the "something is ingesting" signal:
+              amber + faster pulse while autoIngestKind is set, green +
+              slow pulse when idle. Tooltip on the wrapper differentiates
+              "this is when data was last refreshed" (idle) from "an
+              ingest is running right now" (active). The label flip
+              alone is too easy to miss for a 6-second auto-tick. */}
+          <span
+            className={`meta${autoIngestKind ? ' is-ingesting' : ''}`}
+            title={autoIngestKind ? t('header.autoIngestRunning') : t('header.lastRefresh')}
+          >
+            <span className={`pulse${autoIngestKind ? ' is-active' : ''}`} />
             {fmtRel(lastIngestAt, t)}
           </span>
           {/* Spinner state merges manual click + background auto-tick:
