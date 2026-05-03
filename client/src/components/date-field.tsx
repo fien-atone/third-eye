@@ -5,12 +5,14 @@ import {
   eachDayOfInterval, isSameDay, isSameMonth, isToday,
 } from 'date-fns'
 import { useDateLocale } from '../lib/format'
+import { useT } from '../i18n'
 
 /** Compact date picker — trigger button shows the current value, the
  *  popover is fixed-positioned (escapes overflow:hidden ancestors and
  *  stays anchored on scroll-jank). Closes on outside click / Esc /
  *  resize / scroll so it never lingers in the wrong place. */
 export function DateField({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
+  const t = useT()
   const dl = useDateLocale()
   const weekStartsOn = (dl.options?.weekStartsOn ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6
   const [open, setOpen] = useState(false)
@@ -83,9 +85,9 @@ export function DateField({ value, onChange }: { value: Date; onChange: (d: Date
           style={{ position: 'fixed', left: pos.left, top: pos.top }}
         >
           <div className="date-nav">
-            <button className="date-nav-btn" onClick={() => setViewMonth(subMonths(viewMonth, 1))} aria-label="prev">‹</button>
+            <button className="date-nav-btn" onClick={() => setViewMonth(subMonths(viewMonth, 1))} aria-label={t('dateField.prevMonth')}>‹</button>
             <span className="date-nav-title">{format(viewMonth, 'LLLL yyyy', { locale: dl })}</span>
-            <button className="date-nav-btn" onClick={() => setViewMonth(addMonths(viewMonth, 1))} aria-label="next">›</button>
+            <button className="date-nav-btn" onClick={() => setViewMonth(addMonths(viewMonth, 1))} aria-label={t('dateField.nextMonth')}>›</button>
           </div>
           <div className="date-weekdays">
             {weekdays.map((w, i) => <span key={i} className="date-weekday">{w}</span>)}

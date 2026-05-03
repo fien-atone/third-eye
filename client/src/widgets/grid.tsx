@@ -578,7 +578,7 @@ export function WidgetGrid({ screen, catalog, editing, onLayoutSettled, onSlotPi
                     e.stopPropagation()
                     onSlotPick({ x: s.x, y: s.y, maxW: s.w, maxH: s.h, insertMode: 'gap', bottomless: s.bottomless })
                   }}
-                  aria-label="Add widget to empty slot"
+                  aria-label={t('customize.addToEmptySlot')}
                 >
                   <span className="widget-slot-empty-plus">+</span>
                 </button>
