@@ -14,10 +14,12 @@ name: Release
 # is tedious (delete the release, retag the fixed commit, force-push);
 # never publishing in the first place is much cleaner.
 #
-# Recovering from a failed run: amend the tagged commit with the fix,
-# delete the local + remote tag, retag the fixed commit, force-push
-# main + push the tag. release.yml then re-fires and publishes if
-# green.
+# Recovering from a failed run (or amending an already-published
+# tag): amend the tagged commit with the fix, move the tag with
+# `git tag -f`, force-push main + the tag. release.yml re-fires;
+# the publish step is idempotent (creates the release if missing,
+# edits notes/title in place if it already exists), so a re-tagged
+# commit cleanly overwrites the existing release page.
 on:
   push:
     tags:
@@ -91,11 +93,27 @@ jobs:
             echo "flag=--latest=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Idempotent: `gh release create` fails 422 if the tag was
+        # amended + force-pushed (release page already exists from
+        # the previous run). When that happens we update notes +
+        # title in place via `gh release edit` instead. Both
+        # branches honor --latest so the "Latest" pointer stays
+        # consistent if a higher tag has appeared since.
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "${{ steps.notes.outputs.title }}" \
-            --notes-file /tmp/notes.md \
-            ${{ steps.latest.outputs.flag }}
+          set -euo pipefail
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists — editing in place."
+            gh release edit "${GITHUB_REF_NAME}" \
+              --title "${{ steps.notes.outputs.title }}" \
+              --notes-file /tmp/notes.md \
+              ${{ steps.latest.outputs.flag }}
+          else
+            echo "Release ${GITHUB_REF_NAME} does not exist — creating."
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "${{ steps.notes.outputs.title }}" \
+              --notes-file /tmp/notes.md \
+              ${{ steps.latest.outputs.flag }}
+          fi
