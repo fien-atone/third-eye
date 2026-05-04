@@ -151,6 +151,16 @@ export type OverviewResponse = {
      *  the bucket. The bar chart renders one colored stacked segment
      *  per entry. Empty on buckets with no Codex usage. */
     byPlan: Record<string, number>
+    /** Plans that hit a `usage_limit_exceeded` error during the
+     *  bucket — authoritative "got 429'd" signal sourced directly
+     *  from Codex's error events. Drives the red marker on grouped
+     *  bars whose plan actually got blocked (per-plan peaks alone
+     *  understate this since Codex doesn't emit a token_count for
+     *  the failed request). */
+    limitHitPlans: string[]
+    /** Total count of usage_limit_exceeded events in the bucket
+     *  (across plans). Surfaced in the tooltip. */
+    limitHitCount: number
     /** True if any day in the bucket had credits.hasCredits === false. */
     creditsExhausted: boolean
     /** Number of Codex-active days inside the bucket. 0 = empty bucket. */

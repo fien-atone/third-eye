@@ -252,6 +252,8 @@ export const es: Dict = {
   'codexPlanHistory.help': 'Cada barra muestra el pico de la ventana de 5h ese día. Los días con varios planes (free→plus, etc.) apilan un segmento por plan. La línea discontinua sigue la ventana secundaria de 7d, el tope semanal acumulado.',
   'codexPlanHistory.secondaryName': 'Ventana 7d',
   'codexPlanHistory.peakName': 'Pico diario',
+  'codexPlanHistory.limitHitMarker': 'El plan alcanzó un límite 429 en este período',
+  'codexPlanHistory.limitHitFmt': 'Límite alcanzado {n}× en este período',
   'codexPlanHistory.noDataDay': 'Sin actividad en Codex',
 
   'kpi.projects': 'Proyectos',

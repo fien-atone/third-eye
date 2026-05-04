@@ -253,9 +253,11 @@ export const en = {
   'codexPlanHistory.title': 'Codex plan history',
   'codexPlanHistory.description': 'Daily peak 5h-window usage across the range, colored by plan, with the 7d-window line overlaid.',
   'codexPlanHistory.sub': 'Daily peak %, account-wide',
-  'codexPlanHistory.help': 'Each bar shows that day\'s peak 5h-window usage. Days with multiple plans (free→plus etc.) stack one segment per plan. The dashed line tracks the 7d secondary window — slow-moving cumulative weekly cap.',
+  'codexPlanHistory.help': 'Each bar shows the bucket\'s peak 5h-window usage. Days with multiple plans (free→go→plus etc.) fan out into side-by-side bars, one per plan — each bar is % of THAT plan\'s own limit, not additive. The dashed line tracks the 7d secondary window. A red strip on top of a bar means that plan hit a usage_limit_exceeded error during the bucket — Codex doesn\'t emit a token_count for the failed request, so the per-plan peak alone often understates how close you actually got. The strip is the authoritative "blocked" marker pulled directly from Codex error events.',
   'codexPlanHistory.secondaryName': '7d window',
   'codexPlanHistory.peakName': 'Daily peak',
+  'codexPlanHistory.limitHitMarker': 'Plan hit a 429 limit during this bucket',
+  'codexPlanHistory.limitHitFmt': 'Hit limit {n}× during this bucket',
   'codexPlanHistory.noDataDay': 'No Codex usage',
 
   'kpi.projects': 'Projects',

@@ -232,6 +232,16 @@ function migrate(d: Database.Database) {
   // and the widget falls back to a single-segment bar coloured by the
   // snapshot's planType.
   addCol("ALTER TABLE codex_plan_daily ADD COLUMN by_plan_json TEXT")
+
+  // limit_hits_json — { plans: string[], count: number } per day,
+  // sourced from `event_msg.type=error & codex_error_info=usage_limit_exceeded`
+  // events in the rollout files. Authoritative "user actually hit
+  // a 429" signal (the per-plan peaks alone understate this — Codex
+  // doesn't emit a token_count event for the failed request). The
+  // history widget renders a red marker on bars whose plan hit a
+  // limit that day. Optional column; rows without it fall back to
+  // "no known limit hits".
+  addCol("ALTER TABLE codex_plan_daily ADD COLUMN limit_hits_json TEXT")
 }
 
 /** Seed default layouts on first startup. Idempotent: INSERT OR IGNORE

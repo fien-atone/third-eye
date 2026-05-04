@@ -873,9 +873,10 @@ app.get('/api/overview', (req, res) => {
       const endStr = typeof req.query.end === 'string' ? req.query.end : null
       if (!startStr || !endStr || startStr === endStr) return null
       const rows = db().prepare(
-        'SELECT day, primary_pct, secondary_pct, snapshot, by_plan_json FROM codex_plan_daily WHERE day BETWEEN ? AND ? ORDER BY day',
+        'SELECT day, primary_pct, secondary_pct, snapshot, by_plan_json, limit_hits_json FROM codex_plan_daily WHERE day BETWEEN ? AND ? ORDER BY day',
       ).all(startStr, endStr) as Array<{
-        day: string; primary_pct: number; secondary_pct: number; snapshot: string; by_plan_json: string | null
+        day: string; primary_pct: number; secondary_pct: number; snapshot: string;
+        by_plan_json: string | null; limit_hits_json: string | null
       }>
 
       // Map each daily row to its bucket key under the dashboard's
@@ -909,10 +910,20 @@ app.get('/api/overview', (req, res) => {
         byPlan: Map<string, number>
         exhausted: boolean
         dayCount: number
+        // Per-bucket aggregate of authoritative limit-hit signals.
+        // Plans that hit a 429 anywhere in the bucket get added to
+        // the set; total count sums across days. Drives the red
+        // marker on grouped bars whose plan got blocked.
+        limitHitPlans: Set<string>
+        limitHitCount: number
       }
       const agg = new Map<string, Agg>()
       for (const k of bucketKeys) {
-        agg.set(k, { primary: 0, secondary: null, byPlan: new Map(), exhausted: false, dayCount: 0 })
+        agg.set(k, {
+          primary: 0, secondary: null, byPlan: new Map(),
+          exhausted: false, dayCount: 0,
+          limitHitPlans: new Set(), limitHitCount: 0,
+        })
       }
       for (const r of rows) {
         const bk = dayToBucket(r.day)
@@ -937,6 +948,16 @@ app.get('/api/overview', (req, res) => {
         }
         if (snap?.credits?.hasCredits === false) a.exhausted = true
         a.dayCount += 1
+        // Merge limit-hit signals: union of plans across days in
+        // the bucket, sum of counts. limitHitsJson absent on rows
+        // older than the migration → silently treated as no hits.
+        if (r.limit_hits_json) {
+          try {
+            const parsed = JSON.parse(r.limit_hits_json) as { plans?: string[]; count?: number }
+            for (const p of parsed.plans ?? []) a.limitHitPlans.add(p)
+            a.limitHitCount += parsed.count ?? 0
+          } catch { /* malformed, skip */ }
+        }
       }
 
       return bucketKeys.map(bk => {
@@ -950,6 +971,8 @@ app.get('/api/overview', (req, res) => {
           primaryPct: a.primary,
           secondaryPct: a.dayCount === 0 ? null : a.secondary,
           byPlan: Object.fromEntries(a.byPlan),
+          limitHitPlans: [...a.limitHitPlans],
+          limitHitCount: a.limitHitCount,
           creditsExhausted: a.exhausted,
           dayCount: a.dayCount,
         }

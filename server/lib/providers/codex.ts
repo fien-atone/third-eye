@@ -483,12 +483,29 @@ function toWindow(o: Record<string, unknown>): CodexLimitWindow {
  *  only. Drives the Dashboard history bar chart, where each plan
  *  becomes a distinctly-colored stacked segment. Single-plan days
  *  have one entry; days where the user toggled across plans/sessions
- *  ship multiple entries. */
+ *  ship multiple entries.
+ *
+ *  `limitHits` is the AUTHORITATIVE record of "you actually hit a
+ *  cap". Codex doesn't ship a token_count event with used_percent=100
+ *  when the server returns 429 — the recorded peak just stops at the
+ *  last successful sample (often well below 100%). But it DOES emit
+ *  an `event_msg.type=error` with `codex_error_info=usage_limit_exceeded`
+ *  that says exactly that. We parse those and attribute each hit to
+ *  the plan_type that was active at the moment (most recent
+ *  preceding token_count in the same file). The widget renders a
+ *  red marker on bars whose plan hit a limit that day, so the user
+ *  sees "yes, that's where I got blocked" even when the bar reads
+ *  66%. */
 export type CodexPlanDailyRow = {
   day: string
   primaryPct: number
   secondaryPct: number
   byPlan: Record<string, number>
+  /** Plans that hit a usage_limit_exceeded error during the day. */
+  limitHitPlans: string[]
+  /** Total count of usage_limit_exceeded events on the day across
+   *  all plans — surfaced in the tooltip as a sanity check. */
+  limitHitCount: number
   snapshot: CodexPlanSnapshot
 }
 
@@ -524,6 +541,15 @@ type RlSample = {
   ts: number              // epoch ms for sorting
   iso: string             // original ISO string
   rl: Record<string, unknown>
+}
+
+/** Internal: one usage_limit_exceeded error event with the plan
+ *  that was active when it fired. Plan attribution comes from the
+ *  most recent token_count sample in the same rollout file
+ *  preceding the error timestamp. */
+type LimitHit = {
+  ts: number
+  planType: string | null
 }
 
 /** Walk every Codex rollout file and produce a per-day SUMMARY snapshot
@@ -565,6 +591,9 @@ export async function aggregateCodexPlanDaily(codexDir?: string): Promise<CodexP
   try { years = await readdir(root) } catch { return [] }
   // Collect raw samples per day first; summarize after.
   const byDay = new Map<string, RlSample[]>()
+  // Limit-hit error events per local day. Authoritative source for
+  // "the user actually got 429'd" — see CodexPlanDailyRow.limitHits.
+  const hitsByDay = new Map<string, LimitHit[]>()
   for (const year of years) {
     if (!/^\d{4}$/.test(year)) continue
     const yearDir = join(root, year)
@@ -583,13 +612,21 @@ export async function aggregateCodexPlanDaily(codexDir?: string): Promise<CodexP
         for (const f of files) {
           const text = await readFile(join(dayDir, f), 'utf-8').catch(() => '')
           if (!text) continue
+          // We walk the file once and collect TWO kinds of records:
+          //   1. rate_limits samples (lines containing `"rate_limits"`)
+          //   2. usage_limit_exceeded error events
+          // Plan attribution for an error event = plan_type from
+          // the most recent rate_limits sample in this file that
+          // preceded the error. Tracked in `currentPlan` as we
+          // walk in chronological order.
+          let currentPlan: string | null = null
           for (const line of text.split('\n')) {
-            if (!line.trim() || !line.includes('"rate_limits"')) continue
+            if (!line.trim()) continue
+            const hasRateLimits = line.includes('"rate_limits"')
+            const hasUsageLimit = line.includes('usage_limit_exceeded')
+            if (!hasRateLimits && !hasUsageLimit) continue
             let entry: Record<string, unknown>
             try { entry = JSON.parse(line) } catch { continue }
-            const payload = (entry as { payload?: Record<string, unknown> }).payload
-            const rl = payload && (payload as { rate_limits?: Record<string, unknown> }).rate_limits
-            if (!rl || typeof rl !== 'object') continue
             const iso = typeof entry.timestamp === 'string' ? entry.timestamp : new Date().toISOString()
             const ts = Date.parse(iso)
             if (Number.isNaN(ts)) continue
@@ -600,17 +637,34 @@ export async function aggregateCodexPlanDaily(codexDir?: string): Promise<CodexP
             // dumps everything into the start-day bucket — making
             // "today's" data invisible until the user starts a new
             // session. Translating each sample to its own local-tz
-            // date fixes that. Single-user installs run server +
-            // browser on the same machine so process tz === user
-            // tz; if that ever stops being true, this needs a
-            // tzOffsetMin parameter (it doesn't yet).
+            // date fixes that.
             const eventDate = new Date(ts)
             const eventDayKey = `${eventDate.getFullYear()}-`
               + `${String(eventDate.getMonth() + 1).padStart(2, '0')}-`
               + `${String(eventDate.getDate()).padStart(2, '0')}`
-            const list = byDay.get(eventDayKey) ?? []
-            list.push({ ts, iso, rl: rl as Record<string, unknown> })
-            byDay.set(eventDayKey, list)
+
+            const payload = (entry as { payload?: Record<string, unknown> }).payload
+            // (1) rate_limits sample
+            const rl = payload && (payload as { rate_limits?: Record<string, unknown> }).rate_limits
+            if (rl && typeof rl === 'object') {
+              const planType = (rl as { plan_type?: string }).plan_type
+              if (typeof planType === 'string') currentPlan = planType
+              const list = byDay.get(eventDayKey) ?? []
+              list.push({ ts, iso, rl: rl as Record<string, unknown> })
+              byDay.set(eventDayKey, list)
+              continue
+            }
+            // (2) usage_limit_exceeded error event. Authoritative
+            // "user got 429'd" signal — the rate_limits-only path
+            // misses the actual block moment because Codex doesn't
+            // ship a token_count event for failed requests.
+            const errorInfo = payload && (payload as { codex_error_info?: string }).codex_error_info
+            const errType = payload && (payload as { type?: string }).type
+            if (errType === 'error' && errorInfo === 'usage_limit_exceeded') {
+              const list = hitsByDay.get(eventDayKey) ?? []
+              list.push({ ts, planType: currentPlan })
+              hitsByDay.set(eventDayKey, list)
+            }
           }
         }
       }
@@ -680,11 +734,22 @@ export async function aggregateCodexPlanDaily(codexDir?: string): Promise<CodexP
       capturedAt: latest.iso,
     }
 
+    // Limit hits attributed to plans. Unique plan list goes in
+    // limitHitPlans (drives the red-stripe badge in the chart);
+    // total count surfaces in the tooltip for "I hit limit N times
+    // today" sanity. Hits with null planType (an error fired
+    // before any token_count got a plan label) get bucketed under
+    // 'unknown' so the count stays accurate.
+    const dayHits = hitsByDay.get(day) ?? []
+    const limitHitPlans = Array.from(new Set(dayHits.map(h => h.planType ?? 'unknown')))
+
     out.push({
       day,
       primaryPct: peakPrimary >= 0 ? peakPrimary : 0,
       secondaryPct: peakSecondary >= 0 ? peakSecondary : 0,
       byPlan: Object.fromEntries(byPlan),
+      limitHitPlans,
+      limitHitCount: dayHits.length,
       snapshot,
     })
   }

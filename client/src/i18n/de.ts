@@ -252,6 +252,8 @@ export const de: Dict = {
   'codexPlanHistory.help': 'Jeder Balken zeigt die Spitzenauslastung des 5h-Fensters an diesem Tag. Tage mit mehreren Plänen (free→plus etc.) stapeln je ein Segment pro Plan. Die gestrichelte Linie folgt dem sekundären 7d-Fenster — die kumulative Wochengrenze.',
   'codexPlanHistory.secondaryName': '7d-Fenster',
   'codexPlanHistory.peakName': 'Tagesspitze',
+  'codexPlanHistory.limitHitMarker': 'Plan hat in diesem Zeitraum ein 429-Limit erreicht',
+  'codexPlanHistory.limitHitFmt': 'Limit {n}× im Zeitraum erreicht',
   'codexPlanHistory.noDataDay': 'Keine Codex-Aktivität',
 
   'kpi.projects': 'Projekte',

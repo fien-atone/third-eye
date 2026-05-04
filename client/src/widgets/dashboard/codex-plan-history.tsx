@@ -98,16 +98,31 @@ function CodexPlanHistoryTooltip({ active, payload, t }: { active?: boolean; pay
       {!hasAnyData && (
         <div style={{ color: 'var(--muted)' }}>{t('codexPlanHistory.noDataDay')}</div>
       )}
-      {plans.map(([plan, pct]) => (
-        <div key={plan} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ display: 'inline-block', width: 8, height: 8, background: planColor(plan), borderRadius: 2 }} />
-          <span>{planLabel(plan, t)}: <strong>{fmtPct(pct)}</strong></span>
-        </div>
-      ))}
+      {plans.map(([plan, pct]) => {
+        const wasHit = r.limitHitPlans.includes(plan)
+        return (
+          <div key={plan} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 8, height: 8, background: planColor(plan), borderRadius: 2 }} />
+            <span>
+              {planLabel(plan, t)}: <strong>{fmtPct(pct)}</strong>
+              {wasHit && (
+                <span style={{ marginLeft: 6, color: 'var(--danger, #c33)' }} title={t('codexPlanHistory.limitHitMarker')}>
+                  ●
+                </span>
+              )}
+            </span>
+          </div>
+        )
+      })}
       {r.secondaryPct !== null && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
           <span style={{ display: 'inline-block', width: 12, height: 0, borderTop: '2px dashed var(--text)' }} />
           <span>{t('codexPlanHistory.secondaryName')}: <strong>{fmtPct(r.secondaryPct)}</strong></span>
+        </div>
+      )}
+      {r.limitHitCount > 0 && (
+        <div style={{ color: 'var(--danger, #c33)', marginTop: 4 }}>
+          {t('codexPlanHistory.limitHitFmt', { n: r.limitHitCount })}
         </div>
       )}
       {r.creditsExhausted && (
@@ -116,6 +131,34 @@ function CodexPlanHistoryTooltip({ active, payload, t }: { active?: boolean; pay
         </div>
       )}
     </div>
+  )
+}
+
+/** Custom Bar shape that overlays a thin red strip on top of the
+ *  bar when this row's plan hit a usage_limit_exceeded error
+ *  during the bucket. The strip sits flush against the bar's top
+ *  edge so the visual reads as "this is where you got blocked"
+ *  without inflating the bar's % reading. */
+type BarShapeProps = {
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  fill?: string
+  payload?: ChartRow
+  dataKey?: string
+}
+function HitMarkerBar(props: BarShapeProps) {
+  const { x = 0, y = 0, width = 0, height = 0, fill, payload, dataKey } = props
+  const plan = typeof dataKey === 'string' ? dataKey.replace('plan_', '') : ''
+  const wasHit = !!payload && payload._row.limitHitPlans.includes(plan)
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} fill={fill} rx={3} ry={3} />
+      {wasHit && (
+        <rect x={x} y={Math.max(0, y - 4)} width={width} height={3} fill="var(--danger, #d23b3b)" rx={1.5} ry={1.5} />
+      )}
+    </g>
   )
 }
 
@@ -202,6 +245,7 @@ export function codexPlanHistoryWidget(t: T, data: OverviewResponse, granularity
                       fill={planColor(plan)}
                       radius={[3, 3, 0, 0]}
                       isAnimationActive={false}
+                      shape={HitMarkerBar}
                     />
                   ))}
                   {/* 7-day cumulative window — overlaid as a smooth line

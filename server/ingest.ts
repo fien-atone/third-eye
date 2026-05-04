@@ -331,11 +331,19 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
     const tx = d.transaction((rs: typeof rows) => {
       d.prepare('DELETE FROM codex_plan_daily').run()
       const stmt = d.prepare(
-        'INSERT INTO codex_plan_daily (day, primary_pct, secondary_pct, snapshot, by_plan_json, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO codex_plan_daily (day, primary_pct, secondary_pct, snapshot, by_plan_json, limit_hits_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       )
       const now = new Date().toISOString()
       for (const r of rs) {
-        stmt.run(r.day, r.primaryPct, r.secondaryPct, JSON.stringify(r.snapshot), JSON.stringify(r.byPlan), now)
+        stmt.run(
+          r.day,
+          r.primaryPct,
+          r.secondaryPct,
+          JSON.stringify(r.snapshot),
+          JSON.stringify(r.byPlan),
+          JSON.stringify({ plans: r.limitHitPlans, count: r.limitHitCount }),
+          now,
+        )
       }
     })
     tx(rows)
