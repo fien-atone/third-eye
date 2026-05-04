@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Refuses to push a v*.*.* tag whose tree fails npm test or npm run
+# build, so a broken release tag can't reach origin in the first
+# place.
+#
+# Why: the release.yml workflow gates the GitHub Release page on CI
+# (publish job needs build + test), but the TAG itself is created
+# the moment `git push` accepts it — if a tag points to a broken
+# commit, recovering means deleting it on GitHub and force-pushing
+# a fresh one. scripts/release.sh runs the same checks before
+# tagging, but it's easy to skip (manual `git tag` + `git push`),
+# which is exactly what bit us on v2.6.2.
+#
+# Activated automatically via the root `prepare` script
+# (`git config core.hooksPath .githooks`) — no per-clone setup
+# needed beyond the usual `npm install`.
+
+set -euo pipefail
+
+# Stdin format per ref: "<local_ref> <local_sha> <remote_ref> <remote_sha>"
+while read -r local_ref local_sha _remote_ref _remote_sha; do
+  case "$local_ref" in
+    refs/tags/v*.*.*) ;;
+    *) continue ;;
+  esac
+
+  # Fast-fail: only test the tree we're publishing. If the tag
+  # doesn't point at HEAD the working tree is the wrong sample —
+  # tell the user instead of running checks against unrelated code.
+  head_sha="$(git rev-parse HEAD)"
+  if [[ "$local_sha" != "$head_sha" ]]; then
+    echo "pre-push: tag $local_ref points to ${local_sha:0:7} but HEAD is ${head_sha:0:7}"
+    echo "  refuse to test a different tree; check out the tagged commit first"
+    exit 1
+  fi
+
+  echo "pre-push: $local_ref → running npm test + npm run build"
+  npm test --silent
+  npm run build --silent
+done
