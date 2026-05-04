@@ -4,6 +4,72 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.2] — 2026-05-04
+
+A small follow-up focused on the Codex plan-history widget and
+the day-view heatmaps. The widget is now wired into Today with
+an hourly axis, the 7d-window overlay tells the truth about
+inactivity gaps instead of fabricating a flat trend through them,
+and empty heatmap cells are finally visible in the dark theme.
+
+### Added
+
+- **Hourly Codex plan chart on Today.** The same per-plan stacked
+  view that the Dashboard renders for multi-day ranges now also
+  shows up on the Today screen with a 24-hour axis. `/api/overview`
+  gained a single-day + `granularity=hour` branch that re-parses
+  the day's JSONL files into 24 hour buckets on the fly (no DB
+  schema change — the per-day `codex_plan_daily` cache already
+  collapses hour info). Existing Today layouts in the wild stay
+  unchanged; users opt in via Reset layout or Customize.
+- **Authoritative limit-hit markers.** A bar that hit
+  `usage_limit_exceeded` for a given plan during its bucket now
+  carries a thin red strip flush against its top edge, sourced
+  from the same JSONL events that drive the limit-hit tooltip
+  count. Reads as "this is the bar where you got blocked"
+  without inflating the bar's % reading.
+
+### Fixed
+
+- **Plan-history tooltip rendered semi-transparent.** The inline
+  style referenced `var(--surface)`, a token that doesn't exist
+  in either theme, so the tooltip blended into the chart behind
+  it. Swapped to the shared `.tooltip` class already used by
+  every other widget tooltip.
+- **7d-window line lied about long inactivity gaps.** The overlay
+  used `connectNulls=true` and would draw a flat trend across
+  weeks of zero activity, even though the rolling counter
+  actually drains to zero after ~7 days idle. The line now
+  breaks across long gaps (≥7 days of empty buckets, expressed
+  per granularity: hour 168, day 7, week/month 1) and
+  carry-fills short ones so a quiet weekend mid-streak still
+  reads as one continuous line.
+- **7d-window line crashed to zero on Today.** The hour and day
+  Codex aggregators reported `secondaryPct=0` for buckets that
+  had samples but no codex `limit_id` carrying
+  `secondary.used_percent` (e.g. a premium-only hour). Both now
+  return `null` in that case (= "not measured"), letting the
+  carry-fill above bridge it on short gaps and the connectNulls
+  break it on long ones. Existing rows in `codex_plan_daily`
+  keep their stale 0 until the next ingest re-aggregates them.
+- **Plan-history per-day bucketing + readable chart.** Multi-day
+  ranges now group correctly by day instead of merging buckets,
+  and the grouped bars match the per-plan breakdown shown in the
+  tooltip side-by-side instead of stacking into 200%+ towers.
+- **Dashboard data didn't refetch when an auto-tick landed.** The
+  ingest tick wrote new rows but the dashboard's react-query
+  cache held the stale snapshot until a manual Refresh; now the
+  client invalidates the relevant queries when the tick reports
+  fresh data.
+- **Empty cells invisible in day-view heatmaps under dark theme.**
+  The three day-view heatmaps (days×hours grid, weekday×hour
+  matrix, single-day hour strip) painted empty cells with
+  `var(--bg-2)`, which in the dark theme is the same `#111113`
+  as the widget panel underneath. Switched to `var(--panel-2)`,
+  which is defined as "one step away from --panel" in both
+  themes (light `#f9f9fa`, dark `#17171a`); the empty grid now
+  reads in either theme.
+
 ## [2.6.1] — 2026-05-03
 
 The Rebuild flow shipped in 2.6.0 had a foot-gun and a few visual
