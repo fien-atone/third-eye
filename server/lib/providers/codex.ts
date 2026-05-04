@@ -707,7 +707,12 @@ export async function aggregateCodexPlanHourly(targetDay: string, codexDir?: str
     out.push({
       bucket: `${targetDay} ${hourKey}:00`,
       primaryPct: peakPrimary >= 0 ? peakPrimary : 0,
-      secondaryPct: peakSecondary >= 0 ? peakSecondary : (samples.length > 0 ? 0 : null),
+      // null when we have no codex secondary measurement this hour
+      // (samples may exist but only carry premium/credits info, not
+      // a secondary used_percent). Reporting 0 here would draw the
+      // 7d-window line crashing to zero mid-day even though the
+      // rolling counter is still at e.g. 31%.
+      secondaryPct: peakSecondary >= 0 ? peakSecondary : null,
       byPlan: Object.fromEntries(byPlan),
       limitHitPlans: limitPlans,
       limitHitCount: hits.length,
@@ -912,7 +917,11 @@ export async function aggregateCodexPlanDaily(codexDir?: string): Promise<CodexP
     out.push({
       day,
       primaryPct: peakPrimary >= 0 ? peakPrimary : 0,
-      secondaryPct: peakSecondary >= 0 ? peakSecondary : 0,
+      // Mirrors the hourly aggregator: null = "no codex secondary
+      // signal this day", not "zero". Stops the 7d-window line from
+      // dropping to zero on days where we only saw premium-lid
+      // samples or rate_limits without secondary.used_percent.
+      secondaryPct: peakSecondary >= 0 ? peakSecondary : null,
       byPlan: Object.fromEntries(byPlan),
       limitHitPlans,
       limitHitCount: dayHits.length,

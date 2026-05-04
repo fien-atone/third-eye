@@ -93,7 +93,7 @@ function CodexPlanHistoryTooltip({ active, payload, t }: { active?: boolean; pay
   const plans = Object.entries(r.byPlan).sort((a, b) => b[1] - a[1])
   const hasAnyData = plans.length > 0 || r.secondaryPct !== null
   return (
-    <div className="recharts-tooltip-fallback" style={{ background: 'var(--surface)', border: '1px solid var(--grid)', padding: 8, fontSize: 12 }}>
+    <div className="tooltip">
       <div style={{ fontWeight: 600, marginBottom: 4 }}>{cr._labelFull}</div>
       {!hasAnyData && (
         <div style={{ color: 'var(--muted)' }}>{t('codexPlanHistory.noDataDay')}</div>
@@ -203,6 +203,34 @@ export function codexPlanHistoryWidget(t: T, data: OverviewResponse, granularity
     return out
   })
 
+  // The 7d-window meter is a rolling counter that drains to zero
+  // after ~7 days of inactivity, so a long enough gap ≡ "the meter
+  // already reset" and the line MUST break across it. Short gaps
+  // (a quiet weekend mid-streak) we still carry-fill so the line
+  // reads as "value held roughly steady through idle hours" rather
+  // than fragmenting into one-dot-per-active-day.
+  //
+  // Threshold = ≥7 days of empty buckets, expressed in bucket units
+  // for the current granularity. Hour granularity is single-day on
+  // Today, so 168 is effectively unreachable → Today always carry-
+  // fills (one continuous line across the day).
+  const GAP_BREAK_BUCKETS: Record<Granularity, number> = {
+    hour: 168, day: 7, week: 1, month: 1,
+  }
+  const breakAt = GAP_BREAK_BUCKETS[granularity]
+  let lastDataIdx = -1
+  for (let i = 0; i < chartRows.length; i++) {
+    if (chartRows[i]._secondary === null) continue
+    if (lastDataIdx >= 0) {
+      const gap = i - lastDataIdx - 1
+      if (gap > 0 && gap < breakAt) {
+        const carry = chartRows[lastDataIdx]._secondary
+        for (let j = lastDataIdx + 1; j < i; j++) chartRows[j]._secondary = carry
+      }
+    }
+    lastDataIdx = i
+  }
+
   return {
     id: 'chart-codex-plan-history',
     title: t('codexPlanHistory.title'),
@@ -251,13 +279,11 @@ export function codexPlanHistoryWidget(t: T, data: OverviewResponse, granularity
                   {/* 7-day cumulative window — overlaid as a smooth line
                       so the user can read "where the weekly meter is"
                       independently from each day's per-plan peaks. */}
-                  {/* connectNulls=false: leave gaps where there was no
-                      Codex usage — drawing a 7d-window line through
-                      idle days would be a fabrication (the rolling
-                      value carries over invisibly, we don't have it).
-                      `dot` is enabled so isolated data points (range
-                      with only 1–2 active days) still render as
-                      visible markers instead of an invisible line. */}
+                  {/* connectNulls=false: short gaps were carry-filled
+                      above so the line stays continuous across brief
+                      pauses; long gaps (≥7 days no usage) are kept
+                      as nulls and the line genuinely breaks there,
+                      matching the rolling-window reality. */}
                   <Line
                     type="monotone"
                     dataKey="_secondary"
