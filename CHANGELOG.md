@@ -69,6 +69,14 @@ and empty heatmap cells are finally visible in the dark theme.
   which is defined as "one step away from --panel" in both
   themes (light `#f9f9fa`, dark `#17171a`); the empty grid now
   reads in either theme.
+- **Settings → Rebuild button didn't look like a button.** The
+  trigger had `class="ghost is-destructive"` but no CSS rule
+  matched that combination, so it rendered as plain text on a
+  transparent background. Added a scoped `.ghost.is-destructive`
+  rule: red text + a faint red border in the resting state, a
+  light red wash + full red border on hover. Stays softer than
+  the confirm-dialog primary (which keeps its full red fill +
+  white text) so the two destructive surfaces don't compete.
 
 ## [2.6.1] — 2026-05-03
 

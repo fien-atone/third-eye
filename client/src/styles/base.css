@@ -103,6 +103,14 @@ button:hover { background: var(--hover); color: var(--text); border-color: var(-
 button.active { background: var(--text); border-color: var(--text); color: var(--bg); }
 button.ghost { background: transparent; border-color: transparent; padding: 6px 8px; }
 button.ghost:hover { background: var(--hover); border-color: var(--border); }
+/* Ghost-destructive modifier — gives a transparent ghost button
+   enough red tint to read as "this is a button AND it's
+   dangerous" without going full red-fill (that's reserved for the
+   confirm dialog's primary action, which already commits color
+   itself). Scoped to .ghost so it never overrides the confirm
+   dialog's bg+color pair. */
+button.ghost.is-destructive { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+button.ghost.is-destructive:hover { background: color-mix(in srgb, var(--bad) 10%, transparent); border-color: var(--bad); color: var(--bad); }
 
 /* Stable-width button — keeps a uniform footprint across two
    labels (e.g. "Refresh" / "Refreshing…") so the surrounding
