@@ -211,7 +211,7 @@ export function codexPlanHistoryWidget(t: T, data: OverviewResponse, granularity
     sizes: [{ w: 2, h: 2 }, { w: 4, h: 2 }, { w: 2, h: 3 }, { w: 4, h: 3 }],
     minW: 2,
     minH: 2,
-    screens: ['dashboard'],
+    screens: ['dashboard', 'today'],
     render: ({ h }) => (
       <div className="panel widget-panel">
         <PanelHeader

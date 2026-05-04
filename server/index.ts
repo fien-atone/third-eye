@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import { db, getMeta, seedScreenLayouts } from './db.ts'
 import { runIngest } from './ingest.ts'
 import { withIngestLock, IngestBusyError, getActiveIngest } from './lib/ingest-lock.ts'
+import { aggregateCodexPlanHourly } from './lib/providers/codex.ts'
 import { DEFAULT_LAYOUTS, KNOWN_SCREENS, type ScreenLayout } from './lib/default-layouts.ts'
 import { getLatestRelease, getCheckState, startVersionCheck, applyVersionCheckSettings, seedLatestRelease } from './lib/version-check.ts'
 import { envRead, envReadNumber } from './lib/env.ts'
@@ -403,7 +404,7 @@ app.post('/api/refresh', async (req, res) => {
   }
 })
 
-app.get('/api/overview', (req, res) => {
+app.get('/api/overview', async (req, res) => {
   const granularity = (req.query.granularity as Granularity) ?? 'day'
   const tzMin = parseTzMin(req.query.tzOffsetMin)
   const wRaw = parseInt(String(req.query.weekStartsOn ?? '1'), 10)
@@ -812,6 +813,117 @@ app.get('/api/overview', (req, res) => {
     return row
   })
 
+  // ─── Codex plan history (per dashboard granularity) ─────────────────
+  //
+  // Three branches based on the request's date range + granularity:
+  //   1. Single day + hour granularity → 24 hourly buckets re-parsed
+  //      from JSONL on the fly (Today view's hourly chart).
+  //   2. Multi-day (any granularity) → per-bucket aggregation of
+  //      codex_plan_daily rows, bucketed to day/week/month per the
+  //      request's granularity.
+  //   3. Single day + non-hour granularity, OR no Codex calls → null.
+  //
+  // codexPlan (the snapshot KPI) and codexPlanHistory are
+  // independent: a single-day request can carry both (snapshot for
+  // the KPI tile, hourly history for the chart).
+  const codexPlanHistoryComputed: unknown = await (async () => {
+    const codexCount = totals.codex_calls
+    if (!codexCount || codexCount === 0) return null
+    const startStr = typeof req.query.start === 'string' ? req.query.start : null
+    const endStr = typeof req.query.end === 'string' ? req.query.end : null
+    if (!startStr || !endStr) return null
+    if (startStr === endStr) {
+      // Single-day path. Hourly chart only when granularity asks
+      // for it (Today view). Other single-day requests get null;
+      // they're served by the codexPlan KPI tile.
+      if (granularity !== 'hour') return null
+      return await aggregateCodexPlanHourly(startStr)
+    }
+    // Multi-day: read codex_plan_daily, bucket per granularity.
+    const rows = db().prepare(
+      'SELECT day, primary_pct, secondary_pct, snapshot, by_plan_json, limit_hits_json FROM codex_plan_daily WHERE day BETWEEN ? AND ? ORDER BY day',
+    ).all(startStr, endStr) as Array<{
+      day: string; primary_pct: number; secondary_pct: number; snapshot: string;
+      by_plan_json: string | null; limit_hits_json: string | null
+    }>
+    const dayToBucket = (dayStr: string): string => {
+      if (granularity === 'day' || granularity === 'hour') return dayStr
+      const [y, m, d] = dayStr.split('-').map(Number)
+      const dt = new Date(Date.UTC(y, m - 1, d))
+      if (granularity === 'week') {
+        const weekday = dt.getUTCDay()
+        const diff = (weekday - weekStartsOn + 7) % 7
+        dt.setUTCDate(dt.getUTCDate() - diff)
+        const yy = dt.getUTCFullYear()
+        const mm = String(dt.getUTCMonth() + 1).padStart(2, '0')
+        const dd = String(dt.getUTCDate()).padStart(2, '0')
+        return `${yy}-${mm}-${dd}`
+      }
+      return `${y}-${String(m).padStart(2, '0')}`
+    }
+    type Agg = {
+      primary: number
+      secondary: number | null
+      byPlan: Map<string, number>
+      exhausted: boolean
+      dayCount: number
+      limitHitPlans: Set<string>
+      limitHitCount: number
+    }
+    const agg = new Map<string, Agg>()
+    for (const k of bucketKeys) {
+      agg.set(k, {
+        primary: 0, secondary: null, byPlan: new Map(),
+        exhausted: false, dayCount: 0,
+        limitHitPlans: new Set(), limitHitCount: 0,
+      })
+    }
+    for (const r of rows) {
+      const bk = dayToBucket(r.day)
+      const a = agg.get(bk)
+      if (!a) continue
+      let snap: { planType?: string | null; credits?: { hasCredits?: boolean | null } | null } | null = null
+      try { snap = JSON.parse(r.snapshot) } catch {}
+      let byPlan: Record<string, number> = {}
+      if (r.by_plan_json) {
+        try { byPlan = JSON.parse(r.by_plan_json) as Record<string, number> } catch {}
+      }
+      if (Object.keys(byPlan).length === 0 && snap?.planType) {
+        byPlan = { [snap.planType]: r.primary_pct }
+      }
+      if (r.primary_pct > a.primary) a.primary = r.primary_pct
+      if (typeof r.secondary_pct === 'number') {
+        a.secondary = a.secondary === null ? r.secondary_pct : Math.max(a.secondary, r.secondary_pct)
+      }
+      for (const [p, pct] of Object.entries(byPlan)) {
+        const cur = a.byPlan.get(p) ?? 0
+        if (pct > cur) a.byPlan.set(p, pct)
+      }
+      if (snap?.credits?.hasCredits === false) a.exhausted = true
+      a.dayCount += 1
+      if (r.limit_hits_json) {
+        try {
+          const parsed = JSON.parse(r.limit_hits_json) as { plans?: string[]; count?: number }
+          for (const p of parsed.plans ?? []) a.limitHitPlans.add(p)
+          a.limitHitCount += parsed.count ?? 0
+        } catch { /* malformed, skip */ }
+      }
+    }
+    return bucketKeys.map(bk => {
+      const a = agg.get(bk)!
+      return {
+        bucket: bk,
+        primaryPct: a.primary,
+        secondaryPct: a.dayCount === 0 ? null : a.secondary,
+        byPlan: Object.fromEntries(a.byPlan),
+        limitHitPlans: [...a.limitHitPlans],
+        limitHitCount: a.limitHitCount,
+        creditsExhausted: a.exhausted,
+        dayCount: a.dayCount,
+      }
+    })
+  })()
+
   res.json({
     frame: {
       start: new Date(startEpoch).toISOString(),
@@ -866,118 +978,7 @@ app.get('/api/overview', (req, res) => {
     // present in the table are included — sparse ranges are honored
     // (no synthesized zero rows). Codex-call gate kept so the
     // history doesn't appear on Claude-only views.
-    codexPlanHistory: ((): unknown => {
-      const codexCount = totals.codex_calls
-      if (!codexCount || codexCount === 0) return null
-      const startStr = typeof req.query.start === 'string' ? req.query.start : null
-      const endStr = typeof req.query.end === 'string' ? req.query.end : null
-      if (!startStr || !endStr || startStr === endStr) return null
-      const rows = db().prepare(
-        'SELECT day, primary_pct, secondary_pct, snapshot, by_plan_json, limit_hits_json FROM codex_plan_daily WHERE day BETWEEN ? AND ? ORDER BY day',
-      ).all(startStr, endStr) as Array<{
-        day: string; primary_pct: number; secondary_pct: number; snapshot: string;
-        by_plan_json: string | null; limit_hits_json: string | null
-      }>
-
-      // Map each daily row to its bucket key under the dashboard's
-      // current granularity (day/week/month/hour). Day strings are
-      // already in local-tz YYYY-MM-DD shape (Codex session dirs use
-      // local TZ), so the math here is timezone-free.
-      const dayToBucket = (dayStr: string): string => {
-        if (granularity === 'day' || granularity === 'hour') return dayStr
-        const [y, m, d] = dayStr.split('-').map(Number)
-        const dt = new Date(Date.UTC(y, m - 1, d))
-        if (granularity === 'week') {
-          const weekday = dt.getUTCDay()
-          const diff = (weekday - weekStartsOn + 7) % 7
-          dt.setUTCDate(dt.getUTCDate() - diff)
-          const yy = dt.getUTCFullYear()
-          const mm = String(dt.getUTCMonth() + 1).padStart(2, '0')
-          const dd = String(dt.getUTCDate()).padStart(2, '0')
-          return `${yy}-${mm}-${dd}`
-        }
-        // month
-        return `${y}-${String(m).padStart(2, '0')}`
-      }
-
-      // Aggregate daily rows into buckets. Per-bucket peaks: primary
-      // and per-plan use max() of daily peaks (the worst day in the
-      // bucket dominates the bar). Secondary stays null until we see
-      // at least one Codex day in the bucket. exhausted = OR.
-      type Agg = {
-        primary: number
-        secondary: number | null
-        byPlan: Map<string, number>
-        exhausted: boolean
-        dayCount: number
-        // Per-bucket aggregate of authoritative limit-hit signals.
-        // Plans that hit a 429 anywhere in the bucket get added to
-        // the set; total count sums across days. Drives the red
-        // marker on grouped bars whose plan got blocked.
-        limitHitPlans: Set<string>
-        limitHitCount: number
-      }
-      const agg = new Map<string, Agg>()
-      for (const k of bucketKeys) {
-        agg.set(k, {
-          primary: 0, secondary: null, byPlan: new Map(),
-          exhausted: false, dayCount: 0,
-          limitHitPlans: new Set(), limitHitCount: 0,
-        })
-      }
-      for (const r of rows) {
-        const bk = dayToBucket(r.day)
-        const a = agg.get(bk)
-        if (!a) continue
-        let snap: { planType?: string | null; credits?: { hasCredits?: boolean | null } | null } | null = null
-        try { snap = JSON.parse(r.snapshot) } catch {}
-        let byPlan: Record<string, number> = {}
-        if (r.by_plan_json) {
-          try { byPlan = JSON.parse(r.by_plan_json) as Record<string, number> } catch {}
-        }
-        if (Object.keys(byPlan).length === 0 && snap?.planType) {
-          byPlan = { [snap.planType]: r.primary_pct }
-        }
-        if (r.primary_pct > a.primary) a.primary = r.primary_pct
-        if (typeof r.secondary_pct === 'number') {
-          a.secondary = a.secondary === null ? r.secondary_pct : Math.max(a.secondary, r.secondary_pct)
-        }
-        for (const [p, pct] of Object.entries(byPlan)) {
-          const cur = a.byPlan.get(p) ?? 0
-          if (pct > cur) a.byPlan.set(p, pct)
-        }
-        if (snap?.credits?.hasCredits === false) a.exhausted = true
-        a.dayCount += 1
-        // Merge limit-hit signals: union of plans across days in
-        // the bucket, sum of counts. limitHitsJson absent on rows
-        // older than the migration → silently treated as no hits.
-        if (r.limit_hits_json) {
-          try {
-            const parsed = JSON.parse(r.limit_hits_json) as { plans?: string[]; count?: number }
-            for (const p of parsed.plans ?? []) a.limitHitPlans.add(p)
-            a.limitHitCount += parsed.count ?? 0
-          } catch { /* malformed, skip */ }
-        }
-      }
-
-      return bucketKeys.map(bk => {
-        const a = agg.get(bk)!
-        return {
-          bucket: bk,
-          // Empty bucket: every plan-segment column ends up at zero
-          // height, secondary null so the line breaks. The X-axis
-          // tick still renders, keeping bar widths consistent across
-          // sparse ranges.
-          primaryPct: a.primary,
-          secondaryPct: a.dayCount === 0 ? null : a.secondary,
-          byPlan: Object.fromEntries(a.byPlan),
-          limitHitPlans: [...a.limitHitPlans],
-          limitHitCount: a.limitHitCount,
-          creditsExhausted: a.exhausted,
-          dayCount: a.dayCount,
-        }
-      })
-    })(),
+    codexPlanHistory: codexPlanHistoryComputed,
     series,
     models: modelTotals.map(m => ({
       name: m.name, calls: m.calls, cost: roundUsd(m.cost),

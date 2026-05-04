@@ -552,6 +552,172 @@ type LimitHit = {
   planType: string | null
 }
 
+/** Per-hour-of-day breakdown for a single local-tz date. Drives the
+ *  Today view's hourly Codex-plan chart: same byPlan / limit-hit
+ *  story as the Dashboard's per-day chart, but bucketed into the
+ *  24 hours so the user can see "I worked on Free until 14:00,
+ *  switched to Plus at 15:00, hit a limit at 16:00".
+ *
+ *  Bucket key shape matches the rest of the time-series API:
+ *  `YYYY-MM-DD HH:00` (hour aligned, local-tz). Hours with no
+ *  Codex activity get a row with empty byPlan + secondaryPct=null,
+ *  consistent with the bar+line semantics the chart already uses
+ *  for empty buckets on the daily chart. */
+export type CodexPlanHourlyRow = {
+  bucket: string                       // YYYY-MM-DD HH:00
+  primaryPct: number
+  secondaryPct: number | null
+  byPlan: Record<string, number>
+  limitHitPlans: string[]
+  limitHitCount: number
+  creditsExhausted: boolean
+  dayCount: number                     // 0 = empty hour, 1 = had at least one sample
+}
+
+/** Aggregate Codex rate_limits + limit-hit error events into 24
+ *  hourly buckets for one local-tz day. Re-parses the JSONL files
+ *  (no DB cache) because the per-day codex_plan_daily aggregate
+ *  already collapsed the hour info; cheap on a single user's daily
+ *  data (typically <1k rate_limits samples per day). */
+export async function aggregateCodexPlanHourly(targetDay: string, codexDir?: string): Promise<CodexPlanHourlyRow[]> {
+  const root = join(getCodexDir(codexDir), 'sessions')
+  let years: string[] = []
+  try { years = await readdir(root) } catch { return [] }
+  // Per-hour-of-target-day collector. Key = HH (00..23), values
+  // mirror the daily aggregator's structure.
+  const byHour = new Map<string, RlSample[]>()
+  const hitsByHour = new Map<string, LimitHit[]>()
+  // Only walk directories that could contain events landing in the
+  // target local day. Codex stores files by session-START UTC date,
+  // but a session can run across local midnight, so we widen the
+  // search to ±1 UTC day around the target.
+  const target = new Date(`${targetDay}T00:00:00`)
+  if (Number.isNaN(target.getTime())) return []
+  const widenSet = new Set<string>()
+  for (let dayOff = -1; dayOff <= 1; dayOff++) {
+    const probe = new Date(target.getTime() + dayOff * 86_400_000)
+    widenSet.add(`${probe.getUTCFullYear()}-${String(probe.getUTCMonth() + 1).padStart(2, '0')}-${String(probe.getUTCDate()).padStart(2, '0')}`)
+  }
+
+  for (const year of years) {
+    if (!/^\d{4}$/.test(year)) continue
+    const yearDir = join(root, year)
+    const months = (await readdir(yearDir).catch(() => [] as string[]))
+    for (const month of months) {
+      if (!/^\d{2}$/.test(month)) continue
+      const monthDir = join(yearDir, month)
+      const days = (await readdir(monthDir).catch(() => [] as string[]))
+      for (const day of days) {
+        if (!/^\d{2}$/.test(day)) continue
+        const utcDayKey = `${year}-${month}-${day}`
+        if (!widenSet.has(utcDayKey)) continue
+        const dayDir = join(monthDir, day)
+        const files = (await readdir(dayDir).catch(() => [] as string[])).filter(
+          f => f.startsWith('rollout-') && f.endsWith('.jsonl'),
+        )
+        for (const f of files) {
+          const text = await readFile(join(dayDir, f), 'utf-8').catch(() => '')
+          if (!text) continue
+          let currentPlan: string | null = null
+          for (const line of text.split('\n')) {
+            if (!line.trim()) continue
+            const hasRateLimits = line.includes('"rate_limits"')
+            const hasUsageLimit = line.includes('usage_limit_exceeded')
+            if (!hasRateLimits && !hasUsageLimit) continue
+            let entry: Record<string, unknown>
+            try { entry = JSON.parse(line) } catch { continue }
+            const iso = typeof entry.timestamp === 'string' ? entry.timestamp : new Date().toISOString()
+            const ts = Date.parse(iso)
+            if (Number.isNaN(ts)) continue
+            // Only events that land on the target local day.
+            const evt = new Date(ts)
+            const localDayKey = `${evt.getFullYear()}-${String(evt.getMonth() + 1).padStart(2, '0')}-${String(evt.getDate()).padStart(2, '0')}`
+            if (localDayKey !== targetDay) continue
+            const hourKey = String(evt.getHours()).padStart(2, '0')
+            const payload = (entry as { payload?: Record<string, unknown> }).payload
+            const rl = payload && (payload as { rate_limits?: Record<string, unknown> }).rate_limits
+            if (rl && typeof rl === 'object') {
+              const planType = (rl as { plan_type?: string }).plan_type
+              if (typeof planType === 'string') currentPlan = planType
+              const list = byHour.get(hourKey) ?? []
+              list.push({ ts, iso, rl: rl as Record<string, unknown> })
+              byHour.set(hourKey, list)
+              continue
+            }
+            const errorInfo = payload && (payload as { codex_error_info?: string }).codex_error_info
+            const errType = payload && (payload as { type?: string }).type
+            if (errType === 'error' && errorInfo === 'usage_limit_exceeded') {
+              const list = hitsByHour.get(hourKey) ?? []
+              list.push({ ts, planType: currentPlan })
+              hitsByHour.set(hourKey, list)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Emit 24 buckets — empty hours included so the bar chart's x-
+  // axis stays aligned. Same shape as the per-day aggregate so the
+  // /api/overview consumer can flatten both into the same response
+  // type without per-shape branching.
+  const out: CodexPlanHourlyRow[] = []
+  for (let h = 0; h < 24; h++) {
+    const hourKey = String(h).padStart(2, '0')
+    const samples = byHour.get(hourKey) ?? []
+    const hits = hitsByHour.get(hourKey) ?? []
+    if (samples.length === 0 && hits.length === 0) {
+      out.push({
+        bucket: `${targetDay} ${hourKey}:00`,
+        primaryPct: 0,
+        secondaryPct: null,
+        byPlan: {},
+        limitHitPlans: [],
+        limitHitCount: 0,
+        creditsExhausted: false,
+        dayCount: 0,
+      })
+      continue
+    }
+    samples.sort((a, b) => a.ts - b.ts)
+    let peakPrimary = -1
+    let peakSecondary = -1
+    let exhausted = false
+    const byPlan = new Map<string, number>()
+    for (const s of samples) {
+      const lid = s.rl.limit_id
+      if (lid === 'codex') {
+        const p = s.rl.primary as { used_percent?: number } | undefined
+        const sec = s.rl.secondary as { used_percent?: number } | undefined
+        const pt = (s.rl.plan_type as string | null) ?? 'unknown'
+        if (p && typeof p.used_percent === 'number') {
+          if (p.used_percent > peakPrimary) peakPrimary = p.used_percent
+          const cur = byPlan.get(pt) ?? -1
+          if (p.used_percent > cur) byPlan.set(pt, p.used_percent)
+        }
+        if (sec && typeof sec.used_percent === 'number' && sec.used_percent > peakSecondary) {
+          peakSecondary = sec.used_percent
+        }
+      } else if (lid === 'premium') {
+        const credits = (s.rl as { credits?: { has_credits?: boolean } }).credits
+        if (credits && credits.has_credits === false) exhausted = true
+      }
+    }
+    const limitPlans = Array.from(new Set(hits.map(h => h.planType ?? 'unknown')))
+    out.push({
+      bucket: `${targetDay} ${hourKey}:00`,
+      primaryPct: peakPrimary >= 0 ? peakPrimary : 0,
+      secondaryPct: peakSecondary >= 0 ? peakSecondary : (samples.length > 0 ? 0 : null),
+      byPlan: Object.fromEntries(byPlan),
+      limitHitPlans: limitPlans,
+      limitHitCount: hits.length,
+      creditsExhausted: exhausted,
+      dayCount: 1,
+    })
+  }
+  return out
+}
+
 /** Walk every Codex rollout file and produce a per-day SUMMARY snapshot
  *  that reflects what Codex CLI itself would have shown that day. Two
  *  things differ from a naïve "peak primary" approach:

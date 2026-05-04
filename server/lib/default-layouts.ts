@@ -106,6 +106,10 @@ export const TODAY_DEFAULT: ScreenLayout = {
     { i: 'calls',        x: 2, y: 7, w: 2, h: 2, minW: 2, minH: 2 },
     // Activity full-width below.
     { i: 'activity',     x: 0, y: 9, w: 2, h: 2, minW: 2, minH: 2 },
+    // Codex hourly plan chart at the bottom — only renders on
+    // days the user actually used Codex. On Claude-only days it
+    // self-empties; the row is cheap to keep.
+    { i: 'chart-codex-plan-history', x: 0, y: 11, w: 4, h: 2, minW: 2, minH: 2 },
   ],
   // Available via the picker but not in the default layout.
   hidden: ['hour-timeline', 'tokens', 'days-hours-heatmap', 'weekday-hour-heatmap'],
