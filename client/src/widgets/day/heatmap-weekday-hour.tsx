@@ -132,7 +132,7 @@ function WeekdayHourHeatmap({ t, selectedDate, providersParam, weekStartsOn }: {
                     <div
                       key={hour}
                       className={`heatmap-cell${isHover ? ' is-hover' : ''}`}
-                      style={{ background: cost > 0 ? `rgba(255, 140, 66, ${0.15 + intensity * 0.85})` : 'var(--bg-2)' }}
+                      style={{ background: cost > 0 ? `rgba(255, 140, 66, ${0.15 + intensity * 0.85})` : 'var(--panel-2)' }}
                       onMouseEnter={() => setHover({ dow, hour })}
                       onMouseLeave={() => setHover(prev => (prev?.dow === dow && prev?.hour === hour ? null : prev))}
                     />

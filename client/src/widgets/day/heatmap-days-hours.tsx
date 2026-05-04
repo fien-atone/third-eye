@@ -173,7 +173,7 @@ function DaysHoursHeatmap({ t, daysCount, titleKey, subKey, selectedDate, provid
                       <div
                         key={hour}
                         className={`day-heatmap-cell${isHover ? ' is-hover' : ''}`}
-                        style={{ background: cost > 0 ? `rgba(255, 140, 66, ${0.15 + intensity * 0.85})` : 'var(--bg-2)' }}
+                        style={{ background: cost > 0 ? `rgba(255, 140, 66, ${0.15 + intensity * 0.85})` : 'var(--panel-2)' }}
                         onMouseEnter={() => setHover({ dateStr: d.dateStr, hour })}
                         onMouseLeave={() => setHover(prev => (prev?.dateStr === d.dateStr && prev?.hour === hour ? null : prev))}
                         onClick={() => onSelectDate(d.dateStr)}

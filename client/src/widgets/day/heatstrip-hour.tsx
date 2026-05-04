@@ -52,7 +52,7 @@ function HoursHeatstrip({ t, series }: { t: T; series: Array<Record<string, numb
             <div
               key={h}
               className={`heatstrip-cell${hover === h ? ' is-hover' : ''}`}
-              style={{ background: c.cost > 0 ? `rgba(255, 140, 66, ${0.15 + c.intensity * 0.85})` : 'var(--bg-2)' }}
+              style={{ background: c.cost > 0 ? `rgba(255, 140, 66, ${0.15 + c.intensity * 0.85})` : 'var(--panel-2)' }}
               onMouseEnter={() => setHover(h)}
               onMouseLeave={() => setHover(prev => (prev === h ? null : prev))}
             />
