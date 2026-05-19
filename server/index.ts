@@ -145,6 +145,7 @@ app.use(express.json())
 const PROVIDER_DISPLAY: Record<string, string> = {
   claude: 'Claude Code',
   codex: 'Codex (OpenAI)',
+  hermes: 'Hermes',
 }
 
 /** Single source of truth for project-label resolution.
