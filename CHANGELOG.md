@@ -4,6 +4,29 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] — 2026-05-19
+
+Adds a Hermes Agent provider so sessions run inside the
+[Hermes open-source agent wrapper](https://github.com/NousResearch/hermes-agent)
+are tracked in third-eye alongside Claude Code and Codex sessions.
+
+### Added
+
+- **Hermes Agent provider.** Third-eye now reads
+  `~/.hermes/state.db` (SQLite) and surfaces every Hermes session
+  as a first-class entry with model, token counts, cache tokens,
+  reasoning tokens, and theoretical cost (list-price equivalent;
+  actual Codex-subscription sessions are $0 but the number shows
+  what the tokens would cost at API rates). Sessions with zero
+  tokens are silently skipped. The database path can be overridden
+  via the `HERMES_HOME` environment variable.
+- **"Hermes" filter chip** in the provider selector on Dashboard
+  and Today. Selecting it filters to Hermes sessions only; "All"
+  continues to aggregate across all three providers.
+- **GPT-5.5 fallback pricing** added to the built-in pricing
+  table so cost estimates are available even before a fresh
+  LiteLLM cache is populated.
+
 ## [2.6.2] — 2026-05-04
 
 A small follow-up focused on the Codex plan-history widget and
