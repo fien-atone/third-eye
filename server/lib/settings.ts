@@ -9,6 +9,7 @@
  *  Adding a new section: extend Settings + DEFAULTS, expose a typed
  *  getter, and update /api/settings to surface it. */
 import { db } from '../db.ts'
+import { claudeHomeDirs } from './claude-paths.ts'
 
 /** Server is in dev mode when NODE_ENV is anything other than
  *  "production". The Dockerfile sets NODE_ENV=production explicitly,
@@ -46,6 +47,12 @@ export type IngestSettings = {
 export type Settings = {
   updates: UpdatesSettings
   ingest: IngestSettings
+  /** Configured Claude source roots, computed live from env on every
+   *  read. NOT persisted — env is the source of truth, and a
+   *  re-launch picks up env changes. Surfaced via /api/settings so
+   *  the client can render the Settings → Sources panel and let
+   *  users see which Claude roots are being read. */
+  sources: { claude: Array<{ path: string; alias: string }> }
 }
 
 const DEFAULTS: Settings = {
@@ -68,6 +75,9 @@ const DEFAULTS: Settings = {
     // (1m / 5m / 15m / 1h).
     intervalSeconds: 300,
   },
+  // Computed at getSettings() time, not stored — env is the
+  // source of truth and a reload picks up changes.
+  sources: { claude: [] },
 }
 
 const MIN_UPDATES_INTERVAL_DEV_S = 30
@@ -116,7 +126,17 @@ export function getSettings(): Settings {
   return {
     updates: readSection('updates'),
     ingest: readSection('ingest'),
+    sources: { claude: getSourceList() },
   }
+}
+
+/** Read-only snapshot of the configured Claude source list. Computed
+ *  on every call (cheap — it just re-reads env and walks the home
+ *  dir) so a server restart picks up env changes without needing a
+ *  DB write path. Returns an empty array when no sources are
+ *  configured (the canonical fresh-install case). */
+export function getSourceList(): Array<{ path: string; alias: string }> {
+  return claudeHomeDirs().map(s => ({ path: s.path, alias: s.alias }))
 }
 
 export function patchUpdates(patch: Partial<UpdatesSettings>): UpdatesSettings {

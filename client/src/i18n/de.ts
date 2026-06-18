@@ -106,6 +106,18 @@ export const de: Dict = {
   'settings.updates.freq.weekly': 'Einmal pro Woche',
   'settings.updates.devHint': 'Intervalle unter einer Stunde sind nur im Dev-Modus zum Testen verfügbar.',
 
+  'settings.sources.title': 'Quellen',
+  'settings.sources.help': 'Claude-Code-Konfigurationsverzeichnisse, die third-eye liest. Weitere hinzufügen über die Umgebungsvariablen THIRD_EYE_CLAUDE_DIRS und THIRD_EYE_CLAUDE_DIR_ALIASES, dann neu starten.',
+  'settings.sources.colAlias': 'Alias',
+  'settings.sources.colPath': 'Pfad',
+  'settings.sources.empty': 'Keine Claude-Quellen konfiguriert. Es wird auf ~/.claude zurückgefallen, falls vorhanden.',
+  'settings.sources.envHint': 'Über Umgebungsvariablen konfiguriert (THIRD_EYE_CLAUDE_DIRS, THIRD_EYE_CLAUDE_DIR_ALIASES, THIRD_EYE_CLAUDE_DIR). Zum Ändern env anpassen und neu starten.',
+
+  'controls.sourceFilter.all': 'Alle Quellen',
+  'controls.sourceFilter.label': 'Quelle',
+  'projects.colSource': 'Quelle',
+  'projects.sourceNone': '—',
+
   'settings.ingest.title': 'Auto-Aktualisierung',
   'settings.ingest.help': 'Scannt regelmäßig ~/.claude/projects und ~/.codex/sessions im Hintergrund, damit das Dashboard ohne Klick auf Aktualisieren auf dem Stand bleibt. Die Daten verlassen deine Maschine nicht.',
   'settings.ingest.enabledLabel': 'Daten automatisch aktualisieren',

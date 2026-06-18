@@ -8,6 +8,14 @@ export type SessionSource = {
   path: string
   project: string
   provider: string
+  /** Which configured source this session came from. For Claude
+   *  sources, populated by claude.discoverSessions() from
+   *  THIRD_EYE_CLAUDE_DIRS (or the singular THIRD_EYE_CLAUDE_DIR
+   *  legacy override, contributing alias 'default'). For other
+   *  providers there's only one source per provider, so it defaults
+   *  to the provider name. Indexed in api_calls.source_alias for
+   *  the ?source=<alias> query-param filter. */
+  sourceAlias: string
 }
 
 export type SessionParser = {

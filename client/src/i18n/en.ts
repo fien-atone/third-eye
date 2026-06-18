@@ -109,6 +109,18 @@ export const en = {
 
   'settings.ingest.title': 'Auto-refresh',
   'settings.ingest.help': 'Periodically rescan ~/.claude/projects and ~/.codex/sessions in the background so the dashboard stays current without you clicking Refresh. The data never leaves your machine.',
+
+  'settings.sources.title': 'Sources',
+  'settings.sources.help': 'Claude Code config directories third-eye is reading. Add more by setting THIRD_EYE_CLAUDE_DIRS and THIRD_EYE_CLAUDE_DIR_ALIASES in the environment, then restart.',
+  'settings.sources.colAlias': 'Alias',
+  'settings.sources.colPath': 'Path',
+  'settings.sources.empty': 'No Claude sources configured. Falling back to ~/.claude if it exists.',
+  'settings.sources.envHint': 'Configured via environment variables (THIRD_EYE_CLAUDE_DIRS, THIRD_EYE_CLAUDE_DIR_ALIASES, THIRD_EYE_CLAUDE_DIR). Edit env and restart to change.',
+
+  'controls.sourceFilter.all': 'All sources',
+  'controls.sourceFilter.label': 'Source',
+  'projects.colSource': 'Source',
+  'projects.sourceNone': '—',
   'settings.ingest.enabledLabel': 'Refresh data automatically',
   'settings.ingest.frequencyLabel': 'How often',
   'settings.ingest.freq.dev30s': 'Every 30 seconds (dev)',

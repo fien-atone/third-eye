@@ -106,6 +106,18 @@ export const ru: Dict = {
   'settings.updates.freq.weekly': 'Раз в неделю',
   'settings.updates.devHint': 'Интервалы меньше часа доступны только в dev-режиме — для тестирования.',
 
+  'settings.sources.title': 'Источники',
+  'settings.sources.help': 'Директории конфигов Claude Code, которые читает third-eye. Добавьте новые через переменные окружения THIRD_EYE_CLAUDE_DIRS и THIRD_EYE_CLAUDE_DIR_ALIASES, затем перезапустите.',
+  'settings.sources.colAlias': 'Псевдоним',
+  'settings.sources.colPath': 'Путь',
+  'settings.sources.empty': 'Источники Claude не настроены. Используется ~/.claude, если он существует.',
+  'settings.sources.envHint': 'Настраивается через переменные окружения (THIRD_EYE_CLAUDE_DIRS, THIRD_EYE_CLAUDE_DIR_ALIASES, THIRD_EYE_CLAUDE_DIR). Измените env и перезапустите.',
+
+  'controls.sourceFilter.all': 'Все источники',
+  'controls.sourceFilter.label': 'Источник',
+  'projects.colSource': 'Источник',
+  'projects.sourceNone': '—',
+
   'settings.ingest.title': 'Автообновление',
   'settings.ingest.help': 'Регулярно пересканировать ~/.claude/projects и ~/.codex/sessions в фоне, чтобы дашборд был актуален без нажатия Refresh. Данные никуда не уходят с твоей машины.',
   'settings.ingest.enabledLabel': 'Обновлять данные автоматически',

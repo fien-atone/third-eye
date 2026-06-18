@@ -17,6 +17,7 @@ import {
 } from './lib/agent-registry.ts'
 import { getSettings, patchUpdates, patchIngest, IS_DEV } from './lib/settings.ts'
 import { applyAutoIngestSettings } from './lib/auto-ingest.ts'
+import { claudeHomeDirs } from './lib/claude-paths.ts'
 
 // Seed default screen layouts on first start (idempotent — never overwrites
 // user customizations once they exist).
@@ -125,6 +126,40 @@ function normalizeProviders(q: unknown): string[] {
   return q.split(',').map(s => s.trim()).filter(Boolean)
 }
 
+/** Validated source-alias query-param filter. 'all' or empty → no
+ *  filter (return rows from every configured source). Otherwise
+ *  returns a single-element filter on source_alias, or throws a
+ *  typed error the route can surface as 400. */
+function sourceFilterSql(q: unknown, knownAliases: ReadonlyArray<string>):
+  { ok: true; where: string; params: unknown[] } | { ok: false; error: string } {
+  if (q === undefined || q === null) return { ok: true, where: '', params: [] }
+  if (typeof q !== 'string') return { ok: false, error: 'source must be a string' }
+  const trimmed = q.trim()
+  if (!trimmed || trimmed === 'all') return { ok: true, where: '', params: [] }
+  if (!knownAliases.includes(trimmed)) {
+    return { ok: false, error: `unknown source alias "${trimmed}"; known: ${knownAliases.join(', ') || '(none configured)'}` }
+  }
+  return { ok: true, where: 'AND source_alias = ?', params: [trimmed] }
+}
+
+/** Live snapshot of the configured Claude source aliases — used to
+ *  validate the ?source= query param at request time, since the env
+ *  can be reloaded between restarts. Falls back to ['default'] when
+ *  no Claude sources are configured (the canonical single-install
+ *  case). The list also includes non-Claude aliases (codex, hermes,
+ *  desktop) so the filter can isolate any provider's source. */
+function knownSourceAliases(): string[] {
+  const aliases = claudeHomeDirs().map(s => s.alias)
+  if (aliases.length === 0) aliases.push('default')
+  // Always include the synthetic aliases that other providers stamp.
+  // They aren't env-configurable, but a user querying ?source=codex
+  // should still be filterable to that single provider.
+  for (const a of ['codex', 'hermes', 'desktop']) {
+    if (!aliases.includes(a)) aliases.push(a)
+  }
+  return aliases
+}
+
 const app = express()
 // Disable Express's automatic ETag / 304 dance for JSON endpoints.
 // We're a self-hosted localhost dashboard — saving the body bytes
@@ -191,21 +226,31 @@ function getProjectsByKeys(d: ReturnType<typeof db>, keys: string[]): ProjectRow
 }
 
 app.get('/api/projects', (_req, res) => {
+  // ?source=<alias> filter. 'all' / missing → no filter (every
+  // configured source contributes its aggregated totals). Unknown
+  // alias → 400.
+  const sourceRes = sourceFilterSql(_req.query.source, knownSourceAliases())
+  if (!sourceRes.ok) {
+    return res.status(400).json({ error: sourceRes.error })
+  }
+  const sourceFilter = sourceRes
+
   const rows = db().prepare(`
     SELECT p.id, p.key, p.label, p.custom_label, p.is_favorite,
            COUNT(c.dedup_key) AS calls,
            COALESCE(SUM(c.cost_usd), 0) AS cost,
            MIN(c.ts) AS first_ts,
-           MAX(c.ts) AS last_ts
+           MAX(c.ts) AS last_ts,
+           MAX(c.source_alias) AS source_alias
     FROM projects p
-    LEFT JOIN api_calls c ON c.project = p.key AND c.model_short != '<synthetic>'
+    LEFT JOIN api_calls c ON c.project = p.key AND c.model_short != '<synthetic>' ${sourceFilter.where}
     GROUP BY p.id
     HAVING calls > 0
     ORDER BY cost DESC
-  `).all() as Array<{
+  `).all(...sourceFilter.params) as Array<{
     id: string; key: string; label: string | null; custom_label: string | null;
     is_favorite: number; calls: number; cost: number;
-    first_ts: string; last_ts: string
+    first_ts: string; last_ts: string; source_alias: string
   }>
   res.json({
     projects: rows.map(r => ({
@@ -219,6 +264,11 @@ app.get('/api/projects', (_req, res) => {
       cost: roundUsd(r.cost),
       firstTs: r.first_ts,
       lastTs: r.last_ts,
+      // Surface the matched source for the client. When the filter
+      // is inactive (no source param), this is the first alias that
+      // contributed to the project, which the client can show as a
+      // hint that multi-source projects exist.
+      sourceAlias: r.source_alias,
     })),
   })
 })
@@ -434,7 +484,16 @@ app.get('/api/overview', async (req, res) => {
 
   const providerFilter = providerFilterSql(providers)
   const projectFilter = projectKey ? { where: 'AND project = ?', params: [projectKey] } : { where: '', params: [] as unknown[] }
-  const baseParams = [startEpoch, endEpoch, ...providerFilter.params, ...projectFilter.params]
+  // ?source=<alias> filter — composes with provider + project. All
+  // six aggregations in this endpoint honor it so the breakdown
+  // series, model/category/project tables, and totals all reflect
+  // just the rows from that source.
+  const sourceRes = sourceFilterSql(req.query.source, knownSourceAliases())
+  if (!sourceRes.ok) {
+    return res.status(400).json({ error: sourceRes.error })
+  }
+  const sourceFilter = sourceRes
+  const baseParams = [startEpoch, endEpoch, ...providerFilter.params, ...projectFilter.params, ...sourceFilter.params]
   const bucketExpr = bucketSql(granularity, tzMin, weekStartsOn)
   const d = db()
 
@@ -447,7 +506,7 @@ app.get('/api/overview', async (req, res) => {
            SUM(cache_read)     AS cache_read,
            SUM(cache_write)    AS cache_write
     FROM api_calls
-    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where}
+    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where} ${sourceFilter.where}
     GROUP BY bucket
   `).all(...baseParams) as Array<{
     bucket: string; cost: number; calls: number;
@@ -457,7 +516,7 @@ app.get('/api/overview', async (req, res) => {
   const modelBucketRows = d.prepare(`
     SELECT ${bucketExpr} AS bucket, model_short, SUM(cost_usd) AS cost
     FROM api_calls
-    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where}
+    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where} ${sourceFilter.where}
     GROUP BY bucket, model_short
   `).all(...baseParams) as Array<{ bucket: string; model_short: string; cost: number }>
 
@@ -466,7 +525,7 @@ app.get('/api/overview', async (req, res) => {
            SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
            SUM(cache_read) AS cache_read, SUM(cache_write) AS cache_write
     FROM api_calls
-    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where}
+    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where} ${sourceFilter.where}
     GROUP BY model_short
     ORDER BY cost DESC
   `).all(...baseParams) as Array<{
@@ -477,7 +536,7 @@ app.get('/api/overview', async (req, res) => {
   const categoryTotals = d.prepare(`
     SELECT category AS name, COUNT(*) AS calls, SUM(cost_usd) AS cost
     FROM api_calls
-    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where}
+    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where} ${sourceFilter.where}
     GROUP BY category
     ORDER BY cost DESC
   `).all(...baseParams) as Array<{ name: string; calls: number; cost: number }>
@@ -485,7 +544,7 @@ app.get('/api/overview', async (req, res) => {
   const projectTotals = (d.prepare(`
     SELECT project AS name, COUNT(*) AS calls, SUM(cost_usd) AS cost
     FROM api_calls
-    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where}
+    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where} ${sourceFilter.where}
     GROUP BY project
     ORDER BY cost DESC
   `).all(...baseParams) as Array<{ name: string; calls: number; cost: number }>)
@@ -507,7 +566,7 @@ app.get('/api/overview', async (req, res) => {
     ? d.prepare(`
         SELECT ${bucketExpr} AS bucket, project, SUM(cost_usd) AS cost
         FROM api_calls
-        WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where}
+        WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where} ${sourceFilter.where}
         GROUP BY bucket, project
       `).all(...baseParams) as Array<{ bucket: string; project: string; cost: number }>
     : []
@@ -531,7 +590,7 @@ app.get('/api/overview', async (req, res) => {
            SUM(CASE WHEN provider != 'codex' THEN 1 ELSE 0 END) AS cache_write_supported_calls,
            SUM(CASE WHEN provider  = 'codex' THEN 1 ELSE 0 END) AS codex_calls
     FROM api_calls
-    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where}
+    WHERE ts_epoch BETWEEN ? AND ? AND model_short != '<synthetic>' ${providerFilter.where} ${projectFilter.where} ${sourceFilter.where}
   `).get(...baseParams) as {
     cost: number | null; calls: number; input_tokens: number | null; output_tokens: number | null;
     cache_read: number | null; cache_write: number | null; projects: number;

@@ -1,8 +1,9 @@
 import { format, parseISO, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns'
 import type { Locale } from 'date-fns'
+import { useQuery } from '@tanstack/react-query'
 import { useT } from '../i18n'
 import { useDateLocale, fmtCurrency, fmtInt } from '../lib/format'
-import type { Granularity, OverviewResponse, ProvidersResponse } from '../types'
+import type { Granularity, OverviewResponse, ProvidersResponse, SettingsResponse } from '../types'
 import { SlidersIcon } from './icons'
 import { DateField } from './date-field'
 
@@ -43,6 +44,7 @@ export function DashboardControls({
   selectedProviders, setSelectedProviders, toggleProvider,
   providersData,
   frame,
+  selectedSource, setSelectedSource,
   isNarrow,
   editingLayout, setEditingLayout,
   onResetLayout, onCancelEdit,
@@ -58,6 +60,11 @@ export function DashboardControls({
   toggleProvider: (id: string) => void
   providersData: ProvidersResponse | undefined
   frame: OverviewResponse['frame'] | null
+  /** Active source-alias filter (null = "all sources"). The chip
+   *  here mirrors the URL's ?source= param and updates the URL on
+   *  click — same pattern as selectedProviders above. */
+  selectedSource: string | null
+  setSelectedSource: (s: string | null) => void
   isNarrow: boolean
   editingLayout: boolean
   setEditingLayout: (v: boolean) => void
@@ -111,6 +118,17 @@ export function DashboardControls({
             </button>
           ))}
         </div>
+        {/* Source filter chip group. Only renders when the user has
+            configured more than one Claude source — with a single
+            source (the common case) the chip is redundant and would
+            just add visual noise. Same "All / specific" pattern as
+            the provider filter, with the difference that the source
+            list is computed by the server (env-driven) and stays
+            constant for the session. */}
+        <SourceFilterChips
+          selectedSource={selectedSource}
+          setSelectedSource={setSelectedSource}
+        />
         <div className="controls-spacer" />
         {isNarrow ? null : editingLayout ? (
           <div className="edit-toolbar-group">
@@ -163,9 +181,65 @@ export function DashboardControls({
             <span>{frame.bucketCount} {t(granularity === 'day' ? 'summary.days' : granularity === 'week' ? 'summary.weeks' : 'summary.months')}</span>
             <span className="dot">·</span>
             <span>{selectedProviders.length === 0 ? t('summary.allProviders') : selectedProviders.map(id => providersData?.providers.find(p => p.id === id)?.label ?? id).join(' + ')}</span>
+            {selectedSource && (
+              <>
+                <span className="dot">·</span>
+                <span>{t('controls.sourceFilter.label')}: <code>{selectedSource}</code></span>
+              </>
+            )}
           </div>
         </div>
       )}
     </>
+  )
+}
+
+/** Source-alias filter chip group. Renders nothing when the server
+ *  has only one Claude source configured (the common case) — the
+ *  chip is then redundant. Reads the source list from the existing
+ *  /api/settings cache (via useQuery key 'settings'), which is
+ *  already populated by SettingsModal on mount and re-uses the
+ *  cached response — no extra network round-trip. The "All" chip
+ *  clears the filter (sets to null); specific alias chips set
+ *  the active alias. URL sync happens upstream in App.tsx via
+ *  updateFilters — we just call the setter. */
+function SourceFilterChips({
+  selectedSource,
+  setSelectedSource,
+}: {
+  selectedSource: string | null
+  setSelectedSource: (s: string | null) => void
+}) {
+  const t = useT()
+  const settings = useQuery<SettingsResponse>({
+    queryKey: ['settings'],
+    // No queryFn needed — SettingsModal already populates this
+    // cache. We only need the snapshot.
+    queryFn: () => Promise.reject(new Error('unused')),
+    enabled: false,
+  })
+  const sources = settings.data?.sources.claude ?? []
+  // Single-source or zero-source: hide the chip group. The default
+  // install (just ~/.claude) shouldn't visually shout "Filter by
+  // source" — that's a multi-source feature.
+  if (sources.length < 2) return null
+  return (
+    <div className="group">
+      <span className="group-label">{t('controls.sourceFilter.label')}</span>
+      <button
+        className={selectedSource === null ? 'chip active' : 'chip'}
+        onClick={() => setSelectedSource(null)}
+      >{t('controls.sourceFilter.all')}</button>
+      {sources.map(s => (
+        <button
+          key={s.alias}
+          className={selectedSource === s.alias ? 'chip active' : 'chip'}
+          onClick={() => setSelectedSource(s.alias)}
+          title={s.path}
+        >
+          {s.alias}
+        </button>
+      ))}
+    </div>
   )
 }

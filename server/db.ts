@@ -122,6 +122,19 @@ function migrate(d: Database.Database) {
   addCol("ALTER TABLE api_calls ADD COLUMN has_todo_write INTEGER NOT NULL DEFAULT 0")
   addCol("ALTER TABLE api_calls ADD COLUMN file_count INTEGER NOT NULL DEFAULT 0")
 
+  // Multi-source Claude config support: stamp each row with the
+  // source alias it was ingested from. Default 'default' preserves
+  // pre-multi-source data (the single THIRD_EYE_CLAUDE_DIR / ~/.claude
+  // case). Indexed together with provider for the ?source=<alias>
+  // dashboard filter.
+  addCol("ALTER TABLE api_calls ADD COLUMN source_alias TEXT NOT NULL DEFAULT 'default'")
+  addCol("ALTER TABLE tool_events ADD COLUMN source_alias TEXT NOT NULL DEFAULT 'default'")
+  addCol("ALTER TABLE agent_sessions ADD COLUMN source_alias TEXT NOT NULL DEFAULT 'default'")
+  addCol("CREATE INDEX IF NOT EXISTS idx_calls_source ON api_calls(provider, source_alias)")
+  addCol("CREATE INDEX IF NOT EXISTS idx_calls_project_source ON api_calls(project, source_alias)")
+  addCol("CREATE INDEX IF NOT EXISTS idx_tool_events_source ON tool_events(source_alias)")
+  addCol("CREATE INDEX IF NOT EXISTS idx_agent_sessions_source ON agent_sessions(source_alias)")
+
   // User-editable project metadata
   addCol("ALTER TABLE projects ADD COLUMN custom_label TEXT")
   addCol("ALTER TABLE projects ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
@@ -332,4 +345,9 @@ export type CallRow = {
   web_search: number
   cost_usd: number
   speed: string
+  /** Which configured source this row came from. Populated from
+   *  SessionSource.sourceAlias at ingest time. Default 'default' for
+   *  pre-multi-source rows (and for the singular THIRD_EYE_CLAUDE_DIR
+   *  / ~/.claude fallback). Indexed for the ?source=<alias> filter. */
+  source_alias: string
 }

@@ -106,6 +106,18 @@ export const zh: Dict = {
   'settings.updates.freq.weekly': '每周一次',
   'settings.updates.devHint': '小于一小时的间隔仅在 dev 模式下可用，便于测试。',
 
+  'settings.sources.title': '数据源',
+  'settings.sources.help': 'third-eye 正在读取的 Claude Code 配置目录。可通过环境变量 THIRD_EYE_CLAUDE_DIRS 和 THIRD_EYE_CLAUDE_DIR_ALIASES 添加更多，然后重启。',
+  'settings.sources.colAlias': '别名',
+  'settings.sources.colPath': '路径',
+  'settings.sources.empty': '未配置 Claude 数据源。若 ~/.claude 存在则回退使用。',
+  'settings.sources.envHint': '通过环境变量配置（THIRD_EYE_CLAUDE_DIRS、THIRD_EYE_CLAUDE_DIR_ALIASES、THIRD_EYE_CLAUDE_DIR）。修改 env 后需重启。',
+
+  'controls.sourceFilter.all': '全部数据源',
+  'controls.sourceFilter.label': '数据源',
+  'projects.colSource': '数据源',
+  'projects.sourceNone': '—',
+
   'settings.ingest.title': '自动刷新',
   'settings.ingest.help': '在后台定期扫描 ~/.claude/projects 和 ~/.codex/sessions，无需点击刷新即可保持仪表板最新。数据永远不会离开你的机器。',
   'settings.ingest.enabledLabel': '自动刷新数据',

@@ -170,6 +170,10 @@ export function createHermesProvider(hermesHome?: string): Provider {
           path: r.id,
           project: HERMES_PROJECT,
           provider: 'hermes',
+          // Hermes Agent has a single source — its own state.db. We
+          // stamp every row with the 'hermes' alias so the dashboard's
+          // ?source=hermes filter can isolate it from claude/codex.
+          sourceAlias: 'hermes',
         }))
       } finally {
         db.close()

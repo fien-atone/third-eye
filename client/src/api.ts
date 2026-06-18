@@ -92,6 +92,10 @@ export function dashboardParams(opts: {
   granularity?: Granularity
   weekStartsOn?: number
   projectId?: string | null
+  /** Source alias filter. null/undefined/''/'all' = no filter;
+   *  any other value scopes the query to that alias. The server
+   *  validates and 400s on unknown aliases. */
+  source?: string | null
 }): URLSearchParams {
   const p = new URLSearchParams({
     start: toInputDate(opts.start),
@@ -102,5 +106,6 @@ export function dashboardParams(opts: {
   if (opts.granularity) p.set('granularity', opts.granularity)
   if (opts.weekStartsOn !== undefined) p.set('weekStartsOn', String(opts.weekStartsOn))
   if (opts.projectId) p.set('projectId', opts.projectId)
+  if (opts.source && opts.source !== 'all') p.set('source', opts.source)
   return p
 }

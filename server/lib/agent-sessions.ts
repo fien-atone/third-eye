@@ -48,6 +48,10 @@ export type AgentSessionRow = {
   agent_id: string
   source: 'subagent' | 'task'
   project: string
+  /** Which configured Claude source the parent session's JSONL came
+   *  from. Stamped onto agent_sessions.source_alias at ingest. Drives
+   *  the ?source=<alias> filter for the agents widget. */
+  source_alias: string
   ts_start: string
   ts_start_epoch: number
   duration_s: number
@@ -80,7 +84,7 @@ type Usage = {
 // module which honors THIRD_EYE_CLAUDE_DIR and is cross-platform.
 // ──────────────────────────────────────────────────────────────────────
 
-import { claudeProjectsDir, claudeTaskBaseDirs } from './claude-paths.ts'
+import { claudeHomeDirs, claudeProjectsDir, claudeTaskBaseDirs } from './claude-paths.ts'
 
 async function listDir(p: string): Promise<string[]> {
   try { return await readdir(p) } catch { return [] }
@@ -93,28 +97,48 @@ async function isDir(p: string): Promise<boolean> {
 
 /** Yields `{ project, sessionDir }` tuples discovered by scanning the
  *  Claude Code projects folder (one level deep). */
-async function* discoverProjectSessions(): AsyncGenerator<{ project: string; sessionDir: string }> {
-  const projectsDir = claudeProjectsDir()
-  for (const proj of await listDir(projectsDir)) {
-    const projDir = join(projectsDir, proj)
-    if (!(await isDir(projDir))) continue
-    for (const sess of await listDir(projDir)) {
-      const sessDir = join(projDir, sess)
-      if (await isDir(sessDir)) yield { project: proj, sessionDir: sessDir }
+async function* discoverProjectSessions(): AsyncGenerator<{ project: string; sessionDir: string; sourceAlias: string }> {
+  // Walk every configured Claude source so the agent rows we yield
+  // are stamped with the source their parent session belongs to.
+  // (Same pattern as server/lib/providers/claude.ts:discoverSessions().)
+  for (const src of claudeHomeDirs()) {
+    const projectsDir = claudeProjectsDir(src)
+    if (!(await isDir(projectsDir))) continue
+    for (const proj of await listDir(projectsDir)) {
+      const projDir = join(projectsDir, proj)
+      if (!(await isDir(projDir))) continue
+      for (const sess of await listDir(projDir)) {
+        const sessDir = join(projDir, sess)
+        if (await isDir(sessDir)) yield { project: proj, sessionDir: sessDir, sourceAlias: src.alias }
+      }
     }
   }
 }
 
-/** Yields `{ project, sessionDir }` tuples from task-output dirs. */
-async function* discoverTaskSessions(): AsyncGenerator<{ project: string; sessionDir: string }> {
+/** Yields `{ project, sessionDir }` tuples from task-output dirs.
+ *  sourceAlias is inherited from the matching configured Claude source
+ *  by matching the task base dir's project parent path. Falls back to
+ *  'default' if no configured source matches. */
+async function* discoverTaskSessions(): AsyncGenerator<{ project: string; sessionDir: string; sourceAlias: string }> {
+  // Build a map of project-parent-path → source alias so each task
+  // session gets stamped with the source that "owns" the project
+  // directory. (Task base dirs live under the source's project dir.)
+  const aliasByProjectsParent = new Map<string, string>()
+  for (const src of claudeHomeDirs()) {
+    aliasByProjectsParent.set(claudeProjectsDir(src), src.alias)
+  }
+
   for (const base of claudeTaskBaseDirs()) {
     if (!(await isDir(base))) continue
     for (const proj of await listDir(base)) {
       const projDir = join(base, proj)
       if (!(await isDir(projDir))) continue
+      // Match the task's project parent path against our Claude sources
+      // to find the owning source alias.
+      const sourceAlias = aliasByProjectsParent.get(projDir) ?? 'default'
       for (const sess of await listDir(projDir)) {
         const sessDir = join(projDir, sess)
-        if (await isDir(sessDir)) yield { project: proj, sessionDir: sessDir }
+        if (await isDir(sessDir)) yield { project: proj, sessionDir: sessDir, sourceAlias }
       }
     }
   }
@@ -166,7 +190,7 @@ export function detectRole(
  *  no billable tokens (empty / corrupt / synthetic). */
 export async function parseAgentFile(
   filePath: string,
-  opts: { source: 'subagent' | 'task'; project: string; metaDesc?: string | null; metaAgentType?: string | null }
+  opts: { source: 'subagent' | 'task'; project: string; sourceAlias?: string; metaDesc?: string | null; metaAgentType?: string | null }
 ): Promise<AgentSessionRow | null> {
   let content: string
   try { content = await readFile(filePath, 'utf-8') } catch { return null }
@@ -308,6 +332,12 @@ export async function parseAgentFile(
     agent_id: stem,
     source: opts.source,
     project: opts.project,
+    // Inherit the source alias from the parent session's SessionSource
+    // — agent JSONLs are discovered under the parent session's
+    // project dir, so they belong to the same configured Claude
+    // source. The crawl plumbing threads `sourceAlias` through
+    // `discoverProjectSessions` → here.
+    source_alias: opts.sourceAlias ?? 'default',
     ts_start: firstTs ?? new Date().toISOString(),
     ts_start_epoch: firstTs ? Date.parse(firstTs) : Date.now(),
     duration_s: durationS,
@@ -340,7 +370,7 @@ export async function parseAgentFile(
 export async function* scanAgentSessions(): AsyncGenerator<AgentSessionRow> {
   const seen = new Set<string>()
 
-  for await (const { project, sessionDir } of discoverProjectSessions()) {
+  for await (const { project, sessionDir, sourceAlias } of discoverProjectSessions()) {
     const subDir = join(sessionDir, 'subagents')
     if (!(await isDir(subDir))) continue
     for (const f of await listDir(subDir)) {
@@ -369,7 +399,7 @@ export async function* scanAgentSessions(): AsyncGenerator<AgentSessionRow> {
       // introduces a path that throws synchronously we don't want to
       // bring down the whole ingest pipeline. Log+continue.
       try {
-        const row = await parseAgentFile(fp, { source: 'subagent', project, metaDesc, metaAgentType })
+        const row = await parseAgentFile(fp, { source: 'subagent', project, sourceAlias, metaDesc, metaAgentType })
         if (row) yield row
       } catch (err) {
         console.warn(`[agent-sessions] skipped ${fp}: ${(err as Error).message}`)
@@ -377,7 +407,7 @@ export async function* scanAgentSessions(): AsyncGenerator<AgentSessionRow> {
     }
   }
 
-  for await (const { project, sessionDir } of discoverTaskSessions()) {
+  for await (const { project, sessionDir, sourceAlias } of discoverTaskSessions()) {
     const tasksDir = join(sessionDir, 'tasks')
     if (!(await isDir(tasksDir))) continue
     for (const f of await listDir(tasksDir)) {

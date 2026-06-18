@@ -158,11 +158,11 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
     INSERT INTO api_calls (
       dedup_key, ts, ts_epoch, provider, model, model_short, project, session_id,
       category, input_tokens, output_tokens, cache_read, cache_write, web_search, cost_usd, speed,
-      git_branch, cc_version, has_plan_mode, has_todo_write, file_count
+      git_branch, cc_version, has_plan_mode, has_todo_write, file_count, source_alias
     ) VALUES (
       @dedup_key, @ts, @ts_epoch, @provider, @model, @model_short, @project, @session_id,
       @category, @input_tokens, @output_tokens, @cache_read, @cache_write, @web_search, @cost_usd, @speed,
-      @git_branch, @cc_version, @has_plan_mode, @has_todo_write, @file_count
+      @git_branch, @cc_version, @has_plan_mode, @has_todo_write, @file_count, @source_alias
     )
     ON CONFLICT(dedup_key) DO UPDATE SET
       ts=excluded.ts, ts_epoch=excluded.ts_epoch, cost_usd=excluded.cost_usd,
@@ -175,10 +175,16 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
       model=excluded.model, model_short=excluded.model_short,
       git_branch=excluded.git_branch, cc_version=excluded.cc_version,
       has_plan_mode=excluded.has_plan_mode, has_todo_write=excluded.has_todo_write,
-      file_count=excluded.file_count
+      file_count=excluded.file_count,
+      -- Refresh source_alias too: a row's alias can change if a
+      -- re-ingest re-discovers the same JSONL under a new source
+      -- (e.g. user moved ~/.claude to ~/.claude-invent, then ran
+      -- a re-ingest — the JSONLs are the same on disk, so dedup_key
+      -- matches, but the source alias is different).
+      source_alias=excluded.source_alias
   `)
   const deleteEvents = d.prepare('DELETE FROM tool_events WHERE dedup_key = ?')
-  const insertEvent = d.prepare('INSERT INTO tool_events (dedup_key, ts_epoch, project, kind, value, cost_usd) VALUES (?, ?, ?, ?, ?, ?)')
+  const insertEvent = d.prepare('INSERT INTO tool_events (dedup_key, ts_epoch, project, kind, value, cost_usd, source_alias) VALUES (?, ?, ?, ?, ?, ?, ?)')
 
   let inserted = 0
   let skipped = 0
@@ -230,6 +236,7 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
             has_plan_mode: call.hasPlanMode ? 1 : 0,
             has_todo_write: call.hasTodoWrite ? 1 : 0,
             file_count: call.files.length,
+            source_alias: s.sourceAlias ?? 'default',
             _events: events,
           })
         }
@@ -245,7 +252,7 @@ export async function runIngest(opts: IngestOpts = {}): Promise<IngestStats> {
       // Cost attribution: split call cost evenly across its events (at most once per kind+value)
       const costPer = _events.length > 0 ? r.cost_usd / _events.length : 0
       for (const e of _events) {
-        insertEvent.run(r.dedup_key, r.ts_epoch, r.project, e.kind, e.value, costPer)
+        insertEvent.run(r.dedup_key, r.ts_epoch, r.project, e.kind, e.value, costPer, r.source_alias)
       }
       inserted++
     }

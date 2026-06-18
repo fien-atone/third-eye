@@ -40,6 +40,15 @@
   grid-template-columns: 44px minmax(0, 1fr) 110px 110px 130px 130px 56px;
   font-size: 13px;
 }
+/* When the dataset contains rows with sourceAlias set (multi-source
+   users), the grid gains a Source column between Cost and FirstSeen.
+   Same subgrid pattern — the extra column slot fits in a tight
+   ~110px so the alias pill stays one line. Breakpoint overrides
+   below drop it at the same width as the other "secondary" columns
+   (920px). */
+.projects-grid.has-source-col {
+  grid-template-columns: 44px minmax(0, 1fr) 110px 110px 110px 130px 130px 56px;
+}
 .projects-grid > .grid-head,
 .projects-grid > .grid-row {
   display: grid;
@@ -135,6 +144,32 @@
   color: var(--accent);
   font-weight: 700;
 }
+
+/* Source column cell — short monospace alias pill, em-dash when
+   missing. The pill is just a tinted background around <code> so it
+   stands out from the row's other text without competing with the
+   favourite star. */
+.projects-grid .cell-source {
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.source-pill {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  padding: 1px 6px;
+  border-radius: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+.source-none { color: var(--text-dim); }
 
 /* Star button */
 .btn-star {
@@ -383,6 +418,16 @@ table.breakdown td.project-cell .project-name-wrap {
 @media (max-width: 920px) {
   .projects-grid { grid-template-columns: 44px minmax(0, 1fr) 110px 110px 56px; }
   .projects-grid .cell-first, .projects-grid .cell-last { display: none; }
+}
+/* Multi-source: also drop the Source column at the same breakpoint
+   to keep the secondary-column set in sync. The alias pill is less
+   critical than first/last seen, so it loses the slot first when
+   space is tight. */
+@media (max-width: 920px) {
+  .projects-grid.has-source-col { grid-template-columns: 44px minmax(0, 1fr) 110px 110px 56px; }
+  .projects-grid.has-source-col .cell-source,
+  .projects-grid.has-source-col .cell-first,
+  .projects-grid.has-source-col .cell-last { display: none; }
 }
 
 @media (max-width: 640px) {

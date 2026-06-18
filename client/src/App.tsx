@@ -58,6 +58,13 @@ export default function App() {
     () => filters?.providers ?? [],
     [filters?.providers],
   )
+  // Active source-alias filter (or null = "all sources"). Same URL-
+  // driven pattern as selectedProviders — anything in the URL hash
+  // ?source= is the source of truth, and the chip / select updates
+  // the URL rather than local state. The server validates and 400s
+  // on unknown aliases; the chip will reflect the error on the next
+  // render.
+  const selectedSource: string | null = filters?.source ?? null
 
   // updateFilters merges a patch into the current filter set and
   // pushes a new URL. Routes that don't carry filters (projects /
@@ -66,7 +73,7 @@ export default function App() {
   // preset-matching values are dropped so the URL stays at `#/`
   // when the user is on defaults.
   const updateFilters = useCallback(
-    (patch: Partial<{ start: Date; end: Date; granularity: Granularity; providers: string[] }>) => {
+    (patch: Partial<{ start: Date; end: Date; granularity: Granularity; providers: string[]; source: string | null }>) => {
       // Read live route+filters synchronously so chained calls (e.g.
       // a preset click that fires setStart→setEnd→setGranularity in
       // rapid succession) compose against the latest URL, not the
@@ -79,11 +86,13 @@ export default function App() {
       const liveEnd = liveFilters?.to ? parseLocalDate(liveFilters.to) : preset.end
       const liveG = liveFilters?.granularity ?? preset.granularity
       const liveProviders = liveFilters?.providers ?? []
+      const liveSource = liveFilters?.source ?? null
 
       const nextStart = patch.start ?? liveStart
       const nextEnd = patch.end ?? liveEnd
       const nextG = patch.granularity ?? liveG
       const nextProviders = patch.providers ?? liveProviders
+      const nextSource = patch.source === undefined ? liveSource : patch.source
       const next: RouteFilters = {}
       // Only emit filters that differ from preset, so navigating
       // around with default settings keeps URLs short.
@@ -93,6 +102,7 @@ export default function App() {
       if (toStr !== toInputDate(preset.end)) next.to = toStr
       if (nextG !== preset.granularity) next.granularity = nextG
       if (nextProviders.length > 0) next.providers = nextProviders
+      if (nextSource) next.source = nextSource
       const compact = Object.keys(next).length > 0 ? next : undefined
       if (live.name === 'home') {
         navigate({ name: 'home', filters: compact }, { replace: true })
@@ -108,6 +118,10 @@ export default function App() {
   const setGranularity = useCallback((g: Granularity) => updateFilters({ granularity: g }), [updateFilters])
   const setSelectedProviders = useCallback(
     (next: string[]) => updateFilters({ providers: next }),
+    [updateFilters],
+  )
+  const setSelectedSource = useCallback(
+    (next: string | null) => updateFilters({ source: next }),
     [updateFilters],
   )
 
@@ -178,11 +192,13 @@ export default function App() {
   })
 
   const providersParam = selectedProviders.length === 0 ? 'all' : selectedProviders.join(',')
-  const overviewKey = ['overview', start.toISOString().slice(0, 10), end.toISOString().slice(0, 10), granularity, providersParam, projectId ?? '', weekStartsOn]
+  const sourceParam = selectedSource ?? 'all'
+  const overviewKey = ['overview', start.toISOString().slice(0, 10), end.toISOString().slice(0, 10), granularity, providersParam, projectId ?? '', weekStartsOn, sourceParam]
   const overviewQuery = useQuery<OverviewResponse>({
     queryKey: overviewKey,
     queryFn: () => apiGet<OverviewResponse>(`/api/overview?${dashboardParams({
       start, end, providers: providersParam, granularity, weekStartsOn, projectId,
+      source: selectedSource,
     })}`),
     placeholderData: keepPreviousData,
   })
@@ -403,6 +419,8 @@ export default function App() {
         toggleProvider={toggleProvider}
         providersData={providersQuery.data}
         frame={data?.frame ?? null}
+        selectedSource={selectedSource}
+        setSelectedSource={setSelectedSource}
         isNarrow={isNarrow}
         editingLayout={editingLayout}
         setEditingLayout={setEditingLayout}

@@ -75,7 +75,7 @@ describe('createHermesProvider — no DB', () => {
   it('parser yields nothing when state.db is missing', async () => {
     const provider = createHermesProvider(join(tmpDir, 'nonexistent'))
     const parser = provider.createSessionParser(
-      { path: 'sess_aaa', project: 'hermes', provider: 'hermes' },
+      { path: 'sess_aaa', project: 'hermes', provider: 'hermes', sourceAlias: 'hermes' },
       new Set(),
     )
     const calls: unknown[] = []
@@ -102,7 +102,7 @@ describe('createHermesProvider — with fixture DB', () => {
     createFixtureDb(tmpDir)
     const provider = createHermesProvider(tmpDir)
     const parser = provider.createSessionParser(
-      { path: 'sess_aaa', project: 'hermes', provider: 'hermes' },
+      { path: 'sess_aaa', project: 'hermes', provider: 'hermes', sourceAlias: 'hermes' },
       new Set(),
     )
     const calls: Awaited<ReturnType<typeof parser.parse extends () => AsyncGenerator<infer T> ? () => AsyncGenerator<T> : never>>[] = []
@@ -129,7 +129,7 @@ describe('createHermesProvider — with fixture DB', () => {
     seenKeys.add('hermes:sess_aaa') // pre-mark as seen
 
     const parser = provider.createSessionParser(
-      { path: 'sess_aaa', project: 'hermes', provider: 'hermes' },
+      { path: 'sess_aaa', project: 'hermes', provider: 'hermes', sourceAlias: 'hermes' },
       seenKeys,
     )
     const calls: unknown[] = []
@@ -141,7 +141,7 @@ describe('createHermesProvider — with fixture DB', () => {
     createFixtureDb(tmpDir)
     const provider = createHermesProvider(tmpDir)
     const parser = provider.createSessionParser(
-      { path: 'sess_nonexistent', project: 'hermes', provider: 'hermes' },
+      { path: 'sess_nonexistent', project: 'hermes', provider: 'hermes', sourceAlias: 'hermes' },
       new Set(),
     )
     const calls: unknown[] = []
@@ -160,7 +160,7 @@ describe('createHermesProvider — with fixture DB', () => {
     createFixtureDb(tmpDir)
     const provider = createHermesProvider(tmpDir)
     const parser = provider.createSessionParser(
-      { path: 'sess_bbb', project: 'hermes', provider: 'hermes' },
+      { path: 'sess_bbb', project: 'hermes', provider: 'hermes', sourceAlias: 'hermes' },
       new Set(),
     )
     for await (const c of parser.parse()) {

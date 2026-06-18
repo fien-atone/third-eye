@@ -18,6 +18,11 @@ export type RouteFilters = {
   /** Provider id list (codex, claude, …). Empty array means
    *  "all providers" — same convention as the API. */
   providers?: string[]
+  /** Source alias filter (?source=). null/undefined = "all" (no
+   *  filter); a non-empty string scopes every API call to the
+   *  rows stamped with that alias. Identifiers (lowercase, dash /
+   *  underscore) — server validates and 400s on unknown aliases. */
+  source?: string | null
 }
 
 export type Route =
@@ -46,6 +51,19 @@ function parseFilters(query: string): RouteFilters | undefined {
     const list = p.split(',').map(s => s.trim()).filter(Boolean)
     if (list.length > 0) out.providers = list
   }
+  // Source alias (?source=). Empty / 'all' / missing → null (no
+  // filter). The server validates the alias and 400s on unknown
+  // values; we just plumb the string through and let the chip
+  // render the error on the next render. The regex mirrors the
+  // server's `^[a-z0-9_-]{1,32}$` validation so a tampered URL
+  // doesn't carry garbage into the client.
+  const s = params.get('source')
+  if (s) {
+    const trimmed = s.trim()
+    if (trimmed && trimmed !== 'all' && /^[a-z0-9_-]{1,32}$/.test(trimmed)) {
+      out.source = trimmed
+    }
+  }
   return Object.keys(out).length > 0 ? out : undefined
 }
 
@@ -59,6 +77,7 @@ function serializeFilters(f: RouteFilters | undefined): string {
   if (f.to) params.set('to', f.to)
   if (f.granularity) params.set('g', f.granularity)
   if (f.providers && f.providers.length > 0) params.set('p', f.providers.join(','))
+  if (f.source) params.set('source', f.source)
   const s = params.toString()
   return s ? `?${s}` : ''
 }

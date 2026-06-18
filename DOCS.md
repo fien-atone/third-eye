@@ -273,6 +273,34 @@ THIRD_EYE_CLAUDE_DIR=/path/to/.claude
 (`CLAUDE_CONFIG_DIR`, the env Claude Code itself respects, is also
 read as a fallback. `THIRD_EYE_CLAUDE_DIR` wins when both are set.)
 
+### Multiple Claude configs
+
+Run multiple Claude Code installs side by side (e.g. a work install
+under `~/.claude-roman` and a personal one under `~/.claude-invent`)?
+Third Eye will track them as separate "sources" so per-project and
+cost breakdowns stay distinct:
+
+```
+THIRD_EYE_CLAUDE_DIRS=/path/to/.claude-roman,/path/to/.claude-invent
+THIRD_EYE_CLAUDE_DIR_ALIASES=roman,invent
+```
+
+Each path gets an `alias` — a short identifier used everywhere in
+the UI: the header source filter chip, the Source column on the
+Projects page, and the `?source=<alias>` URL parameter. Aliases
+must match `^[a-z0-9_-]{1,32}$` (case-insensitive — lowercased on
+read). Paths must be absolute. If you omit `ALIASES`, the first
+path's alias defaults to `default` and later ones get auto-derived
+from the path basename.
+
+The legacy `THIRD_EYE_CLAUDE_DIR` (singular) is still supported and
+behaves exactly as before — it contributes one source with alias
+`default`.
+
+Configured sources are visible in **Settings → Sources** (read-only
+list, computed live from env on every read). Adding or removing a
+source requires an env change and a server restart.
+
 Common scenarios:
 
 - **Docker:** mount your host's `~/.claude` into the container, e.g.

@@ -213,6 +213,7 @@ function buildSessionSummary(
   sessionId: string,
   project: string,
   turns: ClassifiedTurn[],
+  sourceAlias: string = 'default',
 ): SessionSummary {
   const modelBreakdown: SessionSummary['modelBreakdown'] = {}
   const toolBreakdown: SessionSummary['toolBreakdown'] = {}
@@ -288,6 +289,7 @@ function buildSessionSummary(
   return {
     sessionId,
     project,
+    sourceAlias,
     firstTimestamp: firstTs || turns[0]?.timestamp || '',
     lastTimestamp: lastTs || turns[turns.length - 1]?.timestamp || '',
     totalCostUSD: totalCost,
@@ -360,10 +362,11 @@ async function collectJsonlFiles(dirPath: string): Promise<string[]> {
   return jsonlFiles
 }
 
-async function scanProjectDirs(dirs: Array<{ path: string; name: string }>, seenMsgIds: Set<string>, dateRange?: DateRange): Promise<ProjectSummary[]> {
+async function scanProjectDirs(dirs: Array<{ path: string; name: string; sourceAlias: string }>, seenMsgIds: Set<string>, dateRange?: DateRange): Promise<ProjectSummary[]> {
   const projectMap = new Map<string, SessionSummary[]>()
+  const projectAlias = new Map<string, string>()
 
-  for (const { path: dirPath, name: dirName } of dirs) {
+  for (const { path: dirPath, name: dirName, sourceAlias } of dirs) {
     const jsonlFiles = await collectJsonlFiles(dirPath)
 
     for (const filePath of jsonlFiles) {
@@ -372,6 +375,16 @@ async function scanProjectDirs(dirs: Array<{ path: string; name: string }>, seen
         const existing = projectMap.get(dirName) ?? []
         existing.push(session)
         projectMap.set(dirName, existing)
+        // The same dirName can be seen across multiple sources (e.g.
+        // ~/.claude-invent/projects/foo and ~/.claude-roman/projects/foo
+        // both yield dirName "foo"). We keep the alias from the FIRST
+        // source that contributes — subsequent sources contribute
+        // their own session rows to the same projectMap entry, but the
+        // source_alias is stamped per-row at ingest, so the dashboard
+        // filter still works correctly. Storing only the first alias
+        // here just keeps ProjectSummary consistent with the existing
+        // single-key project identity in the `projects` table.
+        if (!projectAlias.has(dirName)) projectAlias.set(dirName, sourceAlias)
       }
     }
   }
@@ -433,18 +446,18 @@ function providerCallToTurn(call: ParsedProviderCall): ParsedTurn {
 
 async function parseProviderSources(
   providerName: string,
-  sources: Array<{ path: string; project: string }>,
+  sources: Array<{ path: string; project: string; sourceAlias: string }>,
   seenKeys: Set<string>,
   dateRange?: DateRange,
 ): Promise<ProjectSummary[]> {
   const provider = getProvider(providerName)
   if (!provider) return []
 
-  const sessionMap = new Map<string, { project: string; turns: ClassifiedTurn[] }>()
+  const sessionMap = new Map<string, { project: string; turns: ClassifiedTurn[]; sourceAlias: string }>()
 
   for (const source of sources) {
     const parser = provider.createSessionParser(
-      { path: source.path, project: source.project, provider: providerName },
+      { path: source.path, project: source.project, provider: providerName, sourceAlias: source.sourceAlias },
       seenKeys,
     )
 
@@ -457,21 +470,21 @@ async function parseProviderSources(
 
       const turn = providerCallToTurn(call)
       const classified = classifyTurn(turn)
-      const key = `${providerName}:${call.sessionId}:${source.project}`
+      const key = `${providerName}:${call.sessionId}:${source.project}:${source.sourceAlias}`
 
       const existing = sessionMap.get(key)
       if (existing) {
         existing.turns.push(classified)
       } else {
-        sessionMap.set(key, { project: source.project, turns: [classified] })
+        sessionMap.set(key, { project: source.project, turns: [classified], sourceAlias: source.sourceAlias })
       }
     }
   }
 
   const projectMap = new Map<string, SessionSummary[]>()
-  for (const [key, { project, turns }] of sessionMap) {
+  for (const [key, { project, turns, sourceAlias }] of sessionMap) {
     const sessionId = key.split(':')[1] ?? key
-    const session = buildSessionSummary(sessionId, project, turns)
+    const session = buildSessionSummary(sessionId, project, turns, sourceAlias)
     if (session.apiCalls > 0) {
       const existing = projectMap.get(project) ?? []
       existing.push(session)
@@ -526,13 +539,13 @@ export async function parseAllSessions(dateRange?: DateRange, providerFilter?: s
   const claudeSources = allSources.filter(s => s.provider === 'claude')
   const nonClaudeSources = allSources.filter(s => s.provider !== 'claude')
 
-  const claudeDirs = claudeSources.map(s => ({ path: s.path, name: s.project }))
+  const claudeDirs = claudeSources.map(s => ({ path: s.path, name: s.project, sourceAlias: s.sourceAlias }))
   const claudeProjects = await scanProjectDirs(claudeDirs, seenMsgIds, dateRange)
 
-  const providerGroups = new Map<string, Array<{ path: string; project: string }>>()
+  const providerGroups = new Map<string, Array<{ path: string; project: string; sourceAlias: string }>>()
   for (const source of nonClaudeSources) {
     const existing = providerGroups.get(source.provider) ?? []
-    existing.push({ path: source.path, project: source.project })
+    existing.push({ path: source.path, project: source.project, sourceAlias: source.sourceAlias })
     providerGroups.set(source.provider, existing)
   }
 

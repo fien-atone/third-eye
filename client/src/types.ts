@@ -48,6 +48,12 @@ export type IngestSettings = {
 export type SettingsResponse = {
   updates: UpdatesSettings
   ingest: IngestSettings
+  /** Configured Claude source roots, computed live from env on
+   *  every read. NOT persisted — env is the source of truth, and a
+   *  re-launch picks up env changes. Surfaced via /api/settings so
+   *  the client can render the Settings → Sources panel and let
+   *  users see which Claude roots are being read. */
+  sources: { claude: Array<{ path: string; alias: string }> }
   /** 'dev' unlocks sub-hour polling presets in the settings UI for
    *  testing. Production builds always get 'prod' regardless of what
    *  the client sends — the floor is enforced server-side too. */
@@ -65,6 +71,11 @@ export type ProjectInfo = {
   cost: number
   firstTs: string
   lastTs: string
+  /** Source alias that contributed to this project (when a ?source=
+   *  filter is active, this is the alias the filter matched; when
+   *  no filter is set, the first alias that contributed — useful as
+   *  a hint that multi-source projects exist). */
+  sourceAlias?: string
 }
 export type ProjectsResponse = { projects: ProjectInfo[] }
 

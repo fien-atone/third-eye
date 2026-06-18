@@ -372,3 +372,58 @@
   font-style: italic;
   margin-top: 4px;
 }
+
+/* Sources section — read-only two-column table. Alias is the short
+   identifier the user types into ?source=, path is the full filesystem
+   location. Distinct visual treatment from the key-value rows above
+   because the values are code (file paths) rather than toggle-able
+   state. */
+.settings-section-hint {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.settings-sources-table {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-elev);
+}
+.settings-sources-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) minmax(0, 3fr);
+  gap: 12px;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.settings-sources-row:last-child { border-bottom: none; }
+.settings-sources-row.settings-sources-head {
+  background: var(--panel);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.settings-sources-alias code,
+.settings-sources-path code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: transparent;
+  padding: 0;
+  color: var(--text);
+}
+.settings-sources-alias code {
+  color: var(--accent);
+  font-weight: 600;
+}
+.settings-sources-path code {
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}

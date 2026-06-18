@@ -133,7 +133,7 @@ async function discoverSessionsInDir(codexDir: string): Promise<SessionSource[]>
           if (!valid || !meta) continue
 
           const cwd = meta.payload?.cwd ?? 'unknown'
-          sources.push({ path: filePath, project: sanitizeProject(cwd), provider: 'codex' })
+          sources.push({ path: filePath, project: sanitizeProject(cwd), provider: 'codex', sourceAlias: 'codex' })
         }
       }
     }

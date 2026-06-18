@@ -116,6 +116,13 @@ export type ClassifiedTurn = ParsedTurn & {
 export type SessionSummary = {
   sessionId: string
   project: string
+  /** Which configured source this session's JSONL came from. For
+   *  Claude, populated from THIRD_EYE_CLAUDE_DIRS (or the singular
+   *  override / ~/.claude fallback). For codex/hermes, the provider
+   *  name. Stamped on every api_calls / tool_events / agent_sessions
+   *  row at ingest so the dashboard's ?source=<alias> filter is just
+   *  a WHERE clause. */
+  sourceAlias: string
   firstTimestamp: string
   lastTimestamp: string
   totalCostUSD: number

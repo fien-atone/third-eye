@@ -4,6 +4,20 @@ All notable changes to Third Eye are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- **Multiple Claude Code config directories** via `THIRD_EYE_CLAUDE_DIRS` /
+  `THIRD_EYE_CLAUDE_DIR_ALIASES` env vars. Each path is tracked as a
+  separate "source" with a short alias (`^[a-z0-9_-]{1,32}$`), and the
+  dashboard gets three new affordances to use them: a source-filter
+  chip group in the header, a `Source` column on the Projects page
+  (only when multi-source is in use), and a read-only Sources table
+  under **Settings → Sources**. The legacy `THIRD_EYE_CLAUDE_DIR`
+  override continues to work as a single-source fallback. No new
+  dependencies; backward compatible.
+
 ## [2.7.0] — 2026-05-19
 
 Adds a Hermes Agent provider so sessions run inside the

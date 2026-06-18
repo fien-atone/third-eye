@@ -207,6 +207,13 @@ export function ProjectsPage() {
 
   const all = projectsQuery.data?.projects ?? []
 
+  // Source column is only rendered when at least one project row
+  // carries a sourceAlias — i.e. the user has multi-source configured
+  // (or the API happened to return a row with the field). Single-
+  // source users see no extra column. Computed once per render from
+  // the cached list; cheap.
+  const hasSourceColumn = all.some(p => !!p.sourceAlias)
+
   // Search filter — projectSearchInfo decides what counts as a match.
   const q = debouncedSearch.toLowerCase()
   const filtered = q
@@ -296,6 +303,19 @@ export function ProjectsPage() {
         </div>
         <div role="cell" className="cell cell-num cell-calls">{fmtInt(p.calls)}</div>
         <div role="cell" className="cell cell-num cell-cost">{fmtCurrency(p.cost)}</div>
+        {/* Source column — only shown when at least one row has a
+            sourceAlias (i.e. the user has multiple Claude sources
+            configured). Single-source users see no extra column. The
+            cell renders the alias as a small monospace pill; when the
+            alias is missing (legacy / unknown source), it shows an
+            em-dash. */}
+        {hasSourceColumn && (
+          <div role="cell" className="cell cell-source">
+            {p.sourceAlias
+              ? <code className="source-pill" title={p.sourceAlias}>{p.sourceAlias}</code>
+              : <span className="source-none">{t('projects.sourceNone')}</span>}
+          </div>
+        )}
         <div role="cell" className="cell cell-num cell-first"><DateCell value={p.firstTs} /></div>
         <div role="cell" className="cell cell-num cell-last"><DateCell value={p.lastTs} /></div>
         <div role="cell" className="cell cell-actions">
@@ -327,12 +347,15 @@ export function ProjectsPage() {
       return <span className="sort-arrow">↕</span>
     }
     return (
-      <div className="projects-grid" role="table">
+      <div className={`projects-grid${hasSourceColumn ? ' has-source-col' : ''}`} role="table">
         <div role="row" className="grid-head">
           <div role="columnheader" className="cell cell-fav" title={t('projects.favorite')}>★</div>
           <div role="columnheader" className="cell cell-name sortable" onClick={() => onSortClick('name')}>{t('projects.colName')} {sortIcon('name')}</div>
           <div role="columnheader" className="cell cell-num cell-calls sortable" onClick={() => onSortClick('calls')}>{t('projects.colCalls')} {sortIcon('calls')}</div>
           <div role="columnheader" className="cell cell-num cell-cost sortable" onClick={() => onSortClick('cost')}>{t('projects.colCost')} {sortIcon('cost')}</div>
+          {hasSourceColumn && (
+            <div role="columnheader" className="cell cell-source">{t('projects.colSource')}</div>
+          )}
           <div role="columnheader" className="cell cell-num cell-first sortable" onClick={() => onSortClick('firstTs')}>{t('projects.colFirstSeen')} {sortIcon('firstTs')}</div>
           <div role="columnheader" className="cell cell-num cell-last sortable" onClick={() => onSortClick('lastTs')}>{t('projects.colLastSeen')} {sortIcon('lastTs')}</div>
           <div role="columnheader" className="cell cell-actions" aria-label={t('projects.colActions')} />

@@ -104,7 +104,19 @@ export const es: Dict = {
   'settings.updates.freq.every6h': 'Cada 6 horas',
   'settings.updates.freq.daily': 'Una vez al día',
   'settings.updates.freq.weekly': 'Una vez a la semana',
-  'settings.updates.devHint': 'Los intervalos por debajo de una hora solo están disponibles en modo dev para pruebas.',
+  'settings.updates.devHint': 'Los intervalos inferiores a una hora solo están disponibles en modo dev para pruebas.',
+
+  'settings.sources.title': 'Fuentes',
+  'settings.sources.help': 'Directorios de configuración de Claude Code que third-eye está leyendo. Añade más configurando THIRD_EYE_CLAUDE_DIRS y THIRD_EYE_CLAUDE_DIR_ALIASES en el entorno, luego reinicia.',
+  'settings.sources.colAlias': 'Alias',
+  'settings.sources.colPath': 'Ruta',
+  'settings.sources.empty': 'No hay fuentes de Claude configuradas. Se recurre a ~/.claude si existe.',
+  'settings.sources.envHint': 'Configurado mediante variables de entorno (THIRD_EYE_CLAUDE_DIRS, THIRD_EYE_CLAUDE_DIR_ALIASES, THIRD_EYE_CLAUDE_DIR). Edita el entorno y reinicia para cambiar.',
+
+  'controls.sourceFilter.all': 'Todas las fuentes',
+  'controls.sourceFilter.label': 'Fuente',
+  'projects.colSource': 'Fuente',
+  'projects.sourceNone': '—',
 
   'settings.ingest.title': 'Actualización automática',
   'settings.ingest.help': 'Reescanea periódicamente ~/.claude/projects y ~/.codex/sessions en segundo plano para que el panel se mantenga al día sin pulsar Refresh. Los datos nunca salen de tu máquina.',

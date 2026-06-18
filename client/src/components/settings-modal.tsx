@@ -224,6 +224,39 @@ export function SettingsModal({ onClose, onLayoutsReset }: {
             </div>
           </section>
 
+          {/* Sources — read-only list of configured Claude roots
+              (and their aliases). The aliases are what shows up in
+              the header source-filter chip and the per-project Source
+              column. Adding / removing a source requires an env
+              change + restart by design (see the plan: we keep the
+              surface small in this PR — a future one can add config-
+              file backing if the Settings modal grows). */}
+          <section className="settings-section">
+            <h3 className="settings-section-title">{t('settings.sources.title')}</h3>
+            <p className="settings-section-help">{t('settings.sources.help')}</p>
+            {(() => {
+              const sources = settings.data?.sources.claude ?? []
+              if (sources.length === 0) {
+                return <div className="settings-row settings-row-stacked"><span className="settings-row-label">{t('settings.sources.empty')}</span></div>
+              }
+              return (
+                <div className="settings-sources-table">
+                  <div className="settings-sources-row settings-sources-head">
+                    <span className="settings-sources-alias">{t('settings.sources.colAlias')}</span>
+                    <span className="settings-sources-path">{t('settings.sources.colPath')}</span>
+                  </div>
+                  {sources.map(s => (
+                    <div key={s.alias} className="settings-sources-row">
+                      <span className="settings-sources-alias"><code>{s.alias}</code></span>
+                      <span className="settings-sources-path" title={s.path}><code>{s.path}</code></span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+            <p className="settings-section-hint">{t('settings.sources.envHint')}</p>
+          </section>
+
           <section className="settings-section">
             <h3 className="settings-section-title">{t('settings.ingest.title')}</h3>
             <p className="settings-section-help">{t('settings.ingest.help')}</p>
